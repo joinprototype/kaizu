@@ -4,6 +4,14 @@ An Arc-style browser for macOS built on WebKit (the Safari engine), with a
 quiet, crafted soul. Vertical tabs, pinned tabs, a command bar, and real profiles with
 fully isolated website data.
 
+**[Download for Mac](https://kaizu.joinprototype.com)**. Free, open source and early. It needs an
+Apple silicon Mac on macOS 15.4 or later. Apple hasn't checked Kaizu yet, so your Mac stops it the
+first time: the site has the steps. After that it updates itself.
+
+Found a bug? Choose Help → Report a Bug in Kaizu, or write to
+[help@joinprototype.com](mailto:help@joinprototype.com). Made by
+[Prototype](https://joinprototype.com) in Santa Monica.
+
 ## What's in it
 
 - **Sidebar**: spaces (two-finger swipe), favorites, pinned tabs and folders, Today tabs that archive themselves, peek on hover when hidden
@@ -36,6 +44,19 @@ boot straight into a UI state (handy for screenshots), and
 of your real ones. Settings and website data follow the bundle id: for a
 copy that can't touch your real browser at all, give its Info.plist another
 `CFBundleIdentifier` and re-sign it.
+
+## Release
+
+```sh
+scripts/release.sh 0.1.3      # bump the version, write the DMG, signed zip and version.json into site/
+cd site && npx wrangler deploy
+```
+
+Run one release at a time, and it needs the update signing key. Kaizu reads `version.json` 10
+seconds after launch and every 6 hours. A newer build downloads quietly and goes in on restart or
+quit, once its Ed25519 signature, bundle id, build number and code signature all check out. If
+anything fails, or Kaizu can't replace itself, people get a notice with the download link instead.
+It uses Apple frameworks only.
 
 ## Docs
 
