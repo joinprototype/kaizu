@@ -1,0 +1,310 @@
+@font-face {
+  font-family: "Fell";
+  src: url("/fonts/fell.woff2") format("woff2");
+  font-display: swap;
+}
+@font-face {
+  font-family: "Fell";
+  font-style: italic;
+  src: url("/fonts/fell-italic.woff2") format("woff2");
+  font-display: swap;
+}
+
+:root {
+  color-scheme: light;
+  --vellum: #f5f0e4;
+  --land: #ebe2cc;
+  --ink: #1c2541;
+  --ink-soft: #4a4f62;
+  --claret: #7a2335;
+  --on-claret: #f7eee9;
+  --page: min(100% - 2rem, 72rem);
+  --display: "Fell", ui-serif, "New York", Georgia, serif;
+  --text: ui-serif, "New York", Georgia, serif;
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--vellum);
+  color: var(--ink);
+  font: 400 1.125rem/1.6 var(--text);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+h1, h2, p, ul, ol { margin: 0; }
+ul, ol { padding: 0; list-style: none; }
+img, canvas, svg { display: block; }
+img { max-width: 100%; height: auto; }
+
+a { color: inherit; text-underline-offset: 0.18em; text-decoration-thickness: 1px; }
+a:hover { color: var(--claret); }
+:focus-visible { outline: 2px solid var(--claret); outline-offset: 3px; }
+
+.web {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* The chart. */
+.hero {
+  position: relative;
+  padding: 1.25rem 0 0;
+  overflow: hidden;
+}
+.hero .web {
+  -webkit-mask-image: linear-gradient(to right, transparent 8%, #000 48%);
+  mask-image: linear-gradient(to right, transparent 8%, #000 48%);
+}
+.hero::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 14rem;
+  background: linear-gradient(transparent, var(--vellum));
+  pointer-events: none;
+}
+
+.rose {
+  position: absolute;
+  top: clamp(1rem, 9vw, 7.5rem);
+  right: clamp(1rem, 13vw, 13rem);
+  width: clamp(11rem, 34vw, 31rem);
+  height: auto;
+  animation: find-north 2s cubic-bezier(0.22, 1.1, 0.36, 1) both;
+}
+@keyframes find-north {
+  from { transform: rotate(-58deg); }
+}
+
+.maker {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: var(--page);
+  margin: 0 auto;
+  font-size: 1rem;
+  text-align: right;
+  text-decoration: none;
+  color: var(--ink-soft);
+}
+
+.title {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: 0.75rem;
+  justify-items: start;
+  width: var(--page);
+  margin: clamp(1rem, 4vw, 3.5rem) auto 0;
+}
+h1 {
+  font: italic 400 clamp(6.5rem, 17vw, 14.5rem)/0.92 var(--display);
+  letter-spacing: -0.01em;
+  margin-left: -0.04em;
+}
+.kanji {
+  writing-mode: vertical-rl;
+  align-self: center;
+  font: 400 clamp(1.125rem, 2.1vw, 1.625rem)/1 "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
+  letter-spacing: 0.3em;
+  color: var(--claret);
+}
+.lede {
+  grid-column: 1 / -1;
+  margin-top: 0.75rem;
+  font: 400 clamp(1.625rem, 3vw, 2.25rem)/1.2 var(--display);
+}
+.download {
+  display: inline-block;
+  padding: 0.8rem 1.6rem 0.75rem;
+  border-radius: 0.6rem;
+  background: var(--claret);
+  color: var(--on-claret);
+  font: 400 1.1875rem/1.2 var(--text);
+  text-decoration: none;
+  transition: background-color 0.15s;
+}
+.download:hover { background: #5f1a29; color: var(--on-claret); }
+.title .download { grid-column: 1 / -1; margin-top: 1.75rem; }
+.fine {
+  grid-column: 1 / -1;
+  margin-top: 0.75rem;
+  font-size: 1rem;
+  color: var(--ink-soft);
+}
+
+.window {
+  position: relative;
+  z-index: 1;
+  width: min(100% - 2rem, 60rem);
+  margin: clamp(3rem, 7vw, 5rem) auto 0;
+}
+.window img {
+  width: 100%;
+  border-radius: clamp(0.5rem, 1.1vw, 0.75rem);
+  box-shadow: 0 0 0 1px rgb(28 37 65 / 0.14), 0 1.5rem 4rem rgb(28 37 65 / 0.24);
+}
+
+/* Arc. */
+.arc {
+  width: var(--page);
+  max-width: 46rem;
+  margin: clamp(4rem, 9vw, 7.5rem) auto;
+}
+.arc h2 {
+  font: italic 400 clamp(2.5rem, 6vw, 4.25rem)/1.05 var(--display);
+  color: var(--claret);
+}
+.arc p {
+  margin-top: 1.25rem;
+  font-size: clamp(1.1875rem, 2vw, 1.3125rem);
+  max-width: 34em;
+}
+
+/* The features, as harbours on a coast: names written square to the shore
+   the way sea charts wrote them, the important ports in red. */
+.coast {
+  --land-width: 42%;
+  position: relative;
+  padding: clamp(7rem, 13vw, 11rem) 0;
+  overflow: hidden;
+}
+.coast .web {
+  -webkit-mask-image: linear-gradient(transparent, #000 12%, #000 88%, transparent);
+  mask-image: linear-gradient(transparent, #000 12%, #000 88%, transparent);
+}
+.land {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.ports { position: relative; }
+.ports li {
+  display: grid;
+  grid-template-columns: var(--land-width) minmax(0, 1fr);
+  align-items: center;
+  padding: 0.85rem 0;
+}
+.ports h2 {
+  padding-right: 1rem;
+  font: italic 400 clamp(1.5rem, 2.8vw, 2.125rem)/1.1 var(--display);
+  text-align: right;
+  transform: translateX(var(--shift, 0)) rotate(var(--tilt, 0));
+  transform-origin: 100% 50%;
+}
+.ports .major { padding: 1.5rem 0; }
+.ports .major h2 {
+  font-size: clamp(2rem, 4.4vw, 3.5rem);
+  color: var(--claret);
+}
+.ports p {
+  max-width: 27em;
+  padding: 0 1rem 0 clamp(3rem, 7vw, 6rem);
+  font-size: 1.0625rem;
+}
+.ports q { quotes: none; font-style: italic; }
+
+/* Notes for testers. */
+.notes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(3rem, 6vw, 4.5rem) clamp(2.5rem, 6vw, 5rem);
+  width: var(--page);
+  margin: clamp(4rem, 8vw, 6rem) auto;
+}
+.notes h2 {
+  margin-bottom: 0.75rem;
+  font: italic 400 clamp(1.75rem, 3vw, 2.25rem)/1.15 var(--display);
+}
+.notes p + p { margin-top: 0.75rem; }
+.open ol {
+  margin-top: 1.25rem;
+  counter-reset: step;
+}
+.open ol li {
+  position: relative;
+  padding-left: 2.25rem;
+  counter-increment: step;
+}
+.open ol li + li { margin-top: 0.75rem; }
+.open ol li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  font-style: italic;
+  color: var(--claret);
+}
+.terminal-note { margin-top: 1.5rem !important; font-size: 1rem; color: var(--ink-soft); }
+.command {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+  padding: 0.7rem 0.7rem 0.7rem 0.9rem;
+  border: 1px solid rgb(28 37 65 / 0.2);
+  border-radius: 0.5rem;
+}
+.command code {
+  flex: 1;
+  min-width: 0;
+  font: 400 0.875rem/1.5 ui-monospace, "SF Mono", Menlo, monospace;
+  overflow-wrap: anywhere;
+}
+.command button {
+  border: 0;
+  padding: 0.2rem 0.6rem;
+  border-radius: 0.3rem;
+  background: rgb(28 37 65 / 0.08);
+  color: inherit;
+  font: 400 0.9375rem/1.4 var(--text);
+  cursor: pointer;
+}
+.command button:hover { background: rgb(28 37 65 / 0.15); }
+.rough li {
+  padding-left: 1.1rem;
+  text-indent: -1.1rem;
+}
+.rough li::before {
+  content: "";
+  display: inline-block;
+  width: 0.45rem;
+  height: 0.45rem;
+  margin-right: 0.65rem;
+  border-radius: 50%;
+  background: var(--claret);
+  vertical-align: 0.15em;
+}
+.rough li + li { margin-top: 0.5rem; }
+
+footer {
+  padding: clamp(3rem, 7vw, 5rem) 1rem 3rem;
+  text-align: center;
+}
+footer p { margin-top: 1.25rem; font-size: 1rem; color: var(--ink-soft); }
+
+@media (max-width: 760px) {
+  .rose { top: 1rem; right: 0.5rem; width: 9.5rem; }
+  .hero .web { opacity: 0.6; }
+  .maker { text-align: left; }
+  .title { margin-top: 7rem; }
+  .coast { --land-width: 37%; }
+  .ports li, .ports .major { align-items: start; padding: 0.7rem 0; }
+  .ports h2 { padding-right: 0.5rem; }
+  .ports p { padding-left: 2rem; font-size: 1rem; line-height: 1.5; }
+  .notes { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rose { animation: none; }
+  .download { transition: none; }
+}

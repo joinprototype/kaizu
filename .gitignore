@@ -1,0 +1,16 @@
+.DS_Store
+.build/
+build/
+.swiftpm/
+*.xcodeproj/xcuserdata/
+DerivedData/
+.*.swp
+
+# Built by scripts/release.sh
+site/*.dmg
+site/updates/
+.wrangler
+
+# Internal notes, kept out of the public repo
+docs/NEEDS-YOU.md
+docs/research/name-check.md

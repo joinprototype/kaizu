@@ -1,0 +1,29 @@
+[Adblock Plus 2.0]
+! Title: Kaizu site fixes
+! Our own rules, in the same syntax as EasyList. Converted at runtime by
+! FilterListConverter alongside the other lists.
+!
+! --- YouTube ---
+! In-page ad slots. Ads inside the player are handled by
+! Resources/Scripts/youtube-ads.js, which strips them from player responses.
+youtube.com##ytd-ad-slot-renderer
+youtube.com##ytd-in-feed-ad-layout-renderer
+youtube.com##ytd-promoted-sparkles-web-renderer
+youtube.com##ytd-promoted-video-renderer
+youtube.com##ytd-display-ad-renderer
+youtube.com##ytd-companion-slot-renderer
+youtube.com##ytd-action-companion-ad-renderer
+youtube.com##ytd-banner-promo-renderer
+youtube.com##ytd-statement-banner-renderer
+youtube.com##ytd-player-legacy-desktop-watch-ads-renderer
+youtube.com##ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-ads"]
+youtube.com##ytd-rich-item-renderer:has(ytd-ad-slot-renderer)
+youtube.com###player-ads
+youtube.com###masthead-ad
+youtube.com##.ytp-ad-overlay-container
+youtube.com##.ytp-suggested-action-badge
+! "Ad blockers violate YouTube's Terms" interstitial. Hidden here so it doesn't
+! flash; youtube-ads.js closes it, which hiding alone doesn't (its backdrop
+! would keep blocking the page).
+youtube.com##ytd-enforcement-message-view-model
+youtube.com##tp-yt-paper-dialog:has(ytd-enforcement-message-view-model)

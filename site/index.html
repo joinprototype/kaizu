@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kaizu: a quiet browser for the Mac</title>
+<meta name="description" content="Kaizu is a browser for the Mac with a sidebar, spaces and a command bar, built on WebKit. Arc stops working on December 22. Download the test version, free.">
+<link rel="canonical" href="https://kaizu.joinprototype.com/">
+<link rel="icon" type="image/png" href="/favicon.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="theme-color" content="#F5F0E4">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Kaizu">
+<meta property="og:url" content="https://kaizu.joinprototype.com/">
+<meta property="og:title" content="Kaizu: a quiet browser for the Mac">
+<meta property="og:description" content="A sidebar, spaces and a command bar, built on WebKit. Free to test.">
+<meta property="og:image" content="https://kaizu.joinprototype.com/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Kaizu, a compass rose on a web of rhumb lines">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preload" href="/fonts/fell-italic.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/styles.css">
+<script src="/chart.js" defer></script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Kaizu",
+  "alternateName": "海図",
+  "applicationCategory": "BrowserApplication",
+  "operatingSystem": "macOS 15.4 or later",
+  "softwareVersion": "0.1.1",
+  "downloadUrl": "https://kaizu.joinprototype.com/download",
+  "url": "https://kaizu.joinprototype.com/",
+  "image": "https://kaizu.joinprototype.com/og.png",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "author": { "@type": "Organization", "name": "Prototype", "url": "https://joinprototype.com/" }
+}
+</script>
+</head>
+<body>
+
+<section class="hero">
+  <canvas class="web" id="web" aria-hidden="true"></canvas>
+  <svg class="rose" id="rose" viewBox="-300 -300 600 600" aria-hidden="true">
+    <defs>
+      <g id="point-small"><path d="M0 0-16-16 0-110Z" fill="#B9483F"/><path d="M0 0 16-16 0-110Z" fill="#8C2C27"/></g>
+      <g id="point-mid"><path d="M0 0-26-26 0-170Z" fill="#E6CB86"/><path d="M0 0 26-26 0-170Z" fill="#A37A33"/></g>
+      <g id="point-long"><path d="M0 0-34-34 0-230Z" fill="#35466E"/><path d="M0 0 34-34 0-230Z" fill="#1C2541"/></g>
+    </defs>
+    <circle r="150" fill="#F6EEDA"/>
+    <circle r="150" fill="none" stroke="#1C2541" stroke-width="2.5"/>
+    <circle r="136" fill="none" stroke="#1C2541" stroke-width="2.5"/>
+    <circle r="143" fill="none" stroke="#1C2541" stroke-width="14" stroke-dasharray="1.5 10.98"/>
+    <use href="#point-small" transform="rotate(22.5)"/><use href="#point-small" transform="rotate(67.5)"/>
+    <use href="#point-small" transform="rotate(112.5)"/><use href="#point-small" transform="rotate(157.5)"/>
+    <use href="#point-small" transform="rotate(202.5)"/><use href="#point-small" transform="rotate(247.5)"/>
+    <use href="#point-small" transform="rotate(292.5)"/><use href="#point-small" transform="rotate(337.5)"/>
+    <use href="#point-mid" transform="rotate(45)"/><use href="#point-mid" transform="rotate(135)"/>
+    <use href="#point-mid" transform="rotate(225)"/><use href="#point-mid" transform="rotate(315)"/>
+    <use href="#point-long"/><use href="#point-long" transform="rotate(90)"/>
+    <use href="#point-long" transform="rotate(180)"/><use href="#point-long" transform="rotate(270)"/>
+    <circle r="19" fill="#C9A45A" stroke="#1C2541" stroke-width="3"/>
+    <circle r="5.5" fill="#1C2541"/>
+    <g transform="translate(0 -262)" fill="#C9A45A" stroke="#1C2541" stroke-width="2" stroke-linejoin="round">
+      <path d="M-5 14C-20 12-33 2-33-10-33-20-20-22-17-13-21-13-23-9-21-6-18 0-11 2-5 3Z"/>
+      <path d="M5 14C20 12 33 2 33-10 33-20 20-22 17-13 21-13 23-9 21-6 18 0 11 2 5 3Z"/>
+      <path d="M0-34C11-22 14-8 0 16-14-8-11-22 0-34Z"/>
+      <path d="M-13 13H13V19H-13Z"/>
+      <path d="M-7 19C-6 26-3 30 0 34 3 30 6 26 7 19Z"/>
+    </g>
+  </svg>
+
+  <a class="maker" href="https://joinprototype.com/">by Prototype</a>
+
+  <div class="title">
+    <h1>Kaizu</h1>
+    <span class="kanji" lang="ja">海図</span>
+    <p class="lede">A quiet browser for the Mac.</p>
+    <a class="download" href="/download">Download for Mac</a>
+    <p class="fine">Version 0.1.1, free. For Apple silicon Macs on macOS 15.4 or later.</p>
+  </div>
+
+  <figure class="window">
+    <img src="/img/commandbar.jpg" width="1288" height="943" alt="The Kaizu window with its sidebar on the left. The command bar over a Wikipedia page has turned “10 km to mi” into 6.21 mi.">
+  </figure>
+</section>
+
+<main>
+
+<section class="arc">
+  <h2>Arc stops working on December 22.</h2>
+  <p>If you live in your sidebar, Kaizu is for you. It keeps spaces, pinned tabs and Today tabs that clear themselves away. It runs on WebKit, the engine inside Safari, so it stays light on your Mac.</p>
+</section>
+
+<section class="coast" id="coast">
+  <canvas class="web" id="sea" aria-hidden="true"></canvas>
+  <svg class="land" id="land" aria-hidden="true"></svg>
+  <ul class="ports" id="ports">
+    <li class="major">
+      <h2>Spaces</h2>
+      <p>One sidebar for each part of your life, a two-finger swipe apart. Pinned tabs stay. Today tabs archive themselves.</p>
+    </li>
+    <li class="major">
+      <h2>Command bar</h2>
+      <p>⌘T finds addresses, open tabs, history and every menu command. Type <q>10 km to mi</q> or <q>100 usd to eur</q> and the answer is already there.</p>
+    </li>
+    <li class="major">
+      <h2>Blocking</h2>
+      <p>Ads, trackers and YouTube ads stay away, and cookie pop-ups get rejected for you. No extension needed.</p>
+    </li>
+    <li>
+      <h2>Little windows</h2>
+      <p>A link from another app opens small, so you can read it and get back to what you were doing.</p>
+    </li>
+    <li>
+      <h2>Split view</h2>
+      <p>Up to four pages side by side. Drag a tab onto the page.</p>
+    </li>
+    <li>
+      <h2>Quick search</h2>
+      <p>Bring the command bar up over any app, the way Spotlight works.</p>
+    </li>
+    <li>
+      <h2>Profiles</h2>
+      <p>Work and personal stay apart, with separate logins and site data.</p>
+    </li>
+    <li>
+      <h2>Sleeping tabs</h2>
+      <p>Idle tabs hibernate to save memory and wake where you left them.</p>
+    </li>
+    <li>
+      <h2>Extensions</h2>
+      <p>Press Add to Kaizu on the Chrome Web Store or Firefox Add-ons.</p>
+    </li>
+    <li>
+      <h2>Reader</h2>
+      <p>⇧⌘R sets an article in clean type, with nothing around it.</p>
+    </li>
+    <li>
+      <h2>Capture</h2>
+      <p>⇧⌘2, then drag over part of a page to copy it as an image.</p>
+    </li>
+  </ul>
+</section>
+
+<section class="notes">
+  <div class="open" id="open">
+    <h2>Opening it the first time</h2>
+    <p>Apple hasn’t checked Kaizu yet, so your Mac stops it once. It takes a minute, and you only do it the first time.</p>
+    <ol>
+      <li>Open the download and drag Kaizu to Applications.</li>
+      <li>Open Kaizu. When macOS says it can’t verify the app, click Done.</li>
+      <li>Go to System Settings, then Privacy &amp; Security. Scroll down and click Open Anyway.</li>
+    </ol>
+    <p class="terminal-note">Or paste this into Terminal, then open Kaizu:</p>
+    <div class="command">
+      <code id="command">xattr -dr com.apple.quarantine /Applications/Kaizu.app</code>
+      <button type="button" id="copy">Copy</button>
+    </div>
+  </div>
+
+  <div class="rough">
+    <h2>What’s still rough</h2>
+    <ul>
+      <li>This is version 0.1.1, so keep your old browser around.</li>
+      <li>Signing in to Google with a passkey can fail. Use your password.</li>
+      <li>Some Chrome extensions need things WebKit doesn’t have, and only half work.</li>
+      <li>It can’t import your Arc sidebar. You set up your spaces by hand.</li>
+      <li>Macs with Intel chips can’t run it.</li>
+    </ul>
+  </div>
+
+  <div class="keeping">
+    <h2>Staying up to date</h2>
+    <p>You only download Kaizu once. New versions arrive on their own and install when you restart.</p>
+    <p>There’s no account and no analytics. Your tabs and history stay on your Mac.</p>
+  </div>
+
+  <div class="bugs" id="bugs">
+    <h2>Found a bug?</h2>
+    <p>In Kaizu, choose Help, then Report a Bug. It drafts an email with the logs attached, and you can read everything before you send it. Or write to <a href="mailto:help@joinprototype.com">help@joinprototype.com</a>.</p>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <a class="download" href="/download">Download for Mac</a>
+  <p>Made by <a href="https://joinprototype.com/">Prototype</a> in Santa Monica.</p>
+</footer>
+
+</body>
+</html>

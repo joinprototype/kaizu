@@ -1,0 +1,8 @@
+{
+	"$schema": "https://www.unpkg.com/wrangler/config-schema.json",
+	"name": "kaizu",
+	"account_id": "bac6b44f61931c1030eb6448018a84a5",
+	"compatibility_date": "2026-10-01",
+	"assets": { "directory": "." },
+	"routes": [{ "pattern": "kaizu.joinprototype.com", "custom_domain": true }]
+}

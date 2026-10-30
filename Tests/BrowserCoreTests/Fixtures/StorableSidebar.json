@@ -1,0 +1,586 @@
+{
+  "version": 1,
+  "sidebar": {
+    "containers": [
+      {
+        "global": {}
+      },
+      {
+        "spaces": [
+          "6A5F7B70-C913-5E48-9C9F-F89FFAFFCECF",
+          {
+            "id": "6A5F7B70-C913-5E48-9C9F-F89FFAFFCECF",
+            "title": "Work",
+            "profile": {
+              "default": {}
+            },
+            "containerIDs": [
+              "pinned",
+              "EFC68BE4-E08F-5995-84A2-3573FB2CBBA9",
+              "unpinned",
+              "84BDCAA2-ECF2-5BED-986F-8BA2A8EE1DCF"
+            ],
+            "newContainerIDs": [
+              {
+                "pinned": {}
+              },
+              "EFC68BE4-E08F-5995-84A2-3573FB2CBBA9",
+              {
+                "unpinned": {
+                  "_0": {
+                    "shared": {}
+                  }
+                }
+              },
+              "84BDCAA2-ECF2-5BED-986F-8BA2A8EE1DCF"
+            ],
+            "customInfo": {
+              "iconType": {
+                "emoji_v2": "🏢",
+                "emoji": 127970
+              },
+              "windowTheme": {
+                "primaryColorPalette": {
+                  "midTone": {
+                    "red": 0.4236,
+                    "green": 0.7286,
+                    "blue": 0.8512,
+                    "alpha": 1,
+                    "colorSpace": "extendedSRGB"
+                  },
+                  "shaded": {
+                    "red": 0.4236,
+                    "green": 0.7286,
+                    "blue": 0.8512,
+                    "alpha": 1,
+                    "colorSpace": "extendedSRGB"
+                  },
+                  "shadedDark": {
+                    "red": 0.0008,
+                    "green": 0.3744,
+                    "blue": 0.491,
+                    "alpha": 1,
+                    "colorSpace": "extendedSRGB"
+                  },
+                  "tintedLight": {
+                    "red": 0.8947,
+                    "green": 0.949,
+                    "blue": 0.9723,
+                    "alpha": 1,
+                    "colorSpace": "extendedSRGB"
+                  }
+                },
+                "background": {
+                  "single": {
+                    "_0": {
+                      "contentOverBackgroundAppearance": "light",
+                      "isVibrant": true,
+                      "style": {
+                        "color": {
+                          "_0": {
+                            "blendedSingleColor": {
+                              "_0": {
+                                "translucencyStyle": "light",
+                                "color": {
+                                  "red": 0.4236,
+                                  "green": 0.7286,
+                                  "blue": 0.8512,
+                                  "alpha": 1,
+                                  "colorSpace": "extendedSRGB"
+                                },
+                                "modifiers": {
+                                  "intensityFactor": 0.8,
+                                  "noiseFactor": 0,
+                                  "overlay": "grain"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "EACBA255-6807-520B-89FC-ADF642892A2C",
+          {
+            "id": "EACBA255-6807-520B-89FC-ADF642892A2C",
+            "title": "Home",
+            "profile": {
+              "custom": {
+                "_0": {
+                  "directoryBasename": "Profile 1",
+                  "machineID": "00000000-AAAA-BBBB-CCCC-000000000002"
+                }
+              }
+            },
+            "containerIDs": [
+              "unpinned",
+              "F3C6E4F9-EA32-5498-B5B4-65F1B234A790",
+              "pinned",
+              "48AE24BC-1026-54C0-B356-0BAA43B0E353"
+            ],
+            "newContainerIDs": [
+              {
+                "unpinned": {
+                  "_0": {
+                    "shared": {}
+                  }
+                }
+              },
+              "F3C6E4F9-EA32-5498-B5B4-65F1B234A790",
+              {
+                "pinned": {}
+              },
+              "48AE24BC-1026-54C0-B356-0BAA43B0E353"
+            ],
+            "customInfo": {
+              "iconType": {
+                "icon": "planet"
+              }
+            }
+          }
+        ],
+        "topAppsContainerIDs": [
+          {
+            "default": {}
+          },
+          "0428B7B7-7879-5DF8-B029-E494C27C7686",
+          {
+            "custom": {
+              "_0": {
+                "directoryBasename": "Profile 1",
+                "machineID": "00000000-AAAA-BBBB-CCCC-000000000002"
+              }
+            }
+          },
+          "010982DD-E10D-5AB9-8F56-F77B0127C4C9"
+        ],
+        "items": [
+          "0428B7B7-7879-5DF8-B029-E494C27C7686",
+          {
+            "id": "0428B7B7-7879-5DF8-B029-E494C27C7686",
+            "parentID": null,
+            "title": null,
+            "childrenIds": [
+              "A20D17BE-01CB-5F2F-B0DD-F02E93E9E906"
+            ],
+            "createdAt": 750000060.0,
+            "isUnread": false,
+            "originatingDevice": "00000000-AAAA-BBBB-CCCC-000000000001",
+            "data": {
+              "itemContainer": {
+                "containerType": {
+                  "topApps": {
+                    "_0": {
+                      "default": {}
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "A20D17BE-01CB-5F2F-B0DD-F02E93E9E906",
+          {
+            "id": "A20D17BE-01CB-5F2F-B0DD-F02E93E9E906",
+            "parentID": "0428B7B7-7879-5DF8-B029-E494C27C7686",
+            "title": null,
+            "childrenIds": [],
+            "createdAt": 750000120.0,
+            "isUnread": false,
+            "originatingDevice": "00000000-AAAA-BBBB-CCCC-000000000001",
+            "data": {
+              "tab": {
+                "savedURL": "https://mail.example.test/inbox",
+                "savedTitle": "Mail - Inbox",
+                "savedMuteStatus": "allowAudio",
+                "timeLastActiveAt": 750005002.0
+              }
+            }
+          },
+          "010982DD-E10D-5AB9-8F56-F77B0127C4C9",
+          {
+            "id": "010982DD-E10D-5AB9-8F56-F77B0127C4C9",
+            "parentID": null,
+            "title": null,
+            "childrenIds": [
+              "7E24D4B4-C273-5180-9187-57E5DEA1A2EE"
+            ],
+            "createdAt": 750000180.0,
+            "isUnread": false,
+            "originatingDevice": "00000000-AAAA-BBBB-CCCC-000000000001",
+            "data": {
+              "itemContainer": {
+                "containerType": {
+                  "topApps": {
+                    "_0": {
+                      "custom": {
+                        "_0": {
+                          "directoryBasename": "Profile 1",
+                          "machineID": "00000000-AAAA-BBBB-CCCC-000000000002"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "7E24D4B4-C273-5180-9187-57E5DEA1A2EE",
+          {
+            "id": "7E24D4B4-C273-5180-9187-57E5DEA1A2EE",
+            "parentID": "010982DD-E10D-5AB9-8F56-F77B0127C4C9",
+            "title": "Studio Calendar",
+            "childrenIds": [],
+            "createdAt": 750000240.0,
+            "isUnread": false,
+            "originatingDevice": "00000000-AAAA-BBBB-CCCC-000000000001",
+            "data": {
+              "tab": {
+                "savedURL": "https://calendar.example.test/",
+                "savedTitle": "Calendar",
+                "savedMuteStatus": "allowAudio",
+                "timeLastActiveAt": 750005006.0
+              }
+            }
+          },
+          "EFC68BE4-E08F-5995-84A2-3573FB2CBBA9",
+          {
+            "id": "EFC68BE4-E08F-5995-84A2-3573FB2CBBA9",
+            "parentID": null,
+            "title": null,
+            "childrenIds": [
+              "28C5641E-45AA-55AB-9BB1-1DD23B9ABB8C",
+              "0577A01E-75AF-5EF6-B7CB-E1BB2115F1FF",
+              "FFC07AB3-03A6-5564-8A8E-2BB1F7420D2A"
+            ],
+            "createdAt": 750000300.0,
+            "isUnread": false,
+            "originatingDevice": "00000000-AAAA-BBBB-CCCC-000000000001",
+            "data": {
+              "itemContainer": {
+                "containerType": {
+                  "spaceItems": {
+                    "_0": "6A5F7B70-C913-5E48-9C9F-F89FFAFFCECF"
+                  }
+                }
+              }
+            }
+          },
+          "84BDCAA2-ECF2-5BED-986F-8BA2A8EE1DCF",
+          {
+            "id": "84BDCAA2-ECF2-5BED-986F-8BA2A8EE1DCF",
+            "parentID": null,
+            "title": null,
+            "childrenIds": [
+              "D007AF99-7F6A-5624-83D0-CCADFA5AEBF2",
+              "C3E3B4E1-7707-5B41-8C54-DCAEA0AEEB6E"
+            ],
+            "createdAt": 750000360.0,
+            "isUnread": false,
+            "originatingDevice": "00000000-AAAA-BBBB-CCCC-000000000001",
+            "data": {
+              "itemContainer": {
+                "containerType": {
+                  "spaceItems": {
+                    "_0": "6A5F7B70-C913-5E48-9C9F-F89FFAFFCECF"
+                  }
+                }
+              }
+            }
+          },
+          "28C5641E-45AA-55AB-9BB1-1DD23B9ABB8C",
+          {
+            "id": "28C5641E-45AA-55AB-9BB1-1DD23B9ABB8C",
+            "parentID": "EFC68BE4-E08F-5995-84A2-3573FB2CBBA9",
+            "title": null,
+            "childrenIds": [],
+            "createdAt": 750000420.0,
+            "isUnread": false,
+            "originatingDevice": "00000000-AAAA-BBBB-CCCC-000000000001",
+            "data": {
+              "tab": {
+                "savedURL": "https://tracker.example.test/board",
+                "savedTitle": "Board - Tracker",
+                "savedMuteStatus": "allowAudio",
+                "timeLastActiveAt": 750005012.0
+              }
+            }
+          },
+          "0577A01E-75AF-5EF6-B7CB-E1BB2115F1FF",
+          {
+            "id": "0577A01E-75AF-5EF6-B7CB-E1BB2115F1FF",
+            "parentID": "EFC68BE4-E08F-5995-84A2-3573FB2CBBA9",
+            "title": "Docs",
+            "childrenIds": [
+              "E701559A-0D06-5834-BE8E-F22CB43D670B",
+              "C82810AA-3B26-55B7-A5A0-B9C1839D22A6"
+            ],
+            "createdAt": 750000480.0,
+            "isUnread": false,
+            "originatingDevice": "00000000-AAAA-BBBB-CCCC-000000000001",
+            "data": {
+              "list": {}
+            }
+          },
+          "E701559A-0D06-5834-BE8E-F22CB43D670B",
+          {
+            "id": "E701559A-0D06-5834-BE8E-F22CB43D670B",
+            "parentID": "0577A01E-75AF-5EF6-B7CB-E1BB2115F1FF",
+            "title": "Handbook (renamed)",
+            "childrenIds": [],
+            "createdAt": 750000540.0,
+            "isUnread": false,
+            "originatingDevice": "00000000-AAAA-BBBB-CCCC-000000000001",
+            "data": {
+              "tab": {
+                "savedURL": "https://wiki.example.test/handbook",
+                "savedTitle": "Wiki Handbook",
+                "savedMuteStatus": "allowAudio",
+                "timeLastActiveAt": 750005016.0
+              }
+            }
+          },
+          "C82810AA-3B26-55B7-A5A0-B9C1839D22A6",
+          {
+            "id": "C82810AA-3B26-55B7-A5A0-B9C1839D22A6",
+            "parentID": "0577A01E-75AF-5EF6-B7CB-E1BB2115F1FF",
+            "title": "API",
+            "childrenIds": [
+              "C526EDD9-C32C-5FFE-9748-C3D1414D2BA1"
+            ],
+            "createdAt": 750000600.0,
+            "isUnread": false,
+            "originatingDevice": "00000000-AAAA-BBBB-CCCC-000000000001",
+            "data": {
+              "list": {}
+            }
+          },
+          "C526EDD9-C32C-5FFE-9748-C3D1414D2BA1",
+          {
+            "id": "C526EDD9-C32C-5FFE-9748-C3D1414D2BA1",
+            "parentID": "C82810AA-3B26-55B7-A5A0-B9C1839D22A6",
+            "title": null,
+            "childrenIds": [],
+            "createdAt": 750000660.0,
+            "isUnread": false,
+            "originatingDevice": "00000000-AAAA-BBBB-CCCC-000000000001",
+            "data": {
+              "tab": {
+                "savedURL": "https://api.example.test/reference?v=2",
+                "savedTitle": "API Reference",
+                "savedMuteStatus": "allowAudio",
+                "timeLastActiveAt": 750005020.0
+              }
+            }
+          },
+          "FFC07AB3-03A6-5564-8A8E-2BB1F7420D2A",
+          {
+            "id": "FFC07AB3-03A6-5564-8A8E-2BB1F7420D2A",
+            "parentID": "EFC68BE4-E08F-5995-84A2-3573FB2CBBA9",
+            "title": "Sketch board",
+            "childrenIds": [],
+            "createdAt": 750000720.0,
+            "isUnread": false,
+            "originatingDevice": "00000000-AAAA-BBBB-CCCC-000000000001",
+            "data": {
+              "easel": {
+                "easelID": "EASEL-0001",
+                "title": "Sketch board"
+              }
+            }
+          },
+          "D007AF99-7F6A-5624-83D0-CCADFA5AEBF2",
+          {
+            "id": "D007AF99-7F6A-5624-83D0-CCADFA5AEBF2",
+            "parentID": "84BDCAA2-ECF2-5BED-986F-8BA2A8EE1DCF",
+            "title": null,
+            "childrenIds": [],
+            "createdAt": 750000780.0,
+            "isUnread": false,
+            "originatingDevice": "00000000-AAAA-BBBB-CCCC-000000000001",
+            "data": {
+              "tab": {
+                "savedURL": "https://news.example.test/today",
+                "savedTitle": "Today's Headlines",
+                "savedMuteStatus": "allowAudio",
+                "timeLastActiveAt": 750005024.0
+              }
+            }
+          },
+          "C3E3B4E1-7707-5B41-8C54-DCAEA0AEEB6E",
+          {
+            "id": "C3E3B4E1-7707-5B41-8C54-DCAEA0AEEB6E",
+            "parentID": "84BDCAA2-ECF2-5BED-986F-8BA2A8EE1DCF",
+            "title": null,
+            "childrenIds": [
+              "0E864941-22D6-564E-829F-9398450BA747",
+              "B2AF434E-7222-5797-BAC0-72CD9EFF7AE8"
+            ],
+            "createdAt": 750000840.0,
+            "isUnread": false,
+            "originatingDevice": "00000000-AAAA-BBBB-CCCC-000000000001",
+            "data": {
+              "splitView": {
+                "layoutOrientation": "horizontal",
+                "itemWidthFactors": [],
+                "customInfo": null,
+                "focusItemID": null
+              }
+            }
+          },
+          "0E864941-22D6-564E-829F-9398450BA747",
+          {
+            "id": "0E864941-22D6-564E-829F-9398450BA747",
+            "parentID": "C3E3B4E1-7707-5B41-8C54-DCAEA0AEEB6E",
+            "title": null,
+            "childrenIds": [],
+            "createdAt": 750000900.0,
+            "isUnread": false,
+            "originatingDevice": "00000000-AAAA-BBBB-CCCC-000000000001",
+            "data": {
+              "tab": {
+                "savedURL": "https://left.example.test/",
+                "savedTitle": "Left Pane",
+                "savedMuteStatus": "allowAudio",
+                "timeLastActiveAt": 750005028.0
+              }
+            }
+          },
+          "B2AF434E-7222-5797-BAC0-72CD9EFF7AE8",
+          {
+            "id": "B2AF434E-7222-5797-BAC0-72CD9EFF7AE8",
+            "parentID": "C3E3B4E1-7707-5B41-8C54-DCAEA0AEEB6E",
+            "title": null,
+            "childrenIds": [],
+            "createdAt": 750000960.0,
+            "isUnread": false,
+            "originatingDevice": "00000000-AAAA-BBBB-CCCC-000000000001",
+            "data": {
+              "tab": {
+                "savedURL": "https://right.example.test/",
+                "savedTitle": "Right Pane",
+                "savedMuteStatus": "allowAudio",
+                "timeLastActiveAt": 750005030.0
+              }
+            }
+          },
+          "48AE24BC-1026-54C0-B356-0BAA43B0E353",
+          {
+            "id": "48AE24BC-1026-54C0-B356-0BAA43B0E353",
+            "parentID": null,
+            "title": null,
+            "childrenIds": [
+              "67CAEEB5-9C2E-596A-AC0A-20C190CA9856",
+              "F6DAD5E6-93CE-596F-AAEB-A4C02F23B613"
+            ],
+            "createdAt": 750001020.0,
+            "isUnread": false,
+            "originatingDevice": "00000000-AAAA-BBBB-CCCC-000000000001",
+            "data": {
+              "itemContainer": {
+                "containerType": {
+                  "spaceItems": {
+                    "_0": "EACBA255-6807-520B-89FC-ADF642892A2C"
+                  }
+                }
+              }
+            }
+          },
+          "F3C6E4F9-EA32-5498-B5B4-65F1B234A790",
+          {
+            "id": "F3C6E4F9-EA32-5498-B5B4-65F1B234A790",
+            "parentID": null,
+            "title": null,
+            "childrenIds": [
+              "48FE8F6F-9DBD-5C52-8D62-883B0750F7B9"
+            ],
+            "createdAt": 750001080.0,
+            "isUnread": false,
+            "originatingDevice": "00000000-AAAA-BBBB-CCCC-000000000001",
+            "data": {
+              "itemContainer": {
+                "containerType": {
+                  "spaceItems": {
+                    "_0": "EACBA255-6807-520B-89FC-ADF642892A2C"
+                  }
+                }
+              }
+            }
+          },
+          "67CAEEB5-9C2E-596A-AC0A-20C190CA9856",
+          {
+            "id": "67CAEEB5-9C2E-596A-AC0A-20C190CA9856",
+            "parentID": "48AE24BC-1026-54C0-B356-0BAA43B0E353",
+            "title": null,
+            "childrenIds": [],
+            "createdAt": 750001140.0,
+            "isUnread": false,
+            "originatingDevice": "00000000-AAAA-BBBB-CCCC-000000000001",
+            "data": {
+              "tab": {
+                "savedURL": "https://recipes.example.test/",
+                "savedTitle": "Recipes",
+                "savedMuteStatus": "allowAudio",
+                "timeLastActiveAt": 750005036.0
+              }
+            }
+          },
+          "F6DAD5E6-93CE-596F-AAEB-A4C02F23B613",
+          {
+            "id": "F6DAD5E6-93CE-596F-AAEB-A4C02F23B613",
+            "parentID": "48AE24BC-1026-54C0-B356-0BAA43B0E353",
+            "title": "Travel",
+            "childrenIds": [
+              "61AD1FAC-37B9-5872-996E-43853B206887"
+            ],
+            "createdAt": 750001200.0,
+            "isUnread": false,
+            "originatingDevice": "00000000-AAAA-BBBB-CCCC-000000000001",
+            "data": {
+              "list": {}
+            }
+          },
+          "61AD1FAC-37B9-5872-996E-43853B206887",
+          {
+            "id": "61AD1FAC-37B9-5872-996E-43853B206887",
+            "parentID": "F6DAD5E6-93CE-596F-AAEB-A4C02F23B613",
+            "title": null,
+            "childrenIds": [],
+            "createdAt": 750001260.0,
+            "isUnread": false,
+            "originatingDevice": "00000000-AAAA-BBBB-CCCC-000000000001",
+            "data": {
+              "tab": {
+                "savedURL": "https://trains.example.test/timetable",
+                "savedTitle": "Timetable",
+                "savedMuteStatus": "allowAudio",
+                "timeLastActiveAt": 750005040.0
+              }
+            }
+          },
+          "48FE8F6F-9DBD-5C52-8D62-883B0750F7B9",
+          {
+            "id": "48FE8F6F-9DBD-5C52-8D62-883B0750F7B9",
+            "parentID": "F3C6E4F9-EA32-5498-B5B4-65F1B234A790",
+            "title": null,
+            "childrenIds": [],
+            "createdAt": 750001320.0,
+            "isUnread": false,
+            "originatingDevice": "00000000-AAAA-BBBB-CCCC-000000000001",
+            "data": {
+              "tab": {
+                "savedURL": "https://shop.example.test/cart",
+                "savedTitle": "Cart",
+                "savedMuteStatus": "allowAudio",
+                "timeLastActiveAt": 750005042.0
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
