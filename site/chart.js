@@ -176,12 +176,3 @@ if (calm) {
 } else {
   requestAnimationFrame(growHero);
 }
-
-document.getElementById("copy").addEventListener("click", async (event) => {
-  const text = document.getElementById("command").textContent;
-  await navigator.clipboard.writeText(text);
-  event.target.textContent = "Copied";
-  setTimeout(() => {
-    event.target.textContent = "Copy";
-  }, 1600);
-});

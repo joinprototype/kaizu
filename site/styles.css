@@ -244,47 +244,6 @@ h1 {
   font-style: italic;
   color: var(--claret);
 }
-.terminal-note { margin-top: 1.5rem !important; font-size: 1rem; color: var(--ink-soft); }
-.command {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.75rem;
-  margin-top: 0.5rem;
-  padding: 0.7rem 0.7rem 0.7rem 0.9rem;
-  border: 1px solid rgb(28 37 65 / 0.2);
-  border-radius: 0.5rem;
-}
-.command code {
-  flex: 1;
-  min-width: 0;
-  font: 400 0.875rem/1.5 ui-monospace, "SF Mono", Menlo, monospace;
-  overflow-wrap: anywhere;
-}
-.command button {
-  border: 0;
-  padding: 0.2rem 0.6rem;
-  border-radius: 0.3rem;
-  background: rgb(28 37 65 / 0.08);
-  color: inherit;
-  font: 400 0.9375rem/1.4 var(--text);
-  cursor: pointer;
-}
-.command button:hover { background: rgb(28 37 65 / 0.15); }
-.rough li {
-  padding-left: 1.1rem;
-  text-indent: -1.1rem;
-}
-.rough li::before {
-  content: "";
-  display: inline-block;
-  width: 0.45rem;
-  height: 0.45rem;
-  margin-right: 0.65rem;
-  border-radius: 50%;
-  background: var(--claret);
-  vertical-align: 0.15em;
-}
-.rough li + li { margin-top: 0.5rem; }
 
 footer {
   padding: clamp(3rem, 7vw, 5rem) 1rem 3rem;
