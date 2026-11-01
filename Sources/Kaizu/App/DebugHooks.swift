@@ -4,7 +4,7 @@ import BrowserCore
 import CoreSpotlight
 
 /// Lets screenshots / manual QA jump straight into a UI state:
-///   KAIZU_DEBUG=commandbar|location|space|settings|history|private|peek|switcher|extension|nosidebar|reader|pin|split|splitdrop|capture|quickbar|open|swipe|spotlight|spotlightreset|commands|learn|appearance|hide|hotkeys|tour|bugreport|brokensite|windows|privatewindow|stress|browsingdata|arcimport|arcimport-run .build/debug/Kaizu
+///   KAIZU_DEBUG=commandbar|location|space|settings|history|private|peek|switcher|extension|nosidebar|reader|pin|split|splitdrop|capture|quickbar|open|swipe|spotlight|spotlightreset|commands|learn|appearance|hide|hotkeys|tour|bugreport|brokensite|windows|privatewindow|tabmoves|stress|sites|browsingdata|arcimport|arcimport-run .build/debug/Kaizu
 /// With `commandbar` or `quickbar`, KAIZU_TYPE="gi" types into it key by key (through
 /// the real field editor, so inline completion runs).
 /// `reader` shows Reader for the selected tab, or for KAIZU_URL.
@@ -21,8 +21,12 @@ import CoreSpotlight
 /// `windows` drives several windows, logs each rule as ok or FAILED, saves and
 /// quits; run again on the same KAIZU_SUPPORT to check what came back.
 /// `privatewindow` drives a private window, logs each rule as ok or FAILED and quits.
+/// `tabmoves` renames tabs and moves them between spaces, logs each rule as ok or
+/// FAILED and quits; run again on the same KAIZU_SUPPORT to check names came back.
 /// `stress` adds KAIZU_TABS pinned tabs (2,000 by default) if there are fewer, times
 /// what they cost, then quits; run again on the same KAIZU_SUPPORT to time a launch.
+/// `sites` loads each address in the file KAIZU_SITES and logs how it went, with a
+/// picture of each in the folder KAIZU_SHOTS if set, then quits.
 /// `browsingdata` opens Import Browsing Data; with KAIZU_IMPORT set to a profile
 /// folder, an export file, or "arc", it imports that, logs the result and undoes it.
 /// `arcimport` opens Import from Arc; `arcimport-run` imports without it and logs
@@ -122,6 +126,54 @@ enum DebugHooks {
         }
     }
 
+    private static func qaTabMoves(_ store: BrowserStore) {
+        func check(_ name: String, _ passed: Bool) {
+            FileHandle.standardError.write(Data("QA tabs \(passed ? "ok" : "FAILED"): \(name)\n".utf8))
+        }
+        Task {
+            if let named = store.spaces.flatMap(\.allTabs).first(where: { $0.customTitle != nil }) {
+                check("a name comes back after quitting", named.displayTitle == "My page")
+                return NSApp.terminate(nil)
+            }
+            let home = store.activeSpace
+            let page = URL(string: "https://example.com/")!
+            let tab = store.openTab(page)
+            try? await Task.sleep(for: .seconds(2))
+            let pageTitle = tab.title
+            store.rename(tab, to: "  My page ")
+            check("a tab takes a name", tab.displayTitle == "My page" && tab.title == pageTitle)
+            store.rename(tab, to: "   ")
+            check("no name goes back to the page's", tab.customTitle == nil && tab.displayTitle == pageTitle)
+            store.rename(tab, to: "My page")
+
+            store.commit(SpaceDraft(name: "Same profile", hue: Theme.all[1].hue, symbol: Space.symbols[1], profile: .existing(home.profile.id)))
+            let same = store.activeSpace
+            store.commit(SpaceDraft(name: "Other profile", hue: Theme.all[2].hue, symbol: Space.symbols[2], profile: .new))
+            let other = store.activeSpace
+            store.switchTo(home)
+            try? await Task.sleep(for: .seconds(1))
+
+            let webView = tab.webView
+            let stay = store.openTab(URL(string: "https://example.com/stay"))
+            store.select(tab)
+            store.move(tab, toSpace: same)
+            try? await Task.sleep(for: .milliseconds(500))
+            check("moved within a profile it stays live", same.today.contains(tab) && !home.today.contains(tab) && tab.webView === webView && !tab.isDiscarded)
+            check("the window moves on", store.selectedTab === stay)
+
+            store.switchTo(same)
+            store.move(tab, toSpace: other)
+            try? await Task.sleep(for: .milliseconds(500))
+            let reopened = other.today.first
+            check("across profiles it reopens there", tab.isDiscarded && same.today.isEmpty && reopened?.profile === other.profile && reopened?.url == tab.url)
+            check("with its name", reopened?.displayTitle == "My page")
+            check("nothing selected where it left", store.selectedTab == nil)
+            store.switchTo(home)
+            try? await Task.sleep(for: .seconds(1))
+            NSApp.terminate(nil)
+        }
+    }
+
     private static func qaStress(_ store: BrowserStore) {
         let app = store.app
         let count = ProcessInfo.processInfo.environment["KAIZU_TABS"].flatMap(Int.init) ?? 2_000
@@ -186,6 +238,38 @@ enum DebugHooks {
         }
     }
 
+    private static func qaSites(_ store: BrowserStore) {
+        let environment = ProcessInfo.processInfo.environment
+        guard let list = environment["KAIZU_SITES"], let text = try? String(contentsOfFile: list, encoding: .utf8) else { return }
+        let probe = """
+            JSON.stringify({text: document.body ? document.body.innerText.trim().length : -1,
+              nodes: document.querySelectorAll('*').length, images: document.images.length,
+              height: document.documentElement.scrollHeight})
+            """
+        Task {
+            for line in text.split(separator: "\n") {
+                guard let url = URL(string: String(line)) else { continue }
+                let tab = store.openTab(url)
+                let start = ContinuousClock.now
+                try? await Task.sleep(for: .seconds(1))
+                while tab.isLoading, ContinuousClock.now - start < .seconds(15) {
+                    try? await Task.sleep(for: .milliseconds(250))
+                }
+                let loaded = (ContinuousClock.now - start).components.seconds
+                try? await Task.sleep(for: .seconds(2.5))
+                let result = (try? await tab.webView.evaluateJavaScript(probe)) as? String ?? "{}"
+                let name = url.host() ?? "site"
+                FileHandle.standardError.write(Data("QA site \(name) | \(tab.url?.host() ?? "none") | \(loaded)s\(tab.isLoading ? " still loading" : "") | \(result) | \(tab.title.prefix(50))\n".utf8))
+                if let folder = environment["KAIZU_SHOTS"], let image = await tab.screenshot(of: nil), let data = image.tiffRepresentation {
+                    let png = NSBitmapImageRep(data: data)?.representation(using: .png, properties: [:])
+                    try? png?.write(to: URL(fileURLWithPath: folder).appending(path: "\(name).png"))
+                }
+                store.close(tab)
+            }
+            NSApp.terminate(nil)
+        }
+    }
+
     private static func qaBrowsingData(_ store: BrowserStore) {
         func log(_ text: String) {
             FileHandle.standardError.write(Data("QA browsing data: \(text)\n".utf8))
@@ -220,8 +304,13 @@ enum DebugHooks {
                 log("toast \(store.toast?.message ?? "none")")
                 log("stored \(stored) pages, pinned \(pinnedBefore) -> \(space.pinned.count), folder open \(space.pinned.folders.last?.isExpanded ?? false)")
                 log("second time \(data.bookmarkFolder(named: source.folderName, skipping: space.pinnedAddresses)?.count ?? 0) new bookmarks")
+                let moved = store.openTab(URL(string: "https://example.com/moved-in"))
+                if let folder = space.pinned.folders.last {
+                    store.move(moved, to: .pinned(folder: folder, before: nil))
+                }
                 store.undoToast()
                 try? await Task.sleep(for: .seconds(1))
+                log("a tab moved into the folder survives undo: \(space.today.contains(moved) && !moved.isDiscarded && moved.pinnedURL == nil)")
                 let left = await store.history?.recent(profile: profile, limit: 100_000).count ?? 0
                 log("after undo \(left) pages, pinned \(space.pinned.count)")
             } catch {
@@ -252,13 +341,13 @@ enum DebugHooks {
                 check("first window kept its place", store.savedFrame != nil && store.window?.frameDescriptor == store.savedFrame)
                 second.window?.performClose(nil)
                 await settle()
-                check("closing a window leaves its tabs in the sidebar", app.stores.count == 1 && store.activeSpace.today.count == 3)
+                check("closing a window leaves its tabs in the sidebar", app.stores.count == 1 && store.activeSpace.today.count == 4)
                 store.window?.performClose(nil)
                 await settle()
                 check("the last window only hides", app.stores.count == 1 && store.window?.isVisible == false)
-                app.showFront()
+                check("⌘N brings it back instead of leaving it hidden", app.openWindow() === store && app.stores.count == 1)
                 await settle()
-                check("and comes back", store.window?.isVisible == true && store.selectedTab != nil)
+                check("with its page", store.window?.isVisible == true && store.selectedTab != nil)
                 return NSApp.terminate(nil)
             }
 
@@ -315,6 +404,14 @@ enum DebugHooks {
             third.select(three)
             await settle()
             check("a split shows in one window", third.selectedTab === one && app.front === store)
+            let five = third.openTab(page("five"))
+            await settle()
+            let split = store.activeSpace.split
+            third.addToSplit(one)
+            third.closeSplit()
+            check("a window leaves another's split alone", store.activeSpace.split == split && third.selectedTab === five)
+            third.select(one)
+            await settle()
             store.closeSplit()
             store.select(four)
             await settle()
@@ -327,11 +424,41 @@ enum DebugHooks {
             await settle()
             check("a tab another window took isn't selected any more", store.selectedTab == nil && second.selectedTab === four)
 
+            let empty = app.openWindow()
+            await settle()
+            empty.addToSplit(four)
+            await settle()
+            check("a window with nothing to split with takes nothing", second.selectedTab === four && empty.selectedTab == nil)
+            empty.window?.performClose(nil)
+            await settle()
+
+            let work = store.spaces.last ?? home
+            let favorite = store.openTab(page("favorite"))
+            store.move(favorite, to: .favorites(before: nil))
+            await settle()
+            second.switchTo(work)
+            second.select(favorite)
+            await settle()
+            store.switchTo(home)
+            store.moveToNewWindow(favorite)
+            await settle()
+            let fourth = app.stores[app.stores.count - 1]
+            check("a favorite shown on another space moves out too", fourth.selectedTab === favorite && favorite.webView.window === fourth.window && second.selectedTab == nil)
+            fourth.window?.performClose(nil)
+            await settle()
+            second.switchTo(home)
+            second.select(four)
+            await settle()
+
+            third.select(five)
+            await settle()
+            five.lastActiveAt = .distantPast
             third.window?.performClose(nil)
             await settle()
             store.select(one)
             await settle()
             check("a closed window's tabs can show elsewhere", app.stores.count == 2 && one.webView.window === store.window)
+            check("and count as just used", five.lastActiveAt.map { -$0.timeIntervalSinceNow < 60 } == true)
 
             store.window?.setFrameOrigin(NSPoint(x: 240, y: 60))
             second.window?.setFrameOrigin(NSPoint(x: 200, y: 90))
@@ -438,8 +565,12 @@ enum DebugHooks {
             qaWindows(store)
         case "privatewindow":
             qaPrivateWindow(store)
+        case "tabmoves":
+            qaTabMoves(store)
         case "stress":
             qaStress(store)
+        case "sites":
+            qaSites(store)
         case "browsingdata":
             qaBrowsingData(store)
         case "commands":

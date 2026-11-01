@@ -141,6 +141,11 @@ import Testing
         #expect(visits[0].lastVisit == Date(timeIntervalSince1970: 1_700_000_000))
     }
 
+    @Test func readsEitherSpellingOfTheVisitCount() throws {
+        let json = #"{"metadata": {"data_type": "history"}, "history": [{"url": "https://example.com/", "time_usec": 1, "visit_count": 7}]}"#
+        #expect(try #require(SafariExport.history(fromJSON: Data(json.utf8))).first?.count == 7)
+    }
+
     @Test func otherSafariFilesArentHistory() {
         let cards = #"{"metadata": {"data_type": "payment_cards"}, "payment_cards": [{"card_number": "4111"}]}"#
         #expect(SafariExport.history(fromJSON: Data(cards.utf8)) == nil)
@@ -237,6 +242,34 @@ import Testing
         let data = BrowsingData(bookmarks: [.page(title: "Example", url: Self.example)])
         #expect(data.bookmarkFolder(named: "Bookmarks", skipping: [Self.example]) == nil)
         #expect(BrowsingData().bookmarkFolder(named: "Bookmarks", skipping: []) == nil)
+    }
+
+    /// A session has to stay encodable, however deep the file went.
+    @Test func foldersStopNestingWhereASessionCantFollow() throws {
+        var nested = BrowsingData.Bookmark.page(title: "Deep", url: Self.example)
+        for level in 0..<300 {
+            nested = .folder(name: "Level \(level)", children: [nested])
+        }
+        let result = try #require(BrowsingData(bookmarks: [nested]).bookmarkFolder(named: "Bookmarks", skipping: []))
+        var depth = 1
+        var folder = result.folder
+        while case .folder(let inner)? = folder.children.first {
+            depth += 1
+            folder = inner
+        }
+        #expect(depth <= BrowsingData.folderDepthLimit + 1)
+        #expect(folder.children.count == 1)
+        let session = SessionRecord(
+            activeSpaceID: nil, isSidebarVisible: true, sidebarWidth: 248, profiles: [],
+            spaces: [SpaceRecord(id: UUID(), name: "", symbol: "", hue: 0, profileID: UUID(), selectedTabID: nil, pinned: [.folder(result.folder)], today: [])]
+        )
+        #expect(try SessionRecord.decode(try session.encoded()).record == session)
+    }
+
+    @Test func unclosedListsDontNestWithoutEnd() {
+        let html = String(repeating: "<DT><H3>Folder</H3><DL>", count: 5_000) + #"<DT><A HREF="https://example.com/">Deep</A>"#
+        let data = BrowsingData(bookmarks: SafariExport.bookmarks(fromHTML: html))
+        #expect(data.bookmarkFolder(named: "Bookmarks", skipping: [])?.count == 1)
     }
 
     @Test func bookmarksStopAtTheLimit() throws {

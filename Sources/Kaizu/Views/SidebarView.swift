@@ -24,7 +24,7 @@ struct SidebarView: View {
                 .frame(maxHeight: .infinity, alignment: .top)
             if let playing = store.backgroundMediaTab {
                 NowPlayingCard(tab: playing)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .transition(Motion.dissolving(.move(edge: .bottom).combined(with: .opacity)))
             }
             SpaceSwitcher()
         }
@@ -152,7 +152,7 @@ private struct AddressPill: View {
                     if store.didCopyLink {
                         Label("Copied", systemImage: "checkmark")
                             .foregroundStyle(.secondary)
-                            .transition(.opacity.combined(with: .scale(scale: 0.9)))
+                            .transition(Motion.dissolving(.opacity.combined(with: .scale(scale: 0.9))))
                     } else if let tab, let url = tab.url {
                         if url.host() == nil {
                             SiteGlyph(url: url, isLoading: tab.isLoading)

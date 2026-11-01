@@ -15,18 +15,25 @@ extension BrowserStore {
     /// screen. A split that isn't showing (another tab is selected) gives
     /// way to a new one with the selected tab.
     func addToSplit(_ tab: BrowserTab) {
+        guard !isSplitElsewhere else { return showToast("Split View is open in another window", symbol: "rectangle.split.2x1") }
         let space = activeSpace
         let current = selectedTab
-        takeOver(tab, in: space)
         if space.splitTabs.isEmpty || current.map({ !space.splitTabs.contains($0) }) == true {
             guard let current, current !== tab else { return }
             space.split = [current.id, tab.id]
         } else if !space.split.contains(tab.id), space.splitTabs.count < Self.maxSplitPanes {
             space.split.append(tab.id)
         }
+        takeOver(tab)
         withAnimation(Motion.glide) {
             select(tab, in: space)
         }
+    }
+
+    /// A space has one split: while another window shows it, this one leaves it alone.
+    private var isSplitElsewhere: Bool {
+        let elsewhere = tabsElsewhere
+        return activeSpace.splitTabs.contains(where: elsewhere.contains)
     }
 
     /// ⌃⇧=: splits the current tab with the one used most recently before it.
@@ -43,7 +50,7 @@ extension BrowserStore {
 
     /// Whether the sidebar tab `id` can be dropped on `target`'s page.
     func canSplit(_ target: BrowserTab, with id: UUID) -> Bool {
-        guard id != target.id, let tab = tab(TabDrag(id: id)) else { return false }
+        guard id != target.id, !isSplitElsewhere, let tab = tab(TabDrag(id: id)) else { return false }
         let panes = activeSpace.splitTabs
         guard panes.contains(target) else { return true }
         return panes.contains(tab) || panes.count < Self.maxSplitPanes
@@ -55,7 +62,7 @@ extension BrowserStore {
     func split(_ target: BrowserTab, with id: UUID, on edge: HorizontalEdge) {
         guard canSplit(target, with: id), let tab = tab(TabDrag(id: id)) else { return }
         let space = activeSpace
-        takeOver(tab, in: space)
+        takeOver(tab)
         var panes = space.splitTabs.contains(target) ? space.splitTabs.map(\.id) : [target.id]
         panes.removeAll { $0 == id }
         guard let index = panes.firstIndex(of: target.id) else { return }
@@ -88,6 +95,7 @@ extension BrowserStore {
     }
 
     func closeSplit() {
+        guard !isSplitElsewhere else { return }
         withAnimation(Motion.glide) {
             activeSpace.split = []
         }

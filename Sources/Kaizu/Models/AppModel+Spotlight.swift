@@ -68,6 +68,7 @@ extension AppModel {
     /// "Gmail" from "Inbox (3) – someone@example.com – Gmail": the last
     /// part of the title, which is the site's name by convention; else the host.
     private static func siteName(of tab: BrowserTab, url: URL?) -> String {
+        if let customTitle = tab.customTitle { return customTitle }
         let host = url?.displayHost ?? "Pinned tab"
         let separators = [" - ", " – ", " — ", " | ", " · "]
         guard let separator = separators.filter({ tab.title.contains($0) }).max(by: {

@@ -145,10 +145,10 @@ clanks; fixed the loading bar ending, toasts, traffic lights, hover fades,
 peek close/expand, Reader's blank fade, scrims scaling with their cards,
 split open/close, ⌘S from a peek, the space swipe (now 1:1 with the next
 space beside, velocity-carried, backdrop blending), sliding pill and disc,
-row insertion, Clear's teardown. Still open: pre-warming a web view per
-profile so opening a tab never builds one mid-animation; measuring whether
-the sidebar toggle's per-frame page resize stutters on heavy pages; Reduce
-Motion swapping slides for dissolves (it currently just turns them off).
+row insertion, Clear's teardown. Reduce Motion swaps slides for dissolves
+(Nov 1). Still open: pre-warming a web view per profile so opening a tab
+never builds one mid-animation; measuring whether the sidebar toggle's
+per-frame page resize stutters on heavy pages.
 
 Measured (Oct 25, night) with `KAIZU_DEBUG=tour` on a 120 Hz display,
 optimized build: every interaction (command bar, sidebar, space switch and
@@ -195,6 +195,7 @@ What makes someone keep it as their default browser.
 ## Phase 3: Arc signature features
 
 - [x] Favorites row + pinned folders (nested, drag in/out, inline rename) **M**
+- [x] Rename a tab, and Move to Space (live within a profile, reopened across profiles) **S**
 - [x] Today tabs auto-archive + searchable Archive (12 h fixed; setting later) **M**
 - [x] Split view (2–4 panes; context menu "Open in Split View", click to focus, saved per space) **L**
 - [x] Split view: resizable dividers (double-click to even out), widths remembered across launches **S**

@@ -64,7 +64,7 @@ import Testing
             spaces: [SpaceRecord(
                 id: Self.profileID, name: "Personal", symbol: "star.fill", hue: 0.6, profileID: Self.profileID,
                 selectedTabID: nil, pinned: [.folder(folder)],
-                today: [TabRecord(id: Self.tabID, title: "Apple", url: nil, lastActiveAt: Date(timeIntervalSince1970: 1_790_000_000))],
+                today: [TabRecord(id: Self.tabID, title: "Apple", url: nil, lastActiveAt: Date(timeIntervalSince1970: 1_790_000_000), customTitle: "Fruit")],
                 split: [Self.tabID, Self.pinnedID], splitWidths: [0.6, 0.4], appearance: "dark"
             )]
         )

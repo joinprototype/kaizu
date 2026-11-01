@@ -106,6 +106,17 @@ final class AppModel {
     /// ⌘N: another window on the same space, with nothing selected yet.
     @discardableResult
     func openWindow(on space: Space? = nil) -> BrowserStore {
+        // The last window closed is only hidden, and still has its page:
+        // it comes back rather than leaving a window nobody can see in the way.
+        if stores.count == 1, let window = stores[0].window, !window.isVisible, !window.isMiniaturized {
+            let store = stores[0]
+            window.makeKeyAndOrderFront(nil)
+            front = store
+            if let space {
+                store.switchTo(space)
+            }
+            return store
+        }
         let from = regularFront
         let store = addWindow(WindowRecord(
             activeSpaceID: (space ?? from.activeSpace).id,

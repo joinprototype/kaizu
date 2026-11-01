@@ -69,13 +69,17 @@ public enum SafariExport {
             var title: String?
             var time: Double
             var count: Int?
+            var documentedCount: Int?
             var redirectsTo: String?
             var failed: Bool?
 
             enum CodingKeys: String, CodingKey {
                 case url, title
                 case time = "time_usec"
-                case count = "visits_count"
+                // Apple documents the second; Chromium, which reads real
+                // exports, requires the first.
+                case count = "visit_count"
+                case documentedCount = "visits_count"
                 case redirectsTo = "destination_url"
                 case failed = "latest_visit_was_load_failure"
             }
@@ -94,7 +98,7 @@ public enum SafariExport {
         return items.compactMap { item in
             guard item.redirectsTo == nil, item.failed != true, let url = BrowsingData.webURL(item.url) else { return nil }
             return BrowsingData.Visit(
-                url: url, title: item.title ?? "", count: max(item.count ?? 1, 1),
+                url: url, title: item.title ?? "", count: max(item.count ?? item.documentedCount ?? 1, 1),
                 lastVisit: Date(timeIntervalSince1970: item.time / 1_000_000)
             )
         }
@@ -131,7 +135,8 @@ public enum SafariExport {
             } else if match.output.0.hasPrefix("</") {
                 closeList()
             } else {
-                lists.append((nextListName, []))
+                // Unclosed lists can nest without end: keep their contents, not the depth.
+                lists.append((lists.count <= BrowsingData.folderDepthLimit ? nextListName : nil, []))
                 nextListName = nil
             }
         }

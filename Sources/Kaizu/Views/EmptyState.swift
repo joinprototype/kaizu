@@ -32,8 +32,13 @@ struct EmptyState: View {
                 }
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
-                if isFreshFromArc {
-                    Button("Import from Arc…") { UtilityWindows.showArcImport(app: store.app) }
+                if isFresh {
+                    HStack {
+                        if FileManager.default.fileExists(atPath: ArcSidebar.fileURL.path) {
+                            Button("Import from Arc…") { UtilityWindows.showArcImport(app: store.app) }
+                        }
+                        Button("Import History and Bookmarks…") { UtilityWindows.showBrowsingDataImport(app: store.app) }
+                    }
                 }
             }
         }
@@ -42,9 +47,9 @@ struct EmptyState: View {
         .onTapGesture { store.showCommandBar(.newTab) }
     }
 
-    /// Nothing in Kaizu yet, and Arc's sidebar on this Mac to bring in.
-    private var isFreshFromArc: Bool {
-        !store.isPrivate && store.spaces.allSatisfy { $0.allTabs.isEmpty } && FileManager.default.fileExists(atPath: ArcSidebar.fileURL.path)
+    /// Nothing in Kaizu yet.
+    private var isFresh: Bool {
+        !store.isPrivate && store.spaces.allSatisfy { $0.allTabs.isEmpty }
     }
 
     private func hint(_ keys: String, _ label: String) -> some View {

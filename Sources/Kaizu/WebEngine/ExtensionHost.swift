@@ -328,8 +328,8 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
         for extensionContext: WKWebExtensionContext,
         completionHandler: @escaping ((any WKWebExtensionTab)?, (any Error)?) -> Void
     ) {
-        let tab = app?.regularFront.openTab(configuration.url, select: configuration.shouldBeActive)
-        completionHandler(tab, nil)
+        let store = (configuration.window as? MainWindowAdapter)?.store ?? app?.regularFront
+        completionHandler(store?.openTab(configuration.url, select: configuration.shouldBeActive), nil)
     }
 
     func webExtensionController(
@@ -338,9 +338,13 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
         for extensionContext: WKWebExtensionContext,
         completionHandler: @escaping ((any WKWebExtensionWindow)?, (any Error)?) -> Void
     ) {
+        let previous = app?.regularFront
         let store = app?.openWindow()
-        for url in configuration.tabURLs {
-            store?.openTab(url, select: configuration.shouldBeFocused)
+        for url in configuration.tabURLs.reversed() {
+            store?.openTab(url)
+        }
+        if !configuration.shouldBeFocused {
+            previous?.window?.makeKeyAndOrderFront(nil)
         }
         completionHandler(store?.extensionWindow, nil)
     }

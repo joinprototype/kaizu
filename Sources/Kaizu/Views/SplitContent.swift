@@ -22,7 +22,7 @@ struct SplitContent: View {
                         .frame(width: max(available * shares[index], 0))
                         // Panes joining or leaving a split ease in and out;
                         // switching between lone pages stays instant.
-                        .transition(panes.count > 1 ? .opacity.combined(with: .scale(scale: 0.98)) : .identity)
+                        .transition(panes.count > 1 ? Motion.dissolving(.opacity.combined(with: .scale(scale: 0.98))) : .identity)
                         .overlay(alignment: .trailing) {
                             if index < panes.count - 1 {
                                 SplitDivider(shares: shares) { start, distance in
@@ -98,7 +98,7 @@ private struct SplitPane: View {
                 if let reader = store.reader, reader.tabID == tab.id {
                     ReaderView(article: reader)
                         .id(reader.id)
-                        .transition(.opacity.combined(with: .scale(scale: 0.99)))
+                        .transition(Motion.dissolving(.opacity.combined(with: .scale(scale: 0.99))))
                 }
             }
             .overlay(alignment: .bottomTrailing) {
@@ -113,7 +113,7 @@ private struct SplitPane: View {
                 if store.hidingItemsTabID == tab.id {
                     HidingItemsHint()
                         .padding(.top, 16)
-                        .transition(.move(edge: .top).combined(with: .opacity))
+                        .transition(Motion.dissolving(.move(edge: .top).combined(with: .opacity)))
                 }
             }
             .pageCard(shadow: false)

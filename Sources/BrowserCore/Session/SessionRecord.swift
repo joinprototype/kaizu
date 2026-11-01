@@ -191,13 +191,16 @@ public struct TabRecord: Codable, Equatable, Sendable {
     /// Where a favorite or pinned tab returns to when "closed".
     public var pinnedURL: URL?
     public var lastActiveAt: Date?
+    /// The name given to it, shown instead of the page's title.
+    public var customTitle: String?
 
-    public init(id: UUID, title: String, url: URL?, pinnedURL: URL? = nil, lastActiveAt: Date? = nil) {
+    public init(id: UUID, title: String, url: URL?, pinnedURL: URL? = nil, lastActiveAt: Date? = nil, customTitle: String? = nil) {
         self.id = id
         self.title = title
         self.url = url
         self.pinnedURL = pinnedURL
         self.lastActiveAt = lastActiveAt
+        self.customTitle = customTitle
     }
 }
 

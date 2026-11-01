@@ -18,7 +18,7 @@ struct BrowserView: View {
                     SidebarView(space: space)
                         .frame(width: store.sidebarWidth)
                         .overlay(alignment: .trailing) { SidebarResizeHandle() }
-                        .transition(store.sidebarDocksFromPeek ? .identity : .move(edge: .leading).combined(with: .opacity))
+                        .transition(store.sidebarDocksFromPeek ? .identity : Motion.dissolving(.move(edge: .leading).combined(with: .opacity)))
                 }
                 ContentArea(space: space)
                     .padding(.vertical, 8)
@@ -42,13 +42,13 @@ struct BrowserView: View {
                     initialText: mode == .currentTab ? store.selectedTab?.url?.absoluteString ?? "" : ""
                 )
                 .id(mode)
-                .transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
+                .transition(Motion.dissolving(.opacity.combined(with: .scale(scale: 0.98, anchor: .top))))
             }
 
             if let switcher = store.tabSwitcher {
                 TabSwitcherOverlay(state: switcher)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .transition(.scale(scale: 0.96).combined(with: .opacity))
+                    .transition(Motion.dissolving(.scale(scale: 0.96).combined(with: .opacity)))
             }
 
         }
@@ -57,7 +57,7 @@ struct BrowserView: View {
                 ToastView(toast: toast) { store.undoToast() }
                     .id(toast.id)
                     .padding(.bottom, 28)
-                    .transition(.offset(y: 12).combined(with: .opacity))
+                    .transition(Motion.dissolving(.offset(y: 12).combined(with: .opacity)))
             }
         }
         .ignoresSafeArea()
@@ -85,7 +85,7 @@ struct BrowserView: View {
                 .shadow(color: .black.opacity(0.25), radius: 18, x: 4)
                 .padding([.vertical, .leading], 4)
                 .onHover { store.setSidebarPeeking($0) }
-                .transition(store.sidebarDocksFromPeek ? .identity : .move(edge: .leading).combined(with: .opacity))
+                .transition(store.sidebarDocksFromPeek ? .identity : Motion.dissolving(.move(edge: .leading).combined(with: .opacity)))
         }
     }
 }

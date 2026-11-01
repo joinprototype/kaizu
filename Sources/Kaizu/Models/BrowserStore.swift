@@ -94,6 +94,8 @@ final class BrowserStore {
     var leavingSpaceID: UUID?
     /// A folder that was just created and should open in rename mode.
     var renamingFolderID: UUID?
+    /// The tab whose sidebar row is being renamed.
+    var renamingTabID: UUID?
     var toast: Toast?
     /// Briefly true after Copy Link, so the address pill can flash "Copied".
     var didCopyLink = false
@@ -147,6 +149,11 @@ final class BrowserStore {
 
     /// The window is gone for good. Its tabs stay in their spaces.
     func tearDown() {
+        endHidingItems()
+        // What it showed was in use until now, or the next sweep would
+        // archive a tab that's been open here for days.
+        let now = Date()
+        spaces.compactMap(selectedTab(in:)).forEach { $0.lastActiveAt = now }
         eventMonitors.forEach(NSEvent.removeMonitor)
         eventMonitors = []
         peek?.discard()

@@ -153,6 +153,11 @@ extension BrowserStore {
     /// after `index` takes over, unless another window is showing it. Only
     /// remembered if the window is on another space right now.
     func selectNeighbor(of index: Int, in space: Space, excluding tab: BrowserTab? = nil) {
+        // A tab that's going somewhere isn't going to the background, so
+        // it's no one's "previous" page, to float in picture in picture.
+        if tab != nil {
+            setSelected(nil, in: space)
+        }
         let elsewhere = tabsElsewhere
         let free = space.today.enumerated().filter { $0.element !== tab && !elsewhere.contains($0.element) }
         let next = (free.first { $0.offset >= index } ?? free.last)?.element
@@ -171,15 +176,15 @@ extension BrowserStore {
             removeFromSplit(tab)
         }
         let store = app.openWindow(on: space)
-        store.takeOver(tab, in: space)
+        store.takeOver(tab)
         store.select(tab, in: space)
     }
 
     /// Any other window showing `tab` moves on, so this one can have its page.
-    func takeOver(_ tab: BrowserTab, in space: Space) {
-        let index = space.today.firstIndex(of: tab) ?? 0
+    func takeOver(_ tab: BrowserTab) {
         for store in app.stores where store !== self && store.isShowing(tab) {
-            store.selectNeighbor(of: index, in: space, excluding: tab)
+            let space = store.activeSpace
+            store.selectNeighbor(of: space.today.firstIndex(of: tab) ?? 0, in: space, excluding: tab)
         }
     }
 
@@ -264,6 +269,28 @@ extension BrowserStore {
         scheduleSave()
     }
 
+    /// To `target`'s Today. A page can't change profile, so across profiles
+    /// it reopens there, with that profile's logins. Windows showing it move on.
+    func move(_ tab: BrowserTab, toSpace target: Space) {
+        guard let source = space(containing: tab), source !== target else { return }
+        let index = source.today.firstIndex(of: tab) ?? 0
+        for store in app.stores where store.selectedTabIDs[source.id] == tab.id {
+            store.selectNeighbor(of: index, in: source, excluding: tab)
+        }
+        source.split.removeAll { $0 == tab.id }
+        if tab.profile === target.profile {
+            move(tab, to: .today(before: target.today.first?.id), in: target)
+        } else {
+            detach(tab)
+            let reopened = openTab(tab.pinnedURL ?? tab.url, in: target, select: false)
+            reopened.title = tab.title
+            reopened.customTitle = tab.customTitle
+            app.discard([tab])
+        }
+        showToast("Moved to \(target.name)", symbol: target.symbol)
+        scheduleSave()
+    }
+
     /// ⌘D: pin a today tab, or send a favorite/pinned tab back to Today,
     /// with a small toast that can undo it.
     func togglePin(_ tab: BrowserTab) {
@@ -330,6 +357,14 @@ extension BrowserStore {
             move(tab, to: .pinned(folder: folder, before: nil))
         }
         renamingFolderID = folder.id
+        scheduleSave()
+    }
+
+    /// An empty name goes back to the page's title.
+    func rename(_ tab: BrowserTab, to name: String) {
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        tab.customTitle = name.isEmpty ? nil : name
+        renamingTabID = nil
         scheduleSave()
     }
 

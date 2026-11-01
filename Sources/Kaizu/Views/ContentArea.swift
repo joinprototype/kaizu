@@ -31,14 +31,14 @@ struct ContentArea: View {
         .overlay {
             if let peek = store.peek {
                 PeekOverlay(tab: peek)
-                    .transition(.scale(scale: 0.97).combined(with: .opacity))
+                    .transition(Motion.dissolving(.scale(scale: 0.97).combined(with: .opacity)))
             }
         }
         .overlay(alignment: .topTrailing) {
             if store.find != nil {
                 FindBar()
                     .padding(12)
-                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .transition(Motion.dissolving(.move(edge: .top).combined(with: .opacity)))
             }
         }
     }

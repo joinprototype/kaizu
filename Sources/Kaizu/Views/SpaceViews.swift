@@ -31,7 +31,7 @@ struct SpaceSwitcher: View {
             }
             if !DownloadManager.shared.items.isEmpty {
                 DownloadsButton()
-                    .transition(.scale(scale: 0.8).combined(with: .opacity))
+                    .transition(Motion.dissolving(.scale(scale: 0.8).combined(with: .opacity)))
             }
             if !store.isPrivate {
                 IconButton(systemName: "plus", help: "New Space (⇧⌘N)") {

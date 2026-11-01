@@ -66,6 +66,7 @@ extension AppModel {
             pinnedURL: record.pinnedURL, lastActiveAt: record.lastActiveAt
         )
         tab.savedState = savedTabState(for: record.id)
+        tab.customTitle = record.customTitle
         return tab
     }
 

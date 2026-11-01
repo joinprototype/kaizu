@@ -12,6 +12,8 @@ final class BrowserTab: NSObject, Identifiable {
     var url: URL?
     /// Set while pinned; closing a pinned tab resets it to this URL (Arc-style).
     var pinnedURL: URL?
+    /// The name given to it, if any; the page's title otherwise.
+    var customTitle: String?
     var favicon: NSImage?
     var isLoading = false
     var progress = 0.0
@@ -90,6 +92,7 @@ final class BrowserTab: NSObject, Identifiable {
     }
 
     var displayTitle: String {
+        if let customTitle { return customTitle }
         if !title.isEmpty { return title }
         return url?.displayHost ?? "New Tab"
     }
@@ -427,7 +430,7 @@ final class BrowserTab: NSObject, Identifiable {
     }
 
     var record: TabRecord {
-        TabRecord(id: id, title: title, url: url, pinnedURL: pinnedURL, lastActiveAt: lastActiveAt)
+        TabRecord(id: id, title: title, url: url, pinnedURL: pinnedURL, lastActiveAt: lastActiveAt, customTitle: customTitle)
     }
 
     // MARK: - State sync

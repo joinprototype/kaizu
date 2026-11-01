@@ -35,6 +35,9 @@ public struct BrowsingData: Equatable, Sendable {
     public static let visitLimit = 50_000
     /// Each one becomes a pinned tab, so there has to be an end somewhere.
     public static let bookmarkLimit = 2_000
+    /// Folders go this deep, and their contents join the last one: JSON can
+    /// only nest so far, and past that the whole session couldn't be saved.
+    static let folderDepthLimit = 16
 
     public var visits: [Visit]
     public var bookmarks: [Bookmark]
@@ -56,20 +59,21 @@ public struct BrowsingData: Equatable, Sendable {
     public func bookmarkFolder(named name: String, skipping known: Set<URL>) -> BookmarkImport? {
         var seen = known
         var count = 0
-        func records(_ bookmarks: [Bookmark]) -> [SidebarItemRecord] {
-            bookmarks.compactMap { bookmark in
+        func records(_ bookmarks: [Bookmark], depth: Int) -> [SidebarItemRecord] {
+            bookmarks.flatMap { bookmark -> [SidebarItemRecord] in
                 switch bookmark {
                 case .page(let title, let url):
-                    guard count < Self.bookmarkLimit, seen.insert(url).inserted else { return nil }
+                    guard count < Self.bookmarkLimit, seen.insert(url).inserted else { return [] }
                     count += 1
-                    return .tab(TabRecord(id: UUID(), title: title, url: url, pinnedURL: url))
+                    return [.tab(TabRecord(id: UUID(), title: title, url: url, pinnedURL: url))]
                 case .folder(let name, let children):
-                    let kept = records(children)
-                    return kept.isEmpty ? nil : .folder(FolderRecord(id: UUID(), name: name, isExpanded: false, children: kept))
+                    let kept = records(children, depth: depth + 1)
+                    guard !kept.isEmpty, depth < Self.folderDepthLimit else { return kept }
+                    return [.folder(FolderRecord(id: UUID(), name: name, isExpanded: false, children: kept))]
                 }
             }
         }
-        let children = records(bookmarks)
+        let children = records(bookmarks, depth: 1)
         return children.isEmpty ? nil : BookmarkImport(folder: FolderRecord(id: UUID(), name: name, isExpanded: false, children: children), count: count)
     }
 }

@@ -15,9 +15,15 @@ final class MainWindowAdapter: NSObject, WKWebExtensionWindow {
 
     var tabs: [BrowserTab] {
         guard let store else { return [] }
-        let isFirstOnSpace = store === store.app.stores.first { $0.activeSpaceID == store.activeSpaceID }
-        return store.activeSpace.allTabs.filter { tab in
-            guard let showing = store.app.store(showing: tab) else { return isFirstOnSpace }
+        let space = store.activeSpace
+        let isFirstOnSpace = store === store.app.stores.first { $0.activeSpaceID == space.id }
+        // Favorites are on every space of a profile.
+        let isFirstOnProfile = store === store.app.stores.first { $0.activeSpace.profile === space.profile }
+        let favorites = Set(space.profile.favorites)
+        return space.allTabs.filter { tab in
+            guard let showing = store.app.store(showing: tab) else {
+                return favorites.contains(tab) ? isFirstOnProfile : isFirstOnSpace
+            }
             return showing === store
         }
     }

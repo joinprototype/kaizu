@@ -11,7 +11,7 @@ struct AddExtensionOverlay: View {
         ZStack {
             if let listing {
                 AddExtensionButton(listing: listing)
-                    .transition(.scale(scale: 0.96).combined(with: .opacity))
+                    .transition(Motion.dissolving(.scale(scale: 0.96).combined(with: .opacity)))
             }
         }
         .padding(16)

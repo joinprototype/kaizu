@@ -40,9 +40,16 @@ struct TabRow: View {
         let inSplit = store.isInSplit(tab)
         HStack(spacing: 8) {
             FaviconView(tab: tab, size: 16)
-            Text(tab.displayTitle)
+            if store.renamingTabID == tab.id {
+                RenameField(prompt: "Tab name", name: tab.displayTitle) { store.rename(tab, to: $0) } onCancel: {
+                    store.renamingTabID = nil
+                }
                 .font(.system(size: 13))
-                .lineLimit(1)
+            } else {
+                Text(tab.displayTitle)
+                    .font(.system(size: 13))
+                    .lineLimit(1)
+            }
             Spacer(minLength: 4)
             if tab.isPlayingMedia || tab.isMuted {
                 RowAction(
@@ -79,6 +86,33 @@ struct TabRow: View {
     }
 }
 
+/// A sidebar row's name, being edited: Return or clicking away saves, Esc cancels.
+private struct RenameField: View {
+    let prompt: String
+    let name: String
+    let onCommit: (String) -> Void
+    let onCancel: () -> Void
+    @State private var draft = ""
+    @State private var isCancelled = false
+    @FocusState private var isEditing: Bool
+
+    var body: some View {
+        TextField(prompt, text: $draft)
+            .textFieldStyle(.plain)
+            .focused($isEditing)
+            .onAppear {
+                draft = name
+                isEditing = true
+            }
+            .onSubmit { onCommit(draft) }
+            .onExitCommand {
+                isCancelled = true
+                onCancel()
+            }
+            .onChange(of: isEditing) { if !isEditing, !isCancelled { onCommit(draft) } }
+    }
+}
+
 /// Small trailing button on a tab row (pause, split, close…).
 private struct RowAction: View {
     let systemName: String
@@ -104,8 +138,6 @@ struct FolderRow: View {
     let folder: Folder
     let depth: Int
     @State private var isHovering = false
-    @State private var draftName = ""
-    @FocusState private var isEditing: Bool
 
     var body: some View {
         HStack(spacing: 8) {
@@ -116,16 +148,9 @@ struct FolderRow: View {
             Image(systemName: folder.isExpanded ? "folder" : "folder.fill")
                 .font(.system(size: 12))
             if store.renamingFolderID == folder.id {
-                TextField("Folder name", text: $draftName)
-                    .textFieldStyle(.plain)
-                    .focused($isEditing)
-                    .onAppear {
-                        draftName = folder.name
-                        isEditing = true
-                    }
-                    .onSubmit { store.rename(folder, to: draftName) }
-                    .onExitCommand { store.renamingFolderID = nil }
-                    .onChange(of: isEditing) { if !isEditing { store.rename(folder, to: draftName) } }
+                RenameField(prompt: "Folder name", name: folder.name) { store.rename(folder, to: $0) } onCancel: {
+                    store.renamingFolderID = nil
+                }
             } else {
                 Text(folder.name)
                     .lineLimit(1)
@@ -202,6 +227,14 @@ private struct TabContextMenu: View {
                         Button(folder.name) { store.move(tab, to: .pinned(folder: folder, before: nil)) }
                     }
                 }
+                let others = store.spaces.filter { $0 !== space }
+                if !others.isEmpty {
+                    Menu("Move to Space") {
+                        ForEach(others) { other in
+                            Button(other.name) { store.move(tab, toSpace: other) }
+                        }
+                    }
+                }
             }
             Divider()
         }
@@ -217,6 +250,9 @@ private struct TabContextMenu: View {
         }
         if tab.hasWanderedFromPin {
             Button("Back to Pinned Page") { tab.returnToPin() }
+        }
+        if !isFavorite {
+            Button("Rename…") { store.renamingTabID = tab.id }
         }
         Button("Copy Link") { store.copyLink(of: tab) }
             .disabled(tab.url == nil)
