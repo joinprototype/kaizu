@@ -37,7 +37,7 @@ final class AppModel {
     @ObservationIgnored var choices: [UUID: ChoiceMemory] = [:]
     @ObservationIgnored var memoryPressureSource: DispatchSourceMemoryPressure?
     @ObservationIgnored var saveTask: Task<Void, Never>?
-    @ObservationIgnored private weak var lastKeyStore: BrowserStore?
+    private weak var lastKeyStore: BrowserStore?
 
     init() {
         contentBlocker.standardScripts = [MediaEvents.script]
@@ -64,6 +64,7 @@ final class AppModel {
         set { lastKeyStore = newValue }
     }
 
+    @discardableResult
     func addWindow(_ record: WindowRecord) -> BrowserStore {
         let store = BrowserStore(app: self, record: record)
         stores.append(store)
@@ -109,20 +110,29 @@ final class AppModel {
     /// on the Dock brings back what it showed.
     func windowDidClose(_ store: BrowserStore) {
         guard stores.count > 1 else { return }
-        let wasFirst = store === stores[0]
         stores.removeAll { $0 === store }
         store.tearDown()
         if lastKeyStore === store {
             lastKeyStore = stores.last
         }
-        if wasFirst {
-            stores[0].windowController?.takeAutosavedFrame()
-        }
         scheduleSave()
     }
 
     func windowDidBecomeKey(_ store: BrowserStore) {
-        lastKeyStore = store
+        front = store
         extensions.didFocus(store)
+    }
+
+    /// The little window in front, if one is the key window.
+    var keyLittleWindow: LittleWindowController? {
+        littleWindows.first { $0.window?.isKeyWindow == true }
+    }
+
+    /// Tabs leaving for good.
+    func discard(_ tabs: [BrowserTab]) {
+        for tab in tabs {
+            extensions.didClose(tab)
+            tab.discard()
+        }
     }
 }

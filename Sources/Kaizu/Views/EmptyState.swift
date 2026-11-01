@@ -33,7 +33,7 @@ struct EmptyState: View {
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
                 if isFreshFromArc {
-                    Button("Import from Arc…") { UtilityWindows.showArcImport(store: store) }
+                    Button("Import from Arc…") { UtilityWindows.showArcImport(app: store.app) }
                 }
             }
         }

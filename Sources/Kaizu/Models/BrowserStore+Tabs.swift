@@ -38,14 +38,10 @@ extension BrowserStore {
     /// another brings that window forward instead.
     func select(_ tab: BrowserTab, in space: Space? = nil) {
         let space = space ?? self.space(containing: tab) ?? activeSpace
-        let panes = space.splitTabs.contains(tab) ? space.splitTabs : [tab]
-        if let other = panes.lazy.compactMap(app.store(showing:)).first(where: { $0 !== self }) {
+        if let other = space.panes(with: tab).lazy.compactMap(app.store(showing:)).first(where: { $0 !== self }) {
             other.window?.makeKeyAndOrderFront(nil)
             app.front = other
             return other.show(tab, in: other.space(containing: tab) ?? other.activeSpace)
-        }
-        for other in app.stores where other !== self {
-            other.selectedTabIDs = other.selectedTabIDs.filter { $0.value != tab.id }
         }
         show(tab, in: space)
     }
@@ -75,7 +71,7 @@ extension BrowserStore {
             endHidingItems()
         }
         activeSpaceID = space.id
-        selectedTabIDs[space.id] = tab.id
+        setSelected(tab, in: space)
         tab.activate()
         if previous !== tab {
             extensions.didActivate(tab, previous: previous)
@@ -97,11 +93,6 @@ extension BrowserStore {
         activeSpace.profile === profile ? activeSpace : spaces.first { $0.profile === profile }
     }
 
-    /// Not on screen in another window, so this one can show it.
-    func isFree(_ tab: BrowserTab) -> Bool {
-        app.store(showing: tab).map { $0 === self } ?? true
-    }
-
     func selectTab(number: Int) {
         let tabs = activeSpace.visibleTabs
         guard !tabs.isEmpty else { return }
@@ -112,7 +103,8 @@ extension BrowserStore {
     }
 
     func selectAdjacentTab(_ offset: Int) {
-        let tabs = activeSpace.visibleTabs.filter(isFree)
+        let elsewhere = tabsElsewhere
+        let tabs = activeSpace.visibleTabs.filter { !elsewhere.contains($0) }
         guard !tabs.isEmpty else { return }
         guard let current = tabs.firstIndex(where: { $0.id == selectedTabIDs[activeSpace.id] }) else {
             return select(tabs[0])
@@ -122,7 +114,7 @@ extension BrowserStore {
 
     /// Resolves a tab dragged from the sidebar.
     func tab(_ drag: TabDrag) -> BrowserTab? {
-        activeSpace.allTabs.first { $0.id == drag.id }
+        activeSpace.tab(id: drag.id)
     }
 
     // MARK: - Closing
@@ -161,12 +153,13 @@ extension BrowserStore {
     /// after `index` takes over, unless another window is showing it. Only
     /// remembered if the window is on another space right now.
     func selectNeighbor(of index: Int, in space: Space, excluding tab: BrowserTab? = nil) {
-        let free = space.today.enumerated().filter { $0.element !== tab && isFree($0.element) }
+        let elsewhere = tabsElsewhere
+        let free = space.today.enumerated().filter { $0.element !== tab && !elsewhere.contains($0.element) }
         let next = (free.first { $0.offset >= index } ?? free.last)?.element
         if let next, space.id == activeSpaceID {
             select(next, in: space)
         } else {
-            selectedTabIDs[space.id] = next?.id
+            setSelected(next, in: space)
         }
     }
 
@@ -178,20 +171,20 @@ extension BrowserStore {
             removeFromSplit(tab)
         }
         let store = app.openWindow(on: space)
-        release(tab, in: space)
+        store.takeOver(tab, in: space)
         store.select(tab, in: space)
     }
 
-    /// Whichever window shows `tab` moves on, so another can take its page.
-    func release(_ tab: BrowserTab, in space: Space) {
+    /// Any other window showing `tab` moves on, so this one can have its page.
+    func takeOver(_ tab: BrowserTab, in space: Space) {
         let index = space.today.firstIndex(of: tab) ?? 0
-        for store in app.stores where store.isShowing(tab) {
+        for store in app.stores where store !== self && store.isShowing(tab) {
             store.selectNeighbor(of: index, in: space, excluding: tab)
         }
     }
 
     func closeSelectedTab() {
-        if let littleWindow = keyLittleWindow {
+        if let littleWindow = app.keyLittleWindow {
             littleWindow.close()
         } else if let keyWindow = NSApp.keyWindow, keyWindow !== window {
             // Settings, History: ⌘W closes that window, not a tab behind it.
@@ -224,10 +217,10 @@ extension BrowserStore {
             }
         }
         for store in app.stores where store.selectedTabIDs[space.id].map(ids.contains) == true {
-            store.selectedTabIDs[space.id] = nil
+            store.setSelected(nil, in: space)
         }
         scheduleSave()
-        showToast("Closed \(cleared.count) \(cleared.count == 1 ? "tab" : "tabs")", symbol: "xmark.circle") { [weak self] in
+        showToast("Closed \(cleared.count.counted("tab"))", symbol: "xmark.circle") { [weak self] in
             withAnimation(Motion.pop) {
                 space.today = cleared + space.today
             }

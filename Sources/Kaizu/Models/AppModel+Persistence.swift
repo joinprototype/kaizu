@@ -20,15 +20,7 @@ extension AppModel {
     }
 
     func save() {
-        let first = stores[0]
-        let record = SessionRecord(
-            activeSpaceID: first.activeSpaceID,
-            isSidebarVisible: first.isSidebarVisible,
-            sidebarWidth: first.sidebarWidth,
-            profiles: profiles.map(\.record),
-            spaces: spaces.map { $0.record(selectedTabID: first.selectedTabIDs[$0.id]) },
-            extraWindows: stores.count > 1 ? stores.dropFirst().map(\.record) : nil
-        )
+        let record = SessionRecord(windows: stores.map(\.record), profiles: profiles.map(\.record), spaces: spaces.map(\.record))
         do {
             try record.encoded().write(to: Self.sessionURL, options: .atomic)
         } catch {
@@ -46,7 +38,7 @@ extension AppModel {
             createDefaultSpace()
         }
         for record in session?.record.windows ?? [WindowRecord()] {
-            _ = addWindow(record)
+            addWindow(record)
         }
         if session?.migrated == true {
             scheduleSave()  // write the upgraded format right away

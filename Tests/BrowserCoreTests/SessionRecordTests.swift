@@ -98,6 +98,15 @@ import Testing
         )])
     }
 
+    @Test func windowsMakeTheSameSession() {
+        var record = Self.session(selectedTabID: Self.tabID)
+        record.frame = "0 0 800 600 0 0 1440 900"
+        record.extraWindows = [WindowRecord(activeSpaceID: Self.profileID, selectedTabIDs: [Self.profileID: Self.pinnedID], frame: "1 2 3 4 0 0 1440 900")]
+        var spaces = record.spaces
+        spaces[0].selectedTabID = nil
+        #expect(SessionRecord(windows: record.windows, profiles: record.profiles, spaces: spaces) == record)
+    }
+
     @Test func spaceWithNothingSelectedHasNoSelectionInItsWindow() {
         #expect(Self.session(selectedTabID: nil).windows[0].selectedTabIDs.isEmpty)
     }

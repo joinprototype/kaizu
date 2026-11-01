@@ -65,22 +65,21 @@ extension BrowserStore {
     /// Esc closes a capture, item hiding, peek or Reader even while the page
     /// has keyboard focus; Enter finishes a capture.
     func installEscapeMonitor() {
-        addEventMonitor(matching: .keyDown) { [weak self] event in
-            // Only in the main window, and not while the command bar or a sheet wants the key.
-            guard let self, event.window === self.window, self.commandBar == nil, self.window?.attachedSheet == nil
-            else { return event }
+        addEventMonitor(matching: .keyDown) { store, event in
+            // Not while the command bar or a sheet wants the key.
+            guard store.commandBar == nil, store.window?.attachedSheet == nil else { return event }
             let isEscape = event.keyCode == 53
             let isReturn = event.keyCode == 36 || event.keyCode == 76
             // A capture only on the page in front, and Return in a text field stays the field's.
-            if let capture = self.capture, capture == self.selectedTab?.id, isEscape || isReturn,
-               !(self.window?.firstResponder is NSTextView) {
-                isEscape ? self.cancelCapture() : self.finishCapture()
-            } else if isEscape, self.hidingItemsTabID != nil {
-                self.endHidingItems()
-            } else if isEscape, self.peek != nil {
-                self.closePeek()
-            } else if isEscape, self.reader != nil {
-                self.closeReader()
+            if let capture = store.capture, capture == store.selectedTab?.id, isEscape || isReturn,
+               !(store.window?.firstResponder is NSTextView) {
+                isEscape ? store.cancelCapture() : store.finishCapture()
+            } else if isEscape, store.hidingItemsTabID != nil {
+                store.endHidingItems()
+            } else if isEscape, store.peek != nil {
+                store.closePeek()
+            } else if isEscape, store.reader != nil {
+                store.closeReader()
             } else {
                 return event
             }

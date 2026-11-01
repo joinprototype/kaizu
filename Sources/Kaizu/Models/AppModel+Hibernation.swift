@@ -30,7 +30,8 @@ extension AppModel {
 
     /// Hibernates loaded tabs that aren't on screen, haven't been used for
     /// `interval`, and aren't playing media or using the camera/microphone.
-    func hibernateIdleTabs(olderThan interval: TimeInterval = hibernateAfter, now: Date = Date()) async {
+    func hibernateIdleTabs(olderThan interval: TimeInterval = hibernateAfter) async {
+        let now = Date()
         let cutoff = now.addingTimeInterval(-interval)
         for tab in Set(spaces.flatMap(\.allTabs)) where tab.isLoaded && !isOnScreen(tab) {
             // Re-checked after the await: the user may have switched to it meanwhile.

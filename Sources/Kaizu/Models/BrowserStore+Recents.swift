@@ -12,19 +12,18 @@ extension BrowserStore {
     static let switcherLimit = 8
 
     func installTabSwitcherMonitor() {
-        addEventMonitor(matching: [.keyDown, .flagsChanged]) { [weak self] event in
-            guard let self, event.window === self.window else { return event }
+        addEventMonitor(matching: [.keyDown, .flagsChanged]) { store, event in
             if event.type == .keyDown, event.keyCode == 48, event.modifierFlags.contains(.control) {  // Tab
-                self.advanceTabSwitcher(backwards: event.modifierFlags.contains(.shift))
+                store.advanceTabSwitcher(backwards: event.modifierFlags.contains(.shift))
                 return nil
             }
-            guard self.tabSwitcher != nil else { return event }
+            guard store.tabSwitcher != nil else { return event }
             if event.type == .keyDown, event.keyCode == 53 {  // Esc
-                withAnimation(Motion.snap) { self.tabSwitcher = nil }
+                withAnimation(Motion.snap) { store.tabSwitcher = nil }
                 return nil
             }
             if event.type == .flagsChanged, !event.modifierFlags.contains(.control) {
-                self.commitTabSwitcher()
+                store.commitTabSwitcher()
             }
             return event
         }
@@ -37,8 +36,9 @@ extension BrowserStore {
             return
         }
         let current = selectedTab
+        let elsewhere = tabsElsewhere
         let others = activeSpace.allTabs
-            .filter { $0 !== current && isFree($0) }
+            .filter { $0 !== current && !elsewhere.contains($0) }
             .sorted { ($0.lastActiveAt ?? .distantPast) > ($1.lastActiveAt ?? .distantPast) }
         let tabs = (current.map { [$0] } ?? []) + others
         guard tabs.count > 1 else { return }
@@ -53,7 +53,7 @@ extension BrowserStore {
         guard let state = tabSwitcher else { return }
         withAnimation(Motion.snap) { tabSwitcher = nil }
         let id = state.tabIDs[index ?? state.index]
-        if let tab = activeSpace.allTabs.first(where: { $0.id == id }), tab !== selectedTab {
+        if let tab = activeSpace.tab(id: id), tab !== selectedTab {
             select(tab)
         }
     }
@@ -61,9 +61,10 @@ extension BrowserStore {
     // MARK: - Now playing
 
     /// A playing tab that isn't on screen in any window, for the sidebar's
-    /// mini player.
+    /// mini player. Only loaded tabs play, and the sidebar's `body` asks:
+    /// reading the rest would make it depend on every tab there is.
     var backgroundMediaTab: BrowserTab? {
-        activeSpace.allTabs.first { $0.isPlayingMedia && app.store(showing: $0) == nil }
+        activeSpace.allTabs.first { $0.isLoaded && $0.isPlayingMedia && app.store(showing: $0) == nil }
     }
 }
 

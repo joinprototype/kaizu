@@ -63,7 +63,7 @@ public actor HistoryStore {
     }
 
     public func recordVisit(profile: UUID, url: URL, title: String, at date: Date = Date()) {
-        guard let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" else { return }
+        guard url.isWebPage else { return }
         run("""
             INSERT INTO visits (profile, url, title, visit_count, last_visit) VALUES (?1, ?2, ?3, 1, ?4)
             ON CONFLICT (profile, url) DO UPDATE SET
@@ -103,6 +103,19 @@ public actor HistoryStore {
     /// twice changes nothing. Returns the pages that are new, for `remove`.
     @discardableResult
     public func add(_ visits: [BrowsingData.Visit], profile: UUID) -> [URL] {
+        guard let insert = prepare("INSERT OR IGNORE INTO visits (profile, url, title, visit_count, last_visit) VALUES (?1, ?2, ?3, ?4, ?5)", []),
+              let update = prepare("""
+                UPDATE visits SET
+                    visit_count = max(visit_count, ?4),
+                    last_visit = max(last_visit, ?5),
+                    title = CASE WHEN title = '' THEN ?3 ELSE title END
+                WHERE profile = ?1 AND url = ?2
+                """, [])
+        else { return [] }
+        defer {
+            sqlite3_finalize(insert)
+            sqlite3_finalize(update)
+        }
         var added: [URL] = []
         inTransaction {
             for visit in visits {
@@ -110,17 +123,11 @@ public actor HistoryStore {
                     .text(profile.uuidString), .text(visit.url.absoluteString), .text(visit.title),
                     .integer(visit.count), .real(visit.lastVisit.timeIntervalSince1970),
                 ]
-                run("INSERT OR IGNORE INTO visits (profile, url, title, visit_count, last_visit) VALUES (?1, ?2, ?3, ?4, ?5)", values)
+                runAgain(insert, values)
                 if sqlite3_changes(db) > 0 {
                     added.append(visit.url)
                 } else {
-                    run("""
-                        UPDATE visits SET
-                            visit_count = max(visit_count, ?4),
-                            last_visit = max(last_visit, ?5),
-                            title = CASE WHEN title = '' THEN ?3 ELSE title END
-                        WHERE profile = ?1 AND url = ?2
-                        """, values)
+                    runAgain(update, values)
                 }
             }
         }
@@ -128,9 +135,11 @@ public actor HistoryStore {
     }
 
     public func remove(_ urls: [URL], profile: UUID) {
+        guard let delete = prepare("DELETE FROM visits WHERE profile = ?1 AND url = ?2", []) else { return }
+        defer { sqlite3_finalize(delete) }
         inTransaction {
             for url in urls {
-                remove(url, profile: profile)
+                runAgain(delete, [.text(profile.uuidString), .text(url.absoluteString)])
             }
         }
     }
@@ -158,6 +167,13 @@ public actor HistoryStore {
         sqlite3_finalize(statement)
     }
 
+    /// For a statement prepared once and used for many rows.
+    private func runAgain(_ statement: OpaquePointer, _ values: [Value]) {
+        bind(values, to: statement)
+        sqlite3_step(statement)
+        sqlite3_reset(statement)
+    }
+
     private func entries(_ sql: String, _ values: [Value]) -> [Entry] {
         guard let statement = prepare(sql, values) else { return [] }
         defer { sqlite3_finalize(statement) }
@@ -177,6 +193,11 @@ public actor HistoryStore {
     private func prepare(_ sql: String, _ values: [Value]) -> OpaquePointer? {
         var statement: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else { return nil }
+        bind(values, to: statement)
+        return statement
+    }
+
+    private func bind(_ values: [Value], to statement: OpaquePointer?) {
         // SQLite copies bound text (SQLITE_TRANSIENT) so Swift strings can go away.
         let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
         for (offset, value) in values.enumerated() {
@@ -187,6 +208,5 @@ public actor HistoryStore {
             case .integer(let integer): sqlite3_bind_int64(statement, index, Int64(integer))
             }
         }
-        return statement
     }
 }

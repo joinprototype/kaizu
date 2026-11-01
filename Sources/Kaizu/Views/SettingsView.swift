@@ -40,10 +40,10 @@ private struct GeneralSettings: View {
                     }
                 }
                 LabeledContent("Moving from Arc") {
-                    Button("Import…") { UtilityWindows.showArcImport(store: store) }
+                    Button("Import…") { UtilityWindows.showArcImport(app: store.app) }
                 }
                 LabeledContent("History and bookmarks") {
-                    Button("Import…") { UtilityWindows.showBrowsingDataImport(store: store) }
+                    Button("Import…") { UtilityWindows.showBrowsingDataImport(app: store.app) }
                 }
                 Picker("Search engine", selection: $settings.searchEngine) {
                     ForEach(SearchEngine.allCases) { Text($0.name).tag($0) }

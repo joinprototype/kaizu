@@ -17,9 +17,7 @@ extension BrowserStore {
     func addToSplit(_ tab: BrowserTab) {
         let space = activeSpace
         let current = selectedTab
-        if !isFree(tab) {
-            release(tab, in: space)
-        }
+        takeOver(tab, in: space)
         if space.splitTabs.isEmpty || current.map({ !space.splitTabs.contains($0) }) == true {
             guard let current, current !== tab else { return }
             space.split = [current.id, tab.id]
@@ -34,8 +32,9 @@ extension BrowserStore {
     /// ⌃⇧=: splits the current tab with the one used most recently before it.
     func splitWithRecentTab() {
         guard let current = selectedTab else { return }
+        let elsewhere = tabsElsewhere
         let recent = activeSpace.allTabs
-            .filter { $0 !== current && !isInSplit($0) && isFree($0) }
+            .filter { $0 !== current && !isInSplit($0) && !elsewhere.contains($0) }
             .max { ($0.lastActiveAt ?? .distantPast) < ($1.lastActiveAt ?? .distantPast) }
         if let recent {
             addToSplit(recent)
@@ -56,9 +55,7 @@ extension BrowserStore {
     func split(_ target: BrowserTab, with id: UUID, on edge: HorizontalEdge) {
         guard canSplit(target, with: id), let tab = tab(TabDrag(id: id)) else { return }
         let space = activeSpace
-        if !isFree(tab) {
-            release(tab, in: space)
-        }
+        takeOver(tab, in: space)
         var panes = space.splitTabs.contains(target) ? space.splitTabs.map(\.id) : [target.id]
         panes.removeAll { $0 == id }
         guard let index = panes.firstIndex(of: target.id) else { return }
@@ -100,16 +97,15 @@ extension BrowserStore {
     /// Clicking into a pane focuses its tab. Web views swallow mouse events,
     /// so watch them on their way in rather than with a SwiftUI gesture.
     func installSplitFocusMonitor() {
-        addEventMonitor(matching: .leftMouseDown) { [weak self] event in
-            guard let self, event.window === self.window else { return event }
-            let panes = self.activeSpace.splitTabs
+        addEventMonitor(matching: .leftMouseDown) { store, event in
+            let panes = store.activeSpace.splitTabs
             guard panes.count > 1, let window = event.window else { return event }
             let clicked = panes.first { pane in
                 guard pane.isLoaded, pane.webView.window === window else { return false }
                 return pane.webView.bounds.contains(pane.webView.convert(event.locationInWindow, from: nil))
             }
-            if let clicked, clicked !== self.selectedTab {
-                self.select(clicked)
+            if let clicked, clicked !== store.selectedTab {
+                store.select(clicked)
             }
             return event
         }

@@ -7,7 +7,7 @@ struct TabSwitcherOverlay: View {
     let state: TabSwitcherState
 
     var body: some View {
-        let tabs = state.tabIDs.compactMap { id in store.activeSpace.allTabs.first { $0.id == id } }
+        let tabs = state.tabIDs.compactMap { id in store.activeSpace.tab(id: id) }
         let accent = store.activeSpace.theme.accent(scheme)
         HStack(spacing: 12) {
             ForEach(Array(tabs.enumerated()), id: \.element.id) { index, tab in

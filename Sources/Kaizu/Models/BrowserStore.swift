@@ -67,8 +67,8 @@ final class BrowserStore {
         didSet { if activeSpaceID != oldValue { updateWindowAppearance() } }
     }
     /// The tab each space shows in this window, by space. Each window keeps
-    /// its own, and no two windows keep the same tab.
-    var selectedTabIDs: [UUID: UUID]
+    /// its own, and no two keep the same page: see `setSelected`.
+    private(set) var selectedTabIDs: [UUID: UUID]
     var isSidebarVisible: Bool
     var isSidebarPeeking = false
     var sidebarWidth: Double
@@ -146,15 +146,18 @@ final class BrowserStore {
         peek?.discard()
         peek = nil
         app.extensions.didClose(self)
-        // Its views let go of the pages, so another window can take them,
-        // and the autosaved frame is free for the next first window.
+        // Its views let go of the pages, so another window can take them.
         window?.contentView = nil
-        window?.setFrameAutosaveName("")
         windowController = nil
     }
 
-    func addEventMonitor(matching mask: NSEvent.EventTypeMask, handler: @escaping (NSEvent) -> NSEvent?) {
-        if let monitor = NSEvent.addLocalMonitorForEvents(matching: mask, handler: handler) {
+    /// For this window's events only.
+    func addEventMonitor(matching mask: NSEvent.EventTypeMask, handler: @escaping (BrowserStore, NSEvent) -> NSEvent?) {
+        let monitor = NSEvent.addLocalMonitorForEvents(matching: mask) { [weak self] event in
+            guard let self, event.window === self.window else { return event }
+            return handler(self, event)
+        }
+        if let monitor {
             eventMonitors.append(monitor)
         }
     }
@@ -192,15 +195,28 @@ final class BrowserStore {
     }
 
     func selectedTab(in space: Space) -> BrowserTab? {
-        guard let id = selectedTabIDs[space.id] else { return nil }
-        return space.allTabs.first { $0.id == id }
+        selectedTabIDs[space.id].flatMap(space.tab(id:))
     }
 
-    /// The panes on screen: the selected tab, or all of the split it's in.
+    /// The one place selections change. What this window takes, with the
+    /// rest of its split, no other window keeps for when it comes back.
+    func setSelected(_ tab: BrowserTab?, in space: Space) {
+        selectedTabIDs[space.id] = tab?.id
+        guard let tab else { return }
+        let panes = Set(space.panes(with: tab).map(\.id))
+        for other in app.stores where other !== self && other.selectedTabIDs.values.contains(where: panes.contains) {
+            other.selectedTabIDs = other.selectedTabIDs.filter { !panes.contains($0.value) }
+        }
+    }
+
+    /// The panes on screen.
     private var shownTabs: [BrowserTab] {
-        guard let tab = selectedTab else { return [] }
-        let split = activeSpace.splitTabs
-        return split.contains(tab) ? split : [tab]
+        selectedTab.map(activeSpace.panes(with:)) ?? []
+    }
+
+    /// Pages on screen in other windows, which this one can't have.
+    var tabsElsewhere: Set<BrowserTab> {
+        Set(app.stores.filter { $0 !== self }.flatMap(\.shownTabs))
     }
 
     func isShowing(_ tab: BrowserTab) -> Bool {

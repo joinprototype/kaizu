@@ -17,7 +17,7 @@ extension BrowserStore {
     func finishCapture(_ rect: CGRect? = nil) {
         guard let id = capture else { return }
         cancelCapture()
-        if let tab = activeSpace.allTabs.first(where: { $0.id == id }) {
+        if let tab = activeSpace.tab(id: id) {
             copyScreenshot(of: tab, rect: rect)
         }
     }

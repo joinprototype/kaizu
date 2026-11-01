@@ -47,7 +47,7 @@ struct ArcImportView: View {
                     Toggle("Bring Today's tabs too", isOn: $includesToday)
                 } footer: {
                     if sidebar.skipped > 0 {
-                        FooterText("\(sidebar.skipped) \(sidebar.skipped == 1 ? "item" : "items") Kaizu can't open, like Easels and Notes, will stay behind.")
+                        FooterText("\(sidebar.skipped.counted("item")) Kaizu can't open, like Easels and Notes, will stay behind.")
                     }
                 }
             }
@@ -56,8 +56,8 @@ struct ArcImportView: View {
                 Spacer()
                 Button("Cancel") { UtilityWindows.closeArcImport() }
                     .keyboardShortcut(.cancelAction)
-                Button(plan.tabCount == 0 ? "Nothing New" : "Import \(plan.tabCount) \(plan.tabCount == 1 ? "Tab" : "Tabs")") {
-                    store.app.front.importFromArc(plan)
+                Button(plan.tabCount == 0 ? "Nothing New" : "Import \(plan.tabCount.counted("Tab"))") {
+                    store.importFromArc(plan)
                     UtilityWindows.closeArcImport()
                 }
                 .keyboardShortcut(.defaultAction)

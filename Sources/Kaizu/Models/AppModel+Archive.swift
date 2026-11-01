@@ -20,8 +20,9 @@ extension AppModel {
         }
     }
 
-    func archiveStaleTabs(now: Date = Date()) {
+    func archiveStaleTabs() {
         guard let interval = settings.archiveAfter.seconds else { return }
+        let now = Date()
         let cutoff = now.addingTimeInterval(-interval)
         var archived: [ArchivedTabRecord] = []
         for space in spaces {
@@ -36,10 +37,7 @@ extension AppModel {
             withAnimation(Motion.snap) {
                 space.today.removeAll { stale.contains($0) }
             }
-            for tab in stale {
-                extensions.didClose(tab)
-                tab.discard()
-            }
+            discard(stale)
         }
         guard !archived.isEmpty else { return }
         archive = Array((archived + archive).prefix(Self.archiveLimit))

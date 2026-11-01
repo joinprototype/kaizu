@@ -72,7 +72,7 @@ extension AppModel {
         guard let id = UUID(uuidString: identifier) else { return }
         let owner = spaces.first { $0.pinned.tabs.contains { $0.id == id } }
             ?? ([front.activeSpace] + spaces).first { $0.profile.favorites.contains { $0.id == id } }
-        let tab = owner?.allTabs.first { $0.id == id }
+        let tab = owner?.tab(id: id)
         let store = tab.flatMap(store(showing:)) ?? front
         store.window?.makeKeyAndOrderFront(nil)
         NSApp.activate()

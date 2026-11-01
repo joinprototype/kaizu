@@ -48,12 +48,12 @@ struct BrowsingDataImportView: View {
     }
 
     private var space: Space {
-        store.spaces.first { $0.id == spaceID } ?? store.app.front.activeSpace
+        store.spaces.first { $0.id == spaceID } ?? store.activeSpace
     }
 
-    private var bookmarks: (folder: FolderRecord, count: Int)? {
+    private var bookmarks: BookmarkImport? {
         guard let data, let source else { return nil }
-        return store.newBookmarks(in: data, named: source.folderName, for: space)
+        return data.bookmarkFolder(named: source.folderName, skipping: space.pinnedAddresses)
     }
 
     var body: some View {
@@ -99,10 +99,10 @@ struct BrowsingDataImportView: View {
     }
 
     @ViewBuilder
-    private func contents(of data: BrowsingData, bookmarks: (folder: FolderRecord, count: Int)?) -> some View {
+    private func contents(of data: BrowsingData, bookmarks: BookmarkImport?) -> some View {
         Section {
             if !data.visits.isEmpty {
-                Toggle("History: \(data.visits.count.formatted()) \(data.visits.count == 1 ? "page" : "pages")", isOn: $includesHistory)
+                Toggle("History: \(data.visits.count.counted("page"))", isOn: $includesHistory)
             }
             if let bookmarks {
                 Toggle("Bookmarks: \(bookmarks.count.formatted()) as a pinned folder", isOn: $includesBookmarks)
@@ -121,7 +121,7 @@ struct BrowsingDataImportView: View {
         }
     }
 
-    private func footer(for data: BrowsingData, bookmarks: (folder: FolderRecord, count: Int)?) -> String {
+    private func footer(for data: BrowsingData, bookmarks: BookmarkImport?) -> String {
         var notes = ["Kaizu only reads this and doesn't change it. Logins and extensions stay behind."]
         if data.visits.count == BrowsingData.visitLimit {
             notes.append("History is the newest \(BrowsingData.visitLimit.formatted()) pages.")
@@ -154,12 +154,12 @@ struct BrowsingDataImportView: View {
         source = .file(url)
     }
 
-    private func start(history: Bool, bookmarks: (folder: FolderRecord, count: Int)?) {
+    private func start(history: Bool, bookmarks: BookmarkImport?) {
         isImporting = true
         let visits = history ? data?.visits ?? [] : []
         let space = space
         Task {
-            await store.app.front.importBrowsingData(visits, bookmarks: bookmarks, into: space)
+            await store.app.importBrowsingData(visits, bookmarks: bookmarks, into: space)
             UtilityWindows.closeBrowsingDataImport()
         }
     }

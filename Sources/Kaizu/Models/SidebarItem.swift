@@ -72,6 +72,16 @@ extension [SidebarItem] {
         }
     }
 
+    func tab(id: UUID) -> BrowserTab? {
+        for item in self {
+            switch item {
+            case .tab(let tab): if tab.id == id { return tab }
+            case .folder(let folder): if let tab = folder.children.tab(id: id) { return tab }
+            }
+        }
+        return nil
+    }
+
     /// Removes the entry with `id` wherever it sits in the tree.
     @discardableResult
     mutating func remove(id: UUID) -> SidebarItem? {

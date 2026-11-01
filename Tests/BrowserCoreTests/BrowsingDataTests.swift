@@ -135,10 +135,10 @@ import Testing
 
     @Test func readsSafariHistory() throws {
         let visits = try #require(SafariExport.history(fromJSON: Data(Self.historyJSON.utf8)))
-        #expect(visits.map(\.url) == [Self.docs, Self.example])
-        #expect(visits[1].count == 4)
-        #expect(visits[1].title == "Example")
-        #expect(visits[1].lastVisit == Date(timeIntervalSince1970: 1_700_000_000))
+        #expect(visits.map(\.url) == [Self.example, Self.docs])
+        #expect(visits[0].count == 4)
+        #expect(visits[0].title == "Example")
+        #expect(visits[0].lastVisit == Date(timeIntervalSince1970: 1_700_000_000))
     }
 
     @Test func otherSafariFilesArentHistory() {
@@ -197,6 +197,12 @@ import Testing
         #expect(try FileManager.default.contentsOfDirectory(atPath: output.path) == ["Export.zip"])
     }
 
+    @Test func aLoneHistoryFileComesNewestFirst() throws {
+        let file = try folder().appending(path: "History.json")
+        try Data(Self.historyJSON.utf8).write(to: file)
+        #expect(try SafariExport.read(file).visits.map(\.url) == [Self.docs, Self.example])
+    }
+
     @Test func aFileThatIsntAnExportIsAnError() throws {
         let file = try folder().appending(path: "Export.zip")
         try Data("not a zip".utf8).write(to: file)
@@ -212,8 +218,9 @@ import Testing
             .folder(name: "Work", children: [.page(title: "Guide", url: Self.docs)]),
             .folder(name: "Pinned already", children: [.page(title: "Pinned", url: URL(string: "https://pinned.example.com/")!)]),
         ])
-        let (folder, count) = try #require(data.bookmarkFolder(named: "Chrome Bookmarks", skipping: [URL(string: "https://pinned.example.com/")!]))
-        #expect(count == 2)
+        let result = try #require(data.bookmarkFolder(named: "Chrome Bookmarks", skipping: [URL(string: "https://pinned.example.com/")!]))
+        let folder = result.folder
+        #expect(result.count == 2)
         #expect(folder.name == "Chrome Bookmarks")
         #expect(!folder.isExpanded)
         #expect(folder.children.count == 2)

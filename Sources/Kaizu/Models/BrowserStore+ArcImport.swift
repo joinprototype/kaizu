@@ -5,7 +5,7 @@ import SwiftUI
 extension BrowserStore {
     func arcImport(of sidebar: ArcSidebar, includesToday: Bool) -> ArcImport {
         ArcImport(
-            sidebar, profiles: profiles.map(\.record), spaces: spaces.map { $0.record() }, includesToday: includesToday,
+            sidebar, profiles: profiles.map(\.record), spaces: spaces.map(\.record), includesToday: includesToday,
             hues: Theme.all.map(\.hue), symbols: Space.symbols
         )
     }
@@ -52,16 +52,16 @@ extension BrowserStore {
         scheduleSave()
 
         let count = plan.tabCount
-        showToast("Imported \(count) \(count == 1 ? "tab" : "tabs") from Arc", symbol: "square.and.arrow.down", undo: { [weak self] in
+        showToast("Imported \(count.counted("tab")) from Arc", symbol: "square.and.arrow.down", undo: { [weak self] in
             guard let self else { return }
             newSpaces.forEach(self.delete)
             for (profile, ids) in favorites {
-                self.close(profile.favorites.filter { ids.contains($0.id) })
+                self.app.discard(profile.favorites.filter { ids.contains($0.id) })
                 profile.favorites.removeAll { ids.contains($0.id) }
             }
             for (space, ids) in sections {
                 let items = space.pinned.filter { ids.contains($0.id) }
-                self.close(items.tabs + space.today.filter { ids.contains($0.id) })
+                self.app.discard(items.tabs + space.today.filter { ids.contains($0.id) })
                 space.pinned.removeAll { ids.contains($0.id) }
                 space.today.removeAll { ids.contains($0.id) }
             }
@@ -71,12 +71,5 @@ extension BrowserStore {
             }
             self.scheduleSave()
         }, lasts: .seconds(12))
-    }
-
-    func close(_ tabs: [BrowserTab]) {
-        for tab in tabs {
-            extensions.didClose(tab)
-            tab.discard()
-        }
     }
 }

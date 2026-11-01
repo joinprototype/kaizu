@@ -23,10 +23,6 @@ extension BrowserStore {
         reader = nil
         closePeek()
         endHidingItems()
-        // Another window on this space may have taken the tab since.
-        if let tab = selectedTab(in: space), !isFree(tab) {
-            selectedTabIDs[space.id] = nil
-        }
         selectedTab(in: space)?.activate()
         focusWebView()
         scheduleSave()
@@ -50,46 +46,34 @@ extension BrowserStore {
         spaces.first { $0.id == revealingSpaceID }
     }
 
-    func switchToSpace(number: Int) {
-        guard spaces.indices.contains(number - 1) else { return }
-        switchTo(spaces[number - 1])
-    }
-
-    func switchToAdjacentSpace(_ offset: Int) {
-        if let space = adjacentSpace(offset) {
-            switchTo(space)
-        }
-    }
-
     /// Two-finger swipe left/right over the sidebar switches spaces, like
     /// Arc. The sidebar follows the fingers one to one, with the next space
     /// beside it (rubber-banding past the first and last), and on release
     /// a flick or a swipe past halfway carries on into the next space at the
     /// fingers' speed; otherwise it springs back.
     func installSpaceSwipeMonitor() {
-        addEventMonitor(matching: .scrollWheel) { [weak self] event in
-            guard let self, event.window === self.window, self.isSidebarVisible || self.isSidebarPeeking,
-                  event.locationInWindow.x < self.sidebarWidth
+        addEventMonitor(matching: .scrollWheel) { store, event in
+            guard store.isSidebarVisible || store.isSidebarPeeking, event.locationInWindow.x < store.sidebarWidth
             else { return event }
             switch event.phase {
             case .began:
-                self.spaceSwipeTravel = 0
-                self.spaceSwipeSamples = []
-                self.spaceSwipeGeneration += 1
+                store.spaceSwipeTravel = 0
+                store.spaceSwipeSamples = []
+                store.spaceSwipeGeneration += 1
             case .changed:
-                guard var travel = self.spaceSwipeTravel, event.scrollingDeltaX != 0 || event.scrollingDeltaY != 0 else { break }
+                guard var travel = store.spaceSwipeTravel, event.scrollingDeltaX != 0 || event.scrollingDeltaY != 0 else { break }
                 // Vertical from the start: it's a scroll, leave it alone.
                 if travel == 0, abs(event.scrollingDeltaY) >= abs(event.scrollingDeltaX) {
-                    self.spaceSwipeTravel = nil
+                    store.spaceSwipeTravel = nil
                     break
                 }
                 // Positive when the fingers move left, whichever way scrolling is set.
                 travel += event.scrollingDeltaX * (event.isDirectionInvertedFromDevice ? -1 : 1)
-                self.trackSpaceSwipe(to: travel, at: event.timestamp)
+                store.trackSpaceSwipe(to: travel, at: event.timestamp)
             case .ended, .cancelled:
-                guard let travel = self.spaceSwipeTravel else { break }
-                self.spaceSwipeTravel = nil
-                self.finishSpaceSwipe(travel: travel, at: event.timestamp, switches: event.phase == .ended)
+                guard let travel = store.spaceSwipeTravel else { break }
+                store.spaceSwipeTravel = nil
+                store.finishSpaceSwipe(travel: travel, at: event.timestamp, switches: event.phase == .ended)
             default:
                 break
             }
@@ -216,11 +200,7 @@ extension BrowserStore {
     func delete(_ space: Space) {
         guard spaces.count > 1, let index = spaces.firstIndex(where: { $0 === space }) else { return }
         let deletingProfile = deletesProfile(space)
-        let tabs = space.pinned.tabs + space.today + (deletingProfile ? space.profile.favorites : [])
-        for tab in tabs {
-            extensions.didClose(tab)
-            tab.discard()
-        }
+        app.discard(space.pinned.tabs + space.today + (deletingProfile ? space.profile.favorites : []))
         app.closedTabs.removeAll { $0.spaceID == space.id }
         app.archive.removeAll { $0.spaceID == space.id }
         settings.linkRoutes.removeAll { $0.spaceID == space.id }
@@ -228,7 +208,7 @@ extension BrowserStore {
             if space.id == store.activeSpaceID {
                 store.switchTo(spaces[index == 0 ? 1 : index - 1])
             }
-            store.selectedTabIDs[space.id] = nil
+            store.setSelected(nil, in: space)
         }
         withAnimation(Motion.snap) {
             _ = spaces.remove(at: index)

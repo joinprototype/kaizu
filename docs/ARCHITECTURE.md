@@ -168,7 +168,7 @@ struct Command: Identifiable {
 
 | Concern | Files |
 |---|---|
-| Shared state | `Models/AppModel.swift` + `AppModel+Persistence/Archive/Hibernation/Choices/Spotlight/QuickBar.swift` |
+| Shared state | `Models/AppModel.swift` + `AppModel+Persistence/Archive/Hibernation/Choices/Spotlight/QuickBar/DataImport.swift` |
 | A window's state and actions | `Models/BrowserStore.swift` + `BrowserStore+Tabs/Spaces/Split/Recents/Find/Peek/Reader/External/Privacy/Commands.swift`, `App/BrowserWindowController.swift` |
 | A tab and its web view | `Models/BrowserTab.swift` (navigation and UI delegates, permissions, mute, picture in picture, `MediaEvents`) |
 | Command bar | `Views/CommandBar.swift`, `Views/KeyTextField.swift` (inline completion); answers in `BrowserCore/QuickAnswer.swift`, `CurrencyConversion.swift`, `SearchShortcut.swift`, `InlineCompletion.swift`; command registry in `BrowserStore+Commands.swift` |
@@ -176,7 +176,7 @@ struct Command: Identifiable {
 | Extensions | `WebEngine/ExtensionHost.swift`, `ExtensionAdapters.swift`, `Views/ExtensionViews.swift` |
 | Reader | `BrowserStore+Reader.swift` (Readability in an isolated world), `Views/ReaderView.swift` |
 | Arc import | `BrowserCore/ArcSidebar.swift` (reads the file), `ArcImport.swift` (plans what to add, adds only), `Models/BrowserStore+ArcImport.swift`, `Views/ArcImportView.swift` |
-| Browsing data import | `BrowserCore/BrowsingData.swift`, `ChromiumProfile.swift` (reads a copy of `History`, plus `Bookmarks`), `SafariExport.swift` (streams only history and bookmarks out of the .zip, nothing unpacked; it also holds passwords), `Models/BrowserStore+DataImport.swift`, `Views/BrowsingDataImportView.swift` |
+| Browsing data import | `BrowserCore/BrowsingData.swift`, `ChromiumProfile.swift` (reads a copy of `History`, plus `Bookmarks`), `SafariExport.swift` (streams only history and bookmarks out of the .zip, nothing unpacked; it also holds passwords), `Models/AppModel+DataImport.swift`, `Views/BrowsingDataImportView.swift` |
 | Network fetches we make | filter lists (daily), favicons (http/https, 1 MB cap), ECB rates (on first currency query), search suggestions (opt-in) |
 | Bundled page scripts | `Resources/Scripts/` (see its README for sources and licenses) |
 

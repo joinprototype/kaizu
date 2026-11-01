@@ -82,10 +82,8 @@ struct HistoryView: View {
     }
 
     private func open(_ entry: HistoryStore.Entry) {
-        // The window it was opened from may be gone by now.
-        let front = store.app.front
-        front.openTab(entry.url)
-        front.window?.makeKeyAndOrderFront(nil)
+        store.openTab(entry.url)
+        store.window?.makeKeyAndOrderFront(nil)
     }
 
     private func delete(_ entry: HistoryStore.Entry, profile: UUID) {

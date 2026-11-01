@@ -12,8 +12,7 @@ struct ContentArea: View {
     var body: some View {
         Group {
             if let tab = store.selectedTab(in: space) {
-                let split = space.splitTabs
-                SplitContent(space: space, panes: split.contains(tab) ? split : [tab], focused: tab)
+                SplitContent(space: space, panes: space.panes(with: tab), focused: tab)
             } else {
                 EmptyState()
                     .pageCard()

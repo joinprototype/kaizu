@@ -17,7 +17,7 @@ extension BrowserStore {
     var paletteCommands: [PaletteCommand] {
         var commands: [PaletteCommand] = [
             PaletteCommand(id: "settings", title: "Open Settings", symbol: "gearshape", keywords: ["preferences"], shortcut: "⌘,") {
-                UtilityWindows.showSettings(store: self)
+                UtilityWindows.showSettings(app: self.app)
             },
             PaletteCommand(id: "space.new", title: "New Space", symbol: "plus.square.on.square", keywords: ["profile"], shortcut: "⇧⌘N") {
                 self.beginNewSpace()
@@ -35,7 +35,7 @@ extension BrowserStore {
                 self.openPrivateWindow()
             },
             PaletteCommand(id: "history.show", title: "Show History", symbol: "clock", shortcut: "⌘Y") {
-                UtilityWindows.showHistory(store: self)
+                UtilityWindows.showHistory(app: self.app)
             },
             PaletteCommand(id: "folder.new", title: "New Folder", symbol: "folder.badge.plus", keywords: ["group"]) {
                 self.newFolder()

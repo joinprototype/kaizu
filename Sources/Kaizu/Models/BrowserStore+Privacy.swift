@@ -23,10 +23,10 @@ extension BrowserStore {
     /// Off a website there's no site to report, so a plain bug report instead.
     func reportBrokenSite(_ tab: BrowserTab? = nil) {
         guard let tab = tab ?? commandTab ?? selectedTab, let url = tab.url, BrokenSiteReport.site(of: url) != nil else {
-            UtilityWindows.showBugReport(store: self)
+            UtilityWindows.showBugReport(app: app)
             return
         }
-        UtilityWindows.showBrokenSiteReport(tab: tab, url: url, store: self)
+        UtilityWindows.showBrokenSiteReport(tab: tab, url: url, app: app)
     }
 
     func toggleCookieRejection() {

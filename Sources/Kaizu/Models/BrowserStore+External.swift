@@ -62,16 +62,11 @@ extension BrowserStore {
         scheduleSave()
     }
 
-    /// The little window in front, if one is the key window.
-    var keyLittleWindow: LittleWindowController? {
-        app.littleWindows.first { $0.window?.isKeyWindow == true }
-    }
-
     /// The tab menu commands (reload, back, zoom, copy link…) act on: the key
     /// little window's, or the selected tab while the main window is key.
     /// Nil in Settings or History, so ⌘R there doesn't reach a hidden page.
     var commandTab: BrowserTab? {
-        if let littleWindow = keyLittleWindow { return littleWindow.tab }
+        if let littleWindow = app.keyLittleWindow { return littleWindow.tab }
         return window?.isKeyWindow == true ? selectedTab : nil
     }
 }

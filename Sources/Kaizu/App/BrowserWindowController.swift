@@ -28,7 +28,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         if let frame = store.savedFrame {
             window.setFrame(from: frame)
         } else if store === store.app.stores[0] {
-            window.setFrameAutosaveName(Self.frameName)
+            // Where sessions from before several windows left it.
+            window.setFrameUsingName(Self.frameName)
         }
 
         super.init(window: window)
@@ -44,15 +45,16 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         fatalError("init(coder:) has not been implemented")
     }
 
-    /// This window became the first: its frame is the one autosaved now,
-    /// without moving it to where the old first window was.
-    func takeAutosavedFrame() {
-        window?.saveFrame(usingName: Self.frameName)
-        window?.setFrameAutosaveName(Self.frameName)
-    }
-
     func windowDidBecomeKey(_ notification: Notification) {
         store.app.windowDidBecomeKey(store)
+    }
+
+    func windowDidMove(_ notification: Notification) {
+        store.app.scheduleSave()
+    }
+
+    func windowDidEndLiveResize(_ notification: Notification) {
+        store.app.scheduleSave()
     }
 
     func windowWillClose(_ notification: Notification) {

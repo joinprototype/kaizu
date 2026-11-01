@@ -54,11 +54,11 @@ final class Diagnostics: NSObject, MXMetricManagerSubscriber, Sendable {
         }
     }
 
-    /// Everything worth attaching from the last `days` days: MetricKit's
+    /// Everything worth attaching from the last two weeks: MetricKit's
     /// reports, Kaizu's own crash reports, and those of WebKit processes
     /// (pages, GPU, network) that Kaizu started.
-    static func recentReports(days: Int = 14) -> [URL] {
-        let since = Date.now.addingTimeInterval(-Double(days) * 24 * 3600)
+    static func recentReports() -> [URL] {
+        let since = Date.now.addingTimeInterval(-14 * 24 * 3600)
         let manager = FileManager.default
         let keys: Set<URLResourceKey> = [.contentModificationDateKey]
         func files(in directory: URL) -> [URL] {

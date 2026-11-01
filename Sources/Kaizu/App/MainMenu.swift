@@ -73,7 +73,7 @@ enum MainMenu {
         menu.addItem(withTitle: "About Kaizu", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
         menu.addItem(ActionMenuItem("Check for Updates…") { Updates.checkNow(app: app) })
         menu.addItem(.separator())
-        menu.addItem(ActionMenuItem("Settings…", key: ",") { UtilityWindows.showSettings(store: app.front) })
+        menu.addItem(ActionMenuItem("Settings…", key: ",") { UtilityWindows.showSettings(app: app) })
         menu.addItem(.separator())
         menu.addItem(withTitle: "Hide Kaizu", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         let hideOthers = menu.addItem(withTitle: "Hide Others", action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h")
@@ -92,11 +92,11 @@ enum MainMenu {
         menu.addItem(ActionMenuItem("Reopen Closed Tab", key: "t", modifiers: [.command, .shift]) { app.front.reopenClosedTab() })
         menu.addItem(ActionMenuItem("New Little Window", key: "n", modifiers: [.command, .option]) { app.front.openLittleWindow() })
         menu.addItem(ActionMenuItem("New Private Window", key: "p", modifiers: [.command, .shift]) { app.front.openPrivateWindow() })
-        menu.addItem(ActionMenuItem("Open Little Window in Kaizu", key: "o") { app.front.keyLittleWindow?.promote() })
+        menu.addItem(ActionMenuItem("Open Little Window in Kaizu", key: "o") { app.keyLittleWindow?.promote() })
         menu.addItem(.separator())
         menu.addItem(ActionMenuItem("New Space…", key: "n", modifiers: [.command, .shift]) { app.front.beginNewSpace() })
-        menu.addItem(ActionMenuItem("Import from Arc…") { UtilityWindows.showArcImport(store: app.front) })
-        menu.addItem(ActionMenuItem("Import Browsing Data…") { UtilityWindows.showBrowsingDataImport(store: app.front) })
+        menu.addItem(ActionMenuItem("Import from Arc…") { UtilityWindows.showArcImport(app: app) })
+        menu.addItem(ActionMenuItem("Import Browsing Data…") { UtilityWindows.showBrowsingDataImport(app: app) })
         menu.addItem(.separator())
         menu.addItem(ActionMenuItem("Capture…", key: "2", modifiers: [.command, .shift]) {
             app.front.commandTab.map { app.front.beginCapture(of: $0) }
@@ -173,7 +173,7 @@ enum MainMenu {
         menu.addItem(ActionMenuItem("Back", key: "[") { app.front.commandTab?.goBack() })
         menu.addItem(ActionMenuItem("Forward", key: "]") { app.front.commandTab?.goForward() })
         menu.addItem(.separator())
-        menu.addItem(ActionMenuItem("Show All History", key: "y") { UtilityWindows.showHistory(store: app.front) })
+        menu.addItem(ActionMenuItem("Show All History", key: "y") { UtilityWindows.showHistory(app: app) })
         menu.addItem(ActionMenuItem("Clear History…") { app.front.clearHistory() })
         return menu
     }
@@ -221,7 +221,7 @@ enum MainMenu {
 
     private static func helpMenu(_ app: AppModel) -> NSMenu {
         let menu = NSMenu(title: "Help")
-        menu.addItem(ActionMenuItem("Report a Bug…") { UtilityWindows.showBugReport(store: app.front) })
+        menu.addItem(ActionMenuItem("Report a Bug…") { UtilityWindows.showBugReport(app: app) })
         menu.addItem(ActionMenuItem("Report a Broken Site…") { app.front.reportBrokenSite() })
         return menu
     }

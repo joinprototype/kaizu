@@ -44,7 +44,7 @@ enum DebugHooks {
         func log(_ text: String) {
             FileHandle.standardError.write(Data("QA browsing data: \(text)\n".utf8))
         }
-        UtilityWindows.showBrowsingDataImport(store: store)
+        UtilityWindows.showBrowsingDataImport(app: store.app)
         log("browsers \(ChromiumProfile.installed().map(\.title))")
         guard let path = ProcessInfo.processInfo.environment["KAIZU_IMPORT"] else {
             Task {
@@ -67,13 +67,13 @@ enum DebugHooks {
                 let space = store.activeSpace
                 let profile = space.profile.id
                 let pinnedBefore = space.pinned.count
-                let bookmarks = store.newBookmarks(in: data, named: source.folderName, for: space)
+                let bookmarks = data.bookmarkFolder(named: source.folderName, skipping: space.pinnedAddresses)
                 log("read \(data.visits.count) pages, \(bookmarks?.count ?? 0) new bookmarks")
-                await store.importBrowsingData(data.visits, bookmarks: bookmarks, into: space)
+                await store.app.importBrowsingData(data.visits, bookmarks: bookmarks, into: space)
                 let stored = await store.history?.recent(profile: profile, limit: 100_000).count ?? 0
                 log("toast \(store.toast?.message ?? "none")")
                 log("stored \(stored) pages, pinned \(pinnedBefore) -> \(space.pinned.count), folder open \(space.pinned.folders.last?.isExpanded ?? false)")
-                log("second time \(store.newBookmarks(in: data, named: source.folderName, for: space)?.count ?? 0) new bookmarks")
+                log("second time \(data.bookmarkFolder(named: source.folderName, skipping: space.pinnedAddresses)?.count ?? 0) new bookmarks")
                 store.undoToast()
                 try? await Task.sleep(for: .seconds(1))
                 let left = await store.history?.recent(profile: profile, limit: 100_000).count ?? 0
@@ -103,6 +103,7 @@ enum DebugHooks {
                 check("two windows came back", app.stores.count == 2)
                 check("each window kept its own tab", store.selectedTab != nil && second.selectedTab != nil && store.selectedTab !== second.selectedTab)
                 check("second window kept its place", saved != nil && second.window?.frameDescriptor == saved)
+                check("first window kept its place", store.savedFrame != nil && store.window?.frameDescriptor == store.savedFrame)
                 second.window?.performClose(nil)
                 await settle()
                 check("closing a window leaves its tabs in the sidebar", app.stores.count == 1 && store.activeSpace.today.count == 3)
@@ -186,6 +187,7 @@ enum DebugHooks {
             await settle()
             check("a closed window's tabs can show elsewhere", app.stores.count == 2 && one.webView.window === store.window)
 
+            store.window?.setFrameOrigin(NSPoint(x: 240, y: 60))
             second.window?.setFrameOrigin(NSPoint(x: 200, y: 90))
             NSApp.terminate(nil)
         }
@@ -407,7 +409,7 @@ enum DebugHooks {
                 }
             }
         case "settings":
-            UtilityWindows.showSettings(store: store)
+            UtilityWindows.showSettings(app: store.app)
         case "peek":
             if let tab = store.selectedTab {
                 store.peek(URL(string: "https://www.swift.org/about/")!, from: tab)
@@ -420,9 +422,9 @@ enum DebugHooks {
                 Task { await store.extensions.install(from: URL(fileURLWithPath: path), askFirst: false) }
             }
         case "history":
-            UtilityWindows.showHistory(store: store)
+            UtilityWindows.showHistory(app: store.app)
         case "bugreport":
-            UtilityWindows.showBugReport(store: store)
+            UtilityWindows.showBugReport(app: store.app)
             // Also writes a report (as "Show in Finder" would) and logs where.
             Task {
                 try? await Task.sleep(for: .seconds(3))
@@ -442,7 +444,7 @@ enum DebugHooks {
                 FileHandle.standardError.write(Data("QA broken site: \(details)\n".utf8))
             }
         case "arcimport":
-            UtilityWindows.showArcImport(store: store, from: arcFile)
+            UtilityWindows.showArcImport(app: store.app, from: arcFile)
             Task {
                 try? await Task.sleep(for: .seconds(2))
                 saveShot(ofWindow: "Import from Arc")

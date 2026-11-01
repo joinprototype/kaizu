@@ -54,15 +54,31 @@ final class Space: Identifiable {
 
     /// The split's tabs that still exist, in order; empty unless at least two do.
     var splitTabs: [BrowserTab] {
-        let tabs = split.compactMap { id in allTabs.first { $0.id == id } }
+        let tabs = split.compactMap(tab(id:))
         return tabs.count > 1 ? tabs : []
     }
 
-    /// `selectedTabID` is the first window's: each window keeps its own.
-    func record(selectedTabID: UUID? = nil) -> SpaceRecord {
+    /// What shows when `tab` is selected: the split it's in, or it alone.
+    func panes(with tab: BrowserTab) -> [BrowserTab] {
+        let split = splitTabs
+        return split.contains(tab) ? split : [tab]
+    }
+
+    /// Selection asks this several times per render, so it doesn't build `allTabs`.
+    func tab(id: UUID) -> BrowserTab? {
+        today.first { $0.id == id } ?? profile.favorites.first { $0.id == id } ?? pinned.tab(id: id)
+    }
+
+    /// Where the space's pinned tabs and favorites live, for not adding them twice.
+    var pinnedAddresses: Set<URL> {
+        Set((pinned.tabs + profile.favorites).compactMap { $0.pinnedURL ?? $0.url })
+    }
+
+    /// Without a selection: each window keeps its own.
+    var record: SpaceRecord {
         SpaceRecord(
             id: id, name: name, symbol: symbol, hue: hue, profileID: profile.id,
-            selectedTabID: selectedTabID, pinned: pinned.map(\.record), today: today.map(\.record),
+            selectedTabID: nil, pinned: pinned.map(\.record), today: today.map(\.record),
             split: split.isEmpty ? nil : split,
             splitWidths: splitWidths.isEmpty ? nil : splitWidths,
             appearance: appearance == .auto ? nil : appearance.rawValue

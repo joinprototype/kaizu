@@ -18,6 +18,8 @@ public struct SessionRecord: Codable, Equatable, Sendable {
     /// windows still decode without a migration, and older builds can read
     /// these.
     public var extraWindows: [WindowRecord]?
+    /// Where the first window was. Nil in older files, whose frame is in the defaults.
+    public var frame: String?
 
     public init(
         activeSpaceID: UUID?,
@@ -25,7 +27,8 @@ public struct SessionRecord: Codable, Equatable, Sendable {
         sidebarWidth: Double,
         profiles: [ProfileRecord],
         spaces: [SpaceRecord],
-        extraWindows: [WindowRecord]? = nil
+        extraWindows: [WindowRecord]? = nil,
+        frame: String? = nil
     ) {
         self.schemaVersion = Self.currentVersion
         self.activeSpaceID = activeSpaceID
@@ -34,6 +37,25 @@ public struct SessionRecord: Codable, Equatable, Sendable {
         self.profiles = profiles
         self.spaces = spaces
         self.extraWindows = extraWindows
+        self.frame = frame
+    }
+
+    /// `windows` first one first; there's always at least one.
+    public init(windows: [WindowRecord], profiles: [ProfileRecord], spaces: [SpaceRecord]) {
+        let first = windows[0]
+        self.init(
+            activeSpaceID: first.activeSpaceID,
+            isSidebarVisible: first.isSidebarVisible,
+            sidebarWidth: first.sidebarWidth,
+            profiles: profiles,
+            spaces: spaces.map { space in
+                var space = space
+                space.selectedTabID = first.selectedTabIDs[space.id]
+                return space
+            },
+            extraWindows: windows.count > 1 ? Array(windows.dropFirst()) : nil,
+            frame: first.frame
+        )
     }
 
     /// Every window to reopen, first one first.
@@ -41,7 +63,7 @@ public struct SessionRecord: Codable, Equatable, Sendable {
         let selected = spaces.compactMap { space in space.selectedTabID.map { (space.id, $0) } }
         let first = WindowRecord(
             activeSpaceID: activeSpaceID, isSidebarVisible: isSidebarVisible, sidebarWidth: sidebarWidth,
-            selectedTabIDs: Dictionary(selected) { first, _ in first }
+            selectedTabIDs: Dictionary(selected) { first, _ in first }, frame: frame
         )
         return [first] + (extraWindows ?? [])
     }
@@ -54,8 +76,7 @@ public struct WindowRecord: Codable, Equatable, Sendable {
     public var sidebarWidth: Double
     /// The tab each space shows here, by space.
     public var selectedTabIDs: [UUID: UUID]
-    /// `NSWindow.frameDescriptor`. Nil for the first window, whose frame is
-    /// autosaved in the defaults.
+    /// `NSWindow.frameDescriptor`.
     public var frame: String?
 
     public init(

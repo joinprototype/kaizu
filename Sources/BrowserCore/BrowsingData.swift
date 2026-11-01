@@ -1,5 +1,11 @@
 import Foundation
 
+/// Bookmarks ready to add: a closed pinned folder, and how many pages it holds.
+public struct BookmarkImport: Sendable {
+    public var folder: FolderRecord
+    public var count: Int
+}
+
 /// What another browser hands over: pages it has been to, and its bookmarks.
 public struct BrowsingData: Equatable, Sendable {
     public struct Visit: Equatable, Sendable {
@@ -42,14 +48,12 @@ public struct BrowsingData: Equatable, Sendable {
 
     /// Only pages: a bookmarklet is a script, and `file:` isn't the web.
     static func webURL(_ text: String) -> URL? {
-        guard let url = URL(string: text), let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" else { return nil }
-        return url
+        URL(string: text).flatMap { $0.isWebPage ? $0 : nil }
     }
 
     /// The bookmarks as one closed pinned folder, leaving out addresses in
-    /// `known` and repeats. Nil when none of them are new. `count` is how many
-    /// it holds, `bookmarkLimit` at most.
-    public func bookmarkFolder(named name: String, skipping known: Set<URL>) -> (folder: FolderRecord, count: Int)? {
+    /// `known` and repeats, `bookmarkLimit` at most. Nil when none are new.
+    public func bookmarkFolder(named name: String, skipping known: Set<URL>) -> BookmarkImport? {
         var seen = known
         var count = 0
         func records(_ bookmarks: [Bookmark]) -> [SidebarItemRecord] {
@@ -66,6 +70,13 @@ public struct BrowsingData: Equatable, Sendable {
             }
         }
         let children = records(bookmarks)
-        return children.isEmpty ? nil : (FolderRecord(id: UUID(), name: name, isExpanded: false, children: children), count)
+        return children.isEmpty ? nil : BookmarkImport(folder: FolderRecord(id: UUID(), name: name, isExpanded: false, children: children), count: count)
+    }
+}
+
+extension URL {
+    var isWebPage: Bool {
+        let scheme = scheme?.lowercased()
+        return scheme == "http" || scheme == "https"
     }
 }

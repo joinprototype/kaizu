@@ -28,7 +28,7 @@ final class LittleWindowController: NSWindowController, NSWindowDelegate {
 
         let view = LittleBrowserView(tab: tab) { [weak self] in self?.promote() }
         window.title = tab.profile.isPrivate ? "Private" : "Little Window"
-        let hostingView = NSHostingView(rootView: view.environment(app.front))
+        let hostingView = NSHostingView(rootView: FollowsFrontWindow(app: app, content: view))
         hostingView.sizingOptions = []
         window.contentView = hostingView
         window.delegate = self

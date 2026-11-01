@@ -10,15 +10,18 @@ public enum SafariExport {
     /// A .zip from Safari, or a lone history .json or bookmarks .html (any
     /// browser's bookmarks export is this format).
     public static func read(_ file: URL) throws -> BrowsingData {
+        var data: BrowsingData
         switch file.pathExtension.lowercased() {
         case "zip":
-            return try readArchive(file)
+            data = try readArchive(file)
         case "json":
             guard let visits = history(fromJSON: try Data(contentsOf: file)) else { throw BrowsingData.Failure.unreadable }
-            return BrowsingData(visits: visits)
+            data = BrowsingData(visits: visits)
         default:
-            return BrowsingData(bookmarks: bookmarks(fromHTML: try String(contentsOf: file, encoding: .utf8)))
+            data = BrowsingData(bookmarks: bookmarks(fromHTML: try String(contentsOf: file, encoding: .utf8)))
         }
+        data.visits = Array(data.visits.sorted { $0.lastVisit > $1.lastVisit }.prefix(BrowsingData.visitLimit))
+        return data
     }
 
     private static func readArchive(_ file: URL) throws -> BrowsingData {
@@ -36,7 +39,6 @@ public enum SafariExport {
                 data.visits += visits
             }
         }
-        data.visits = Array(data.visits.sorted { $0.lastVisit > $1.lastVisit }.prefix(BrowsingData.visitLimit))
         return data
     }
 
@@ -89,14 +91,13 @@ public enum SafariExport {
         guard let file = try? JSONDecoder().decode(HistoryFile.self, from: data),
               file.metadata?.dataType == "history", let items = file.history
         else { return nil }
-        let visits = items.compactMap { item -> BrowsingData.Visit? in
+        return items.compactMap { item in
             guard item.redirectsTo == nil, item.failed != true, let url = BrowsingData.webURL(item.url) else { return nil }
             return BrowsingData.Visit(
                 url: url, title: item.title ?? "", count: max(item.count ?? 1, 1),
                 lastVisit: Date(timeIntervalSince1970: item.time / 1_000_000)
             )
         }
-        return Array(visits.sorted { $0.lastVisit > $1.lastVisit }.prefix(BrowsingData.visitLimit))
     }
 
     /// The Netscape bookmarks format: `<DL>` lists of `<A HREF>` pages, each
