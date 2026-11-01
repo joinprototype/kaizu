@@ -4,7 +4,7 @@ import BrowserCore
 import CoreSpotlight
 
 /// Lets screenshots / manual QA jump straight into a UI state:
-///   KAIZU_DEBUG=commandbar|location|space|settings|history|private|peek|switcher|extension|nosidebar|reader|pin|split|splitdrop|capture|quickbar|open|swipe|spotlight|spotlightreset|commands|learn|appearance|hide|hotkeys|tour|bugreport|brokensite|windows|arcimport|arcimport-run .build/debug/Kaizu
+///   KAIZU_DEBUG=commandbar|location|space|settings|history|private|peek|switcher|extension|nosidebar|reader|pin|split|splitdrop|capture|quickbar|open|swipe|spotlight|spotlightreset|commands|learn|appearance|hide|hotkeys|tour|bugreport|brokensite|windows|browsingdata|arcimport|arcimport-run .build/debug/Kaizu
 /// With `commandbar` or `quickbar`, KAIZU_TYPE="gi" types into it key by key (through
 /// the real field editor, so inline completion runs).
 /// `reader` shows Reader for the selected tab, or for KAIZU_URL.
@@ -20,6 +20,8 @@ import CoreSpotlight
 /// Report… to the form; KAIZU_SHOT=/path.png saves the form as a picture.
 /// `windows` drives several windows, logs each rule as ok or FAILED, saves and
 /// quits; run again on the same KAIZU_SUPPORT to check what came back.
+/// `browsingdata` opens Import Browsing Data; with KAIZU_IMPORT set to a profile
+/// folder, an export file, or "arc", it imports that, logs the result and undoes it.
 /// `arcimport` opens Import from Arc; `arcimport-run` imports without it and logs
 /// the result. KAIZU_ARC=/path/to/StorableSidebar.json reads that instead of Arc's.
 @MainActor
@@ -36,6 +38,50 @@ enum DebugHooks {
         else { return }
         view.cacheDisplay(in: view.bounds, to: picture)
         try? picture.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
+    }
+
+    private static func qaBrowsingData(_ store: BrowserStore) {
+        func log(_ text: String) {
+            FileHandle.standardError.write(Data("QA browsing data: \(text)\n".utf8))
+        }
+        UtilityWindows.showBrowsingDataImport(store: store)
+        log("browsers \(ChromiumProfile.installed().map(\.title))")
+        guard let path = ProcessInfo.processInfo.environment["KAIZU_IMPORT"] else {
+            Task {
+                try? await Task.sleep(for: .seconds(3))
+                saveShot(ofWindow: "Import Browsing Data")
+            }
+            return
+        }
+        let source: BrowsingDataImportView.Source
+        if path == "arc", let arc = ChromiumProfile.installed().first(where: { $0.browser == "Arc" }) {
+            source = .browser(arc)
+        } else if path.hasSuffix(".zip") || path.hasSuffix(".html") || path.hasSuffix(".json") {
+            source = .file(URL(fileURLWithPath: path))
+        } else {
+            source = .browser(ChromiumProfile(browser: "QA", title: "QA", directory: URL(fileURLWithPath: path)))
+        }
+        Task {
+            do {
+                let data = try await Task.detached { try source.read() }.value
+                let space = store.activeSpace
+                let profile = space.profile.id
+                let pinnedBefore = space.pinned.count
+                let bookmarks = store.newBookmarks(in: data, named: source.folderName, for: space)
+                log("read \(data.visits.count) pages, \(bookmarks?.count ?? 0) new bookmarks")
+                await store.importBrowsingData(data.visits, bookmarks: bookmarks, into: space)
+                let stored = await store.history?.recent(profile: profile, limit: 100_000).count ?? 0
+                log("toast \(store.toast?.message ?? "none")")
+                log("stored \(stored) pages, pinned \(pinnedBefore) -> \(space.pinned.count), folder open \(space.pinned.folders.last?.isExpanded ?? false)")
+                log("second time \(store.newBookmarks(in: data, named: source.folderName, for: space)?.count ?? 0) new bookmarks")
+                store.undoToast()
+                try? await Task.sleep(for: .seconds(1))
+                let left = await store.history?.recent(profile: profile, limit: 100_000).count ?? 0
+                log("after undo \(left) pages, pinned \(space.pinned.count)")
+            } catch {
+                log("failed \(error)")
+            }
+        }
     }
 
     private static func qaWindows(_ store: BrowserStore) {
@@ -242,6 +288,8 @@ enum DebugHooks {
             }
         case "windows":
             qaWindows(store)
+        case "browsingdata":
+            qaBrowsingData(store)
         case "commands":
             // Logs what the command bar would offer for KAIZU_TYPE.
             Task {

@@ -41,7 +41,7 @@ struct ArcImportView: View {
                         LabeledContent("Favorites", value: "\(plan.tabCount - inSpaces)")
                     }
                 } footer: {
-                    FooterText("Logins, history and extensions stay in Arc. Kaizu only reads Arc's sidebar and doesn't change it.")
+                    FooterText("Logins and extensions stay in Arc; history comes with File → Import Browsing Data…. Kaizu only reads Arc's sidebar and doesn't change it.")
                 }
                 Section {
                     Toggle("Bring Today's tabs too", isOn: $includesToday)

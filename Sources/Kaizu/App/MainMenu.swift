@@ -96,6 +96,7 @@ enum MainMenu {
         menu.addItem(.separator())
         menu.addItem(ActionMenuItem("New Space…", key: "n", modifiers: [.command, .shift]) { app.front.beginNewSpace() })
         menu.addItem(ActionMenuItem("Import from Arc…") { UtilityWindows.showArcImport(store: app.front) })
+        menu.addItem(ActionMenuItem("Import Browsing Data…") { UtilityWindows.showBrowsingDataImport(store: app.front) })
         menu.addItem(.separator())
         menu.addItem(ActionMenuItem("Capture…", key: "2", modifiers: [.command, .shift]) {
             app.front.commandTab.map { app.front.beginCapture(of: $0) }

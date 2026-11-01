@@ -45,6 +45,16 @@ enum UtilityWindows {
         windows["Import from Arc"] = nil
     }
 
+    static func showBrowsingDataImport(store: BrowserStore) {
+        show("Import Browsing Data", size: NSSize(width: 460, height: 460), store: store) { BrowsingDataImportView() }
+    }
+
+    /// Forgotten, not just closed: next time it looks for browsers afresh.
+    static func closeBrowsingDataImport() {
+        windows["Import Browsing Data"]?.close()
+        windows["Import Browsing Data"] = nil
+    }
+
     private static func show(
         _ title: String,
         size: NSSize,

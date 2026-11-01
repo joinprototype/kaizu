@@ -98,6 +98,49 @@ public actor HistoryStore {
         run("DELETE FROM visits WHERE profile = ?1 AND url = ?2", [.text(profile.uuidString), .text(url.absoluteString)])
     }
 
+    /// Pages from another browser, all at once. A page already here keeps its
+    /// title and takes the higher count and the later date, so importing
+    /// twice changes nothing. Returns the pages that are new, for `remove`.
+    @discardableResult
+    public func add(_ visits: [BrowsingData.Visit], profile: UUID) -> [URL] {
+        var added: [URL] = []
+        inTransaction {
+            for visit in visits {
+                let values: [Value] = [
+                    .text(profile.uuidString), .text(visit.url.absoluteString), .text(visit.title),
+                    .integer(visit.count), .real(visit.lastVisit.timeIntervalSince1970),
+                ]
+                run("INSERT OR IGNORE INTO visits (profile, url, title, visit_count, last_visit) VALUES (?1, ?2, ?3, ?4, ?5)", values)
+                if sqlite3_changes(db) > 0 {
+                    added.append(visit.url)
+                } else {
+                    run("""
+                        UPDATE visits SET
+                            visit_count = max(visit_count, ?4),
+                            last_visit = max(last_visit, ?5),
+                            title = CASE WHEN title = '' THEN ?3 ELSE title END
+                        WHERE profile = ?1 AND url = ?2
+                        """, values)
+                }
+            }
+        }
+        return added
+    }
+
+    public func remove(_ urls: [URL], profile: UUID) {
+        inTransaction {
+            for url in urls {
+                remove(url, profile: profile)
+            }
+        }
+    }
+
+    private func inTransaction(_ body: () -> Void) {
+        sqlite3_exec(db, "BEGIN", nil, nil, nil)
+        body()
+        sqlite3_exec(db, "COMMIT", nil, nil, nil)
+    }
+
     /// Forgets everything, or only one profile's history.
     public func removeAll(profile: UUID? = nil) {
         if let profile {

@@ -92,7 +92,7 @@ default-browser capable · curated themes · app icon.
 | Extensions | Chrome Web Store | — | P4 | L | `WKWebExtension` ✓ (macOS 15.4+) |
 | Password managers | extensions | manual typing | P4 via extensions | L | 1Password/Bitwarden web extensions |
 | Passkeys | ✓ | blocked | P6 | — | needs Apple's browser passkey entitlement |
-| Import (Arc / Chrome / Safari) | ✓ | Arc | P4 | M | Arc keeps its sidebar in `StorableSidebar.json` |
+| Import (Arc / Chrome / Safari) | ✓ | ✓ | P4 | M | Arc keeps its sidebar in `StorableSidebar.json`; Chromium browsers share one history and bookmarks format; Safari exports a .zip |
 | Boosts (per-site CSS/JS) | ✓ | — | P5 | M | `WKUserScript` ✓ |
 | AI features | Arc Max | — | P5, opt-in | M | side panel with the user's own claude.ai / ChatGPT login |
 | Settings window | ✓ | — | P2 | S | — |
@@ -218,7 +218,7 @@ What makes someone keep it as their default browser.
 - [x] Import from Safari: Settings → Extensions lists Safari *web* extensions in /Applications and loads them via `WKWebExtension(appExtensionBundle:)` **M**
 - [ ] Chrome-style native messaging (reuse Chrome/Brave `NativeMessagingHosts` manifests) to unlock 1Password/Bitwarden desktop integration **M**. On hold: 1Password's app only talks to browsers it approves (it has a "trust this browser" option, but Orion, also WebKit, still failed with it per their forum); Bitwarden's app writes host manifests per known browser. Worth asking both vendors once Kaizu is public; their extensions work on their own meanwhile
 - [x] Import from Arc (spaces, pinned tabs, folders, favorites, Today tabs) **M**
-- [ ] Import from Chrome and Safari (bookmarks, history) **M**
+- [x] Import Browsing Data: history and bookmarks from Arc, Chrome, Brave, Edge, Vivaldi, a Safari export or any bookmarks .html; history goes to a space's profile, bookmarks to a closed pinned folder, Undo takes both back **M**
 
 ## Phase 5: Kaizu's own magic
 
@@ -237,7 +237,7 @@ plain-text config file, link hints, per-tab hotkeys, command aliases,
 quicklinks, a `kaizu://` scheme, focus mode, snippets, ⌘1–4 browse
 modes, Quick Keys, inline action parameters.)
 
-- [ ] ★ Quick search from any app (Ghostty's quick terminal, Raycast): a shortcut set in Settings brings the command bar over whatever you're in; answers right there, pages in a little window. Off by default **M**
+- [x] ★ Quick search from any app (Ghostty's quick terminal, Raycast): a shortcut set in Settings brings the command bar over whatever you're in; answers right there, pages in a little window. Off by default **M**
 - [x] Site settings popover from the address pill's lock (Safari's "Settings for this website"): blocking, zoom, camera/microphone/location (Ask/Allow/Block), clear the site's cookies and data **M**
 - [x] Learned ranking: the command bar puts what you usually pick for a query first (local, per profile; Clear History forgets it) **S**
 - [x] Every menu item findable in the command bar, read from the menus **S**

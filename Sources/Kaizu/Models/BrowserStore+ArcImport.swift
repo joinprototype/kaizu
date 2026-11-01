@@ -73,7 +73,7 @@ extension BrowserStore {
         }, lasts: .seconds(12))
     }
 
-    private func close(_ tabs: [BrowserTab]) {
+    func close(_ tabs: [BrowserTab]) {
         for tab in tabs {
             extensions.didClose(tab)
             tab.discard()
