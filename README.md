@@ -81,4 +81,5 @@ Bundled third-party files keep their own licenses:
 
 - EasyList, EasyPrivacy and the EasyList Cookie List: see [Resources/Filters](Resources/Filters/README.md)
 - autoconsent (MPL-2.0) and Readability (Apache-2.0): see [Resources/Scripts](Resources/Scripts/README.md)
+- IM Fell, the type on Kaizu's headings (SIL Open Font License): [Resources/Fonts](Resources/Fonts/OFL.txt)
 - Site fonts (SIL OFL 1.1): see [site/fonts/OFL.txt](site/fonts/OFL.txt)

@@ -156,6 +156,12 @@ struct Command: Identifiable {
   (backdrop, accent, onAccent). Never derive colors from hue math.
 - `Surface`: opaque elevated surfaces, hairlines, scrims. Never put a material
   over web content (page colors bleed through).
+- `Typeface`: IM Fell for names (`display`, upright like land on a chart) and
+  sections (`water`, in italics); New York everywhere else, from
+  `fontDesign(.serif)` at the root of each window.
+- `CompassRose`, `RhumbWeb`, `Neatline`, `Graticule`: the chart Kaizu is drawn
+  on. Static art, cached (`drawingGroup`) where it moves, so turning the rose
+  is a transform and costs nothing per frame.
 - `Motion`: named springs (`.snap` for chrome, `.pop` for small moments of delight,
   `.glide` for layout) plus Reduce Motion handling in one place.
 - `Metrics`: radii, spacing, sidebar dimensions.

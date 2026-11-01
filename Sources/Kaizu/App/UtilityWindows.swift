@@ -90,6 +90,6 @@ struct FollowsFrontWindow<Content: View>: View {
     let content: Content
 
     var body: some View {
-        content.environment(app.regularFront)
+        content.environment(app.regularFront).fontDesign(.serif)
     }
 }

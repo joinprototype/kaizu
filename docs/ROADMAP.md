@@ -56,7 +56,7 @@ Pulled forward from the phases below, in order:
 
 1. **Feel first.** Every interaction has intentional motion; nothing jumps, nothing janks.
 2. **Native and light.** WebKit + AppKit/SwiftUI. Battery life and memory are features.
-3. **Quiet craft.** Understated, precise, built to last. Old-world chart-maker care; never flashy, never generic.
+3. **Made with love.** Warm and alive, with old-world chart-maker care: real type, real inks, a rose that turns. Never minimal for its own sake, never flashy, never generic.
 4. **Keyboard-first.** If you can click it, you can find it in the command bar.
 5. **Never lose user data.** Versioned formats, migrations, backups.
 
@@ -163,6 +163,7 @@ Plus, where Kaizu gets its personality:
 - [x] Loading delight: a compass needle in the address pill swings while a page loads and settles on north when done **S**
 - [x] A chart-paper empty state: a sea chart's rhumb-line web, drawn outward once, in the chart-maker's three inks **S**
 - [ ] Optional soft UI sounds (off by default) **S**
+- [x] The chart room: IM Fell for names, New York for text, water lettered in italics; the icon's rose behind the sidebar, turning to a new bearing with each space and following the fingers in a swipe; rhumb lines, paper grain, gilt seals for favorites, paper slips, chart borders; "Where to?" **M**
 - [x] Heritage space colors (Claret, Cognac, Ochre, Vellum, Sage, Verdigris, Navy, Heather) replace the candy palette; existing spaces map to the nearest **S**
 - [x] Theme picker with live preview (the window takes the color as you pick; Cancel puts it back); per-space themes **S**
 - [x] Light/dark/auto per space (pages follow it) **S**

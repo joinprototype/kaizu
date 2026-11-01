@@ -8,6 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillFinishLaunching(_ notification: Notification) {
         // Kaizu's windows are spaces and tabs, never system tabs of each other.
         NSWindow.allowsAutomaticWindowTabbing = false
+        Typeface.register()
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {

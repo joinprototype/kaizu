@@ -18,9 +18,10 @@ app: build
 	cp "$$(swift build -c $(CONFIG) --show-bin-path)/$(APP_NAME)" $(APP)/Contents/MacOS/$(APP_NAME)
 	cp Resources/Info.plist $(APP)/Contents/Info.plist
 	cp Resources/AppIcon.icns $(APP)/Contents/Resources/AppIcon.icns
-	mkdir -p $(APP)/Contents/Resources/Filters $(APP)/Contents/Resources/Scripts
+	mkdir -p $(APP)/Contents/Resources/Filters $(APP)/Contents/Resources/Scripts $(APP)/Contents/Resources/Fonts
 	cp Resources/Filters/*.txt $(APP)/Contents/Resources/Filters/
 	cp Resources/Scripts/*.js Resources/Scripts/*.txt $(APP)/Contents/Resources/Scripts/
+	cp Resources/Fonts/* $(APP)/Contents/Resources/Fonts/
 	codesign --force --sign - $(APP)
 
 run: app

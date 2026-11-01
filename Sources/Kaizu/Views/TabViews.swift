@@ -44,10 +44,10 @@ struct TabRow: View {
                 RenameField(prompt: "Tab name", name: tab.displayTitle) { store.rename(tab, to: $0) } onCancel: {
                     store.renamingTabID = nil
                 }
-                .font(.system(size: 13))
+                .font(.system(size: 13.5))
             } else {
                 Text(tab.displayTitle)
-                    .font(.system(size: 13))
+                    .font(.system(size: 13.5))
                     .lineLimit(1)
             }
             Spacer(minLength: 4)
@@ -157,7 +157,7 @@ struct FolderRow: View {
             }
             Spacer(minLength: 4)
         }
-        .font(.system(size: 13))
+        .font(.system(size: 13.5))
         .sidebarRow(depth: depth, isHovering: isHovering)
         .onTapGesture { store.toggle(folder) }
         .onHoverFade($isHovering)
@@ -178,14 +178,21 @@ struct FavoriteTile: View {
     @State private var isHovering = false
 
     var body: some View {
-        FaviconView(tab: tab, size: 18)
-            .frame(maxWidth: .infinity)
-            .frame(height: 42)
+        // A seal: the site in a gilt ring.
+        FaviconView(tab: tab, size: 19)
+            .frame(width: 46, height: 46)
             .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                Circle()
                     .fill(isSelected ? SidebarFill.selected(scheme) : isHovering ? SidebarFill.selected(scheme).opacity(0.7) : SidebarFill.subtle(scheme))
-                    .shadow(color: .black.opacity(isSelected ? 0.08 : 0), radius: 1, y: 1)
+                    .shadow(color: .black.opacity(isSelected ? 0.14 : 0.05), radius: 2, y: 1)
             )
+            .overlay {
+                ZStack {
+                    Circle().strokeBorder(Ink.gilt(scheme).opacity(isSelected ? 0.95 : 0.6), lineWidth: 1)
+                    Circle().strokeBorder(Ink.gilt(scheme).opacity(0.3), lineWidth: 0.5).padding(3)
+                }
+            }
+            .frame(maxWidth: .infinity)
             // Morphs from (and back into) the tab's row when favorited.
             .sidebarRowGeometry(tab.id, in: rowNamespace)
             .contentShape(Rectangle())

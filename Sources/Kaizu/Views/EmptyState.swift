@@ -11,18 +11,20 @@ struct EmptyState: View {
             Surface.paper(scheme)
             ChartPaper()
             // A clearing in the lines for the name, like a chart's cartouche.
-            RadialGradient(colors: [Surface.paper(scheme), Surface.paper(scheme).opacity(0)], center: .center, startRadius: 40, endRadius: 260)
-            VStack(spacing: 22) {
-                VStack(spacing: 6) {
+            RadialGradient(colors: [Surface.paper(scheme), Surface.paper(scheme).opacity(0)], center: .center, startRadius: 120, endRadius: 340)
+            VStack(spacing: 20) {
+                CompassRose()
+                    .frame(width: 190, height: 190)
+                VStack(spacing: 4) {
                     Text("Kaizu")
-                        .font(.system(size: 56, weight: .regular, design: .serif))
-                        .tracking(1)
+                        .font(Typeface.display(76))
+                        .foregroundStyle(Ink.iron(scheme))
                     // 海図, "sea chart".
                     Text("海図")
-                        .font(.system(size: 15, weight: .regular, design: .serif))
+                        .font(.system(size: 16, weight: .regular, design: .serif))
                         .tracking(6)
+                        .foregroundStyle(Ink.claret(scheme))
                 }
-                .foregroundStyle(.tertiary)
                 Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 8) {
                     hint("⌘T", "New tab")
                     hint("⌘L", "Open location")
@@ -41,6 +43,15 @@ struct EmptyState: View {
                     }
                 }
             }
+        }
+        .overlay {
+            ZStack {
+                Neatline(cornerRadius: 6)
+                Graticule()
+                    .stroke(Ink.iron(scheme).opacity(0.3), lineWidth: 0.5)
+                    .padding(3)
+            }
+            .padding(12)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .contentShape(Rectangle())
@@ -80,11 +91,11 @@ private struct ChartPaper: View {
             let reach = 1 - pow(1 - progress, 3)  // ease out
             ZStack {
                 RhumbLines(bearings: stride(from: 0, to: 32, by: 4), reach: reach)
-                    .stroke(.primary.opacity(0.09), lineWidth: 0.75)
+                    .stroke(Ink.iron(scheme).opacity(0.15), lineWidth: 0.75)
                 RhumbLines(bearings: stride(from: 2, to: 32, by: 4), reach: reach)
-                    .stroke(Ink.verdigris(scheme).opacity(0.10), lineWidth: 0.5)
+                    .stroke(Ink.verdigris(scheme).opacity(0.22), lineWidth: 0.5)
                 RhumbLines(bearings: stride(from: 1, to: 32, by: 2), reach: reach)
-                    .stroke(Ink.claret(scheme).opacity(0.08), lineWidth: 0.5)
+                    .stroke(Ink.claret(scheme).opacity(0.17), lineWidth: 0.5)
             }
         }
         .allowsHitTesting(false)

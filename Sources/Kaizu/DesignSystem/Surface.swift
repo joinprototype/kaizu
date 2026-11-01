@@ -17,6 +17,39 @@ enum Surface {
         .black.opacity(scheme == .dark ? 0.4 : 0.18)
     }
 
+    /// Fresh paper: the command bar, toasts, slips.
+    static func card(_ scheme: ColorScheme) -> Color {
+        Color(hex: scheme == .dark ? 0x22211F : 0xFBF7EC)
+    }
+
+    /// Paper's tooth: dark and light flecks, so it shows on any color. A
+    /// tile made once, always the same.
+    static let grain: NSImage = {
+        let size = 192
+        var seed: UInt64 = 0x4B41495A55
+        func next() -> UInt64 {
+            seed = seed &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+            return seed >> 33
+        }
+        var pixels = [UInt8](repeating: 0, count: size * size * 4)
+        for index in stride(from: 0, to: pixels.count, by: 4) {
+            let roll = next() % 100
+            guard roll < 40 else { continue }
+            let alpha = UInt8(next() % 10 + 3)
+            // Premultiplied: a light fleck has its alpha in every channel.
+            let shade = roll < 22 ? 0 : alpha
+            pixels[index] = shade
+            pixels[index + 1] = shade
+            pixels[index + 2] = shade
+            pixels[index + 3] = alpha
+        }
+        let image = CGContext(
+            data: &pixels, width: size, height: size, bitsPerComponent: 8, bytesPerRow: size * 4,
+            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )?.makeImage()
+        return image.map { NSImage(cgImage: $0, size: NSSize(width: size / 2, height: size / 2)) } ?? NSImage()
+    }()
+
     /// Vellum, where Kaizu draws its own pages (Reader's `--paper`).
     static func paper(_ scheme: ColorScheme) -> Color {
         Color(hex: scheme == .dark ? 0x1C1A17 : 0xF4EFE3)
@@ -25,6 +58,15 @@ enum Surface {
 
 /// The chart-maker's inks, from the icon's compass rose.
 enum Ink {
+    /// Iron gall: what headings are written in.
+    static func iron(_ scheme: ColorScheme) -> Color {
+        Color(hex: scheme == .dark ? 0xEFE6CF : 0x1C2541)
+    }
+
+    static func gilt(_ scheme: ColorScheme) -> Color {
+        Color(hex: scheme == .dark ? 0xD2B063 : 0x9A7A2E)
+    }
+
     static func claret(_ scheme: ColorScheme) -> Color {
         Color(hex: scheme == .dark ? 0xD9A08B : 0x8C3A32)
     }

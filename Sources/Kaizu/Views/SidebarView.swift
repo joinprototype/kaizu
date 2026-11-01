@@ -33,7 +33,12 @@ struct SidebarView: View {
         .padding(.horizontal, 10)
         .padding(.bottom, 10)
         .frame(maxHeight: .infinity, alignment: .top)
-        .background { WindowDragArea() }
+        .background {
+            ZStack {
+                SidebarChart()
+                WindowDragArea()
+            }
+        }
         .environment(\.sidebarRowNamespace, rows)
     }
 }
@@ -70,6 +75,43 @@ private struct PagerOffset: ViewModifier {
 
     func body(content: Content) -> some View {
         content.offset(x: CGFloat(position) * page + store.spaceSwipeOffset)
+    }
+}
+
+/// What the sidebar is drawn on: rhumb lines running out from a compass rose
+/// low in the corner, which turns to a new bearing with each space.
+private struct SidebarChart: View {
+    var body: some View {
+        GeometryReader { geometry in
+            let side = min(geometry.size.width * 1.06, 300)
+            let center = CGPoint(x: geometry.size.width * 0.68, y: geometry.size.height - side * 0.36)
+            ZStack {
+                RhumbWeb(center: center, strength: 0.55)
+                TurningRose()
+                    .frame(width: side, height: side)
+                    .position(center)
+            }
+        }
+        .clipped()
+        .allowsHitTesting(false)
+    }
+}
+
+/// On its own, so a swipe turns it without redrawing the sidebar.
+private struct TurningRose: View {
+    @Environment(BrowserStore.self) private var store
+    /// Not a whole number of points: every space points somewhere new.
+    private static let turn = 67.5
+
+    var body: some View {
+        let index = store.spaces.firstIndex { $0.id == store.activeSpaceID } ?? 0
+        let swipe = Double(store.spaceSwipeOffset / max(store.sidebarWidth, 1))
+        CompassRose()
+            .drawingGroup()
+            // An empty page has its own rose.
+            .opacity(store.selectedTab == nil ? 0 : 0.3)
+            .animation(Motion.hover, value: store.selectedTab == nil)
+            .rotationEffect(.degrees((Double(index) - swipe) * Self.turn))
     }
 }
 
@@ -197,10 +239,14 @@ private struct AddressPill: View {
                 .help("Copy Link (⇧⌘C)")
             }
         }
-        .font(.system(size: 13))
+        .font(.system(size: 13.5))
         .padding(.horizontal, 11)
         .frame(height: 34)
         .background(SidebarFill.subtle(scheme), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(Ink.iron(scheme).opacity(isHovering ? 0.28 : 0.16), lineWidth: 0.75)
+        }
         .onHoverFade($isHovering)
     }
 }
@@ -293,7 +339,7 @@ private struct PinnedSection: View {
     let space: Space
 
     var body: some View {
-        SectionHeader(title: space.name, symbol: space.symbol) {
+        SectionHeader(title: space.name, isName: true) {
             IconButton(systemName: "folder.badge.plus", help: "New Folder") { store.newFolder() }
         }
         .tabDropTarget(.pinned(folder: nil, before: nil))
@@ -310,7 +356,7 @@ private struct TodaySection: View {
     let space: Space
 
     var body: some View {
-        SectionHeader(title: "Today") {
+        SectionHeader(title: "Today", note: Date.now.formatted(.dateTime.weekday(.wide).day().month(.wide))) {
             if !space.today.isEmpty {
                 Button("Clear") { store.clearToday(in: space) }
                     .buttonStyle(.plain)
@@ -333,27 +379,36 @@ private struct TodaySection: View {
     }
 }
 
+/// A space's name, lettered like a place on the chart; or a section,
+/// lettered like water, with a word in passing that gives way on hover.
 private struct SectionHeader<Trailing: View>: View {
+    @Environment(\.colorScheme) private var scheme
     let title: String
-    var symbol: String?
+    var isName = false
+    var note: String?
     @ViewBuilder let trailing: () -> Trailing
     @State private var isHovering = false
 
     var body: some View {
-        HStack(spacing: 6) {
-            if let symbol {
-                Image(systemName: symbol)
-            }
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
             Text(title)
+                .font(isName ? Typeface.display(23) : Typeface.water(17))
+                .foregroundStyle(isName ? AnyShapeStyle(Ink.iron(scheme)) : AnyShapeStyle(.secondary))
+                .lineLimit(1)
             Spacer()
             if isHovering {
                 trailing()
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            } else if let note {
+                Text(note)
+                    .font(Typeface.water(12.5))
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
             }
         }
-        .font(.system(size: 12, weight: .semibold))
-        .foregroundStyle(.secondary)
         .padding(.horizontal, 10)
-        .frame(height: 26)
+        .frame(height: isName ? 36 : 28)
         .contentShape(Rectangle())
         .onHoverFade($isHovering)
     }
@@ -368,7 +423,7 @@ private struct NewTabRow: View {
             Image(systemName: "plus")
                 .font(.system(size: 12, weight: .semibold))
                 .frame(width: 16)
-            Text("New Tab")
+            Text("New tab")
             Spacer()
         }
         .font(.system(size: 13))

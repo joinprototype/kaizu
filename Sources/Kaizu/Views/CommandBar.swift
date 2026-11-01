@@ -164,12 +164,15 @@ struct CommandBar: View {
 
         return VStack(spacing: 0) {
             HStack(spacing: 12) {
-                Image(systemName: mode == .newTab ? "plus.magnifyingglass" : "magnifyingglass")
-                    .font(.system(size: 17, weight: .medium))
-                    .foregroundStyle(.secondary)
+                // The needle swings as you type.
+                CompassRose()
+                    .frame(width: 34, height: 34)
+                    .rotationEffect(.degrees(Double(text.count) * 22.5))
+                    .animation(Motion.snap, value: text.count)
                 KeyTextField(
                     text: $text,
-                    placeholder: mode == .currentTab ? "Enter address…" : "Search, enter address, or type 20+20…",
+                    placeholder: "",
+                    font: Typeface.displayField(25),
                     onMove: { delta in
                         guard !suggestions.isEmpty else { return }
                         withAnimation(Motion.snap) {
@@ -186,6 +189,16 @@ struct CommandBar: View {
                         return InlineCompletion.complete(typed, from: known)
                     }
                 )
+                // Here rather than the field's own, which loses Fell's kerning.
+                .overlay(alignment: .leading) {
+                    if text.isEmpty {
+                        Text(mode == .currentTab ? "Enter an address" : "Where to?")
+                            .font(Typeface.display(25))
+                            .foregroundStyle(.tertiary)
+                            .padding(.leading, 2)
+                            .allowsHitTesting(false)
+                    }
+                }
             }
             .padding(.horizontal, 18)
             .frame(height: 56)
@@ -229,20 +242,18 @@ struct CommandBar: View {
                 KeyHint(keys: "esc", label: "close")
                 Spacer()
                 Text("Try 20+20, 100 usd to eur, yt lofi")
+                    .font(Typeface.water(14))
                     .foregroundStyle(.tertiary)
             }
-            .font(.system(size: 11))
+            .font(.system(size: 11.5))
             .foregroundStyle(.secondary)
             .padding(.horizontal, 18)
-            .frame(height: 30)
+            .frame(height: 32)
         }
         .frame(width: 620)
-        .background(Surface.elevated(scheme), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Surface.hairline(scheme))
-        }
-        .shadow(color: .black.opacity(0.25), radius: 40, y: 16)
+        .background(Surface.card(scheme), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay { Neatline() }
+        .shadow(color: .black.opacity(0.3), radius: 40, y: 16)
     }
 
     private func dismiss() {
@@ -327,12 +338,12 @@ private struct SuggestionRow: View {
             .frame(width: 18, height: 18)
             VStack(alignment: .leading, spacing: 1) {
                 Text(presentation.title)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(size: 14, weight: .medium))
                     .lineLimit(1)
                 if let subtitle = presentation.subtitle {
                     Text(subtitle)
-                        .font(.system(size: 11))
-                        .opacity(0.65)
+                        .font(Typeface.water(13))
+                        .opacity(0.7)
                         .lineLimit(1)
                 }
             }

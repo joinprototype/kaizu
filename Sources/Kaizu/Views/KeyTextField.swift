@@ -10,6 +10,7 @@ struct KeyTextField: NSViewRepresentable {
     @Binding var text: String
     let placeholder: String
     var fontSize: CGFloat = 19
+    var font: NSFont?
     let onMove: (Int) -> Void
     let onSubmit: () -> Void
     let onCancel: () -> Void
@@ -20,7 +21,7 @@ struct KeyTextField: NSViewRepresentable {
         field.isBordered = false
         field.drawsBackground = false
         field.focusRingType = .none
-        let font = NSFont.systemFont(ofSize: fontSize)
+        let font = font ?? Typeface.textField(fontSize)
         field.font = font
         field.textColor = .labelColor
         field.placeholderAttributedString = NSAttributedString(

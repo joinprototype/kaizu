@@ -45,7 +45,7 @@ final class QuickBarController: NSObject, NSWindowDelegate {
     /// Spotlight sits.
     func show() {
         // A new identity each time: empty, nothing selected.
-        hostingView.rootView = AnyView(CommandBar(mode: .quick, initialText: "").id(UUID()).environment(app.regularFront))
+        hostingView.rootView = AnyView(CommandBar(mode: .quick, initialText: "").id(UUID()).environment(app.regularFront).fontDesign(.serif))
         let mouse = NSEvent.mouseLocation
         if let screen = NSScreen.screens.first(where: { $0.frame.contains(mouse) }) ?? NSScreen.main {
             let visible = screen.visibleFrame

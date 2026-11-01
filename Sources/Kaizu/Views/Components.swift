@@ -58,12 +58,13 @@ struct ToastView: View {
                     .fontWeight(.semibold)
             }
         }
-        .font(.system(size: 13, weight: .medium))
-        .padding(.horizontal, 16)
-        .padding(.vertical, 9)
-        .background(Surface.elevated(scheme), in: Capsule())
-        .overlay(Capsule().strokeBorder(Surface.hairline(scheme)))
-        .shadow(color: .black.opacity(0.15), radius: 12, y: 4)
+        .font(Typeface.water(16))
+        .foregroundStyle(Ink.iron(scheme))
+        .padding(.horizontal, 18)
+        .padding(.vertical, 10)
+        .background(Surface.card(scheme), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+        .overlay { Neatline(cornerRadius: 11) }
+        .shadow(color: .black.opacity(0.18), radius: 14, y: 5)
     }
 }
 
@@ -127,6 +128,7 @@ extension EnvironmentValues {
 
 private struct SidebarRowStyle: ViewModifier {
     @Environment(\.colorScheme) private var scheme
+    @Environment(BrowserStore.self) private var store
     let depth: Int
     let isSelected: Bool
     let isHovering: Bool
@@ -139,7 +141,16 @@ private struct SidebarRowStyle: ViewModifier {
             .background(
                 RoundedRectangle(cornerRadius: 9, style: .continuous)
                     .fill(isSelected ? SidebarFill.selected(scheme) : isHovering ? SidebarFill.hover(scheme) : .clear)
-                    .shadow(color: .black.opacity(isSelected ? 0.08 : 0), radius: 1, y: 1)
+                    .shadow(color: .black.opacity(isSelected ? 0.14 : 0), radius: 2, y: 1)
+                    .overlay(alignment: .leading) {
+                        // A slip of paper, with a tick of the space's ink.
+                        if isSelected {
+                            Capsule()
+                                .fill(store.activeSpace.theme.accent(scheme))
+                                .frame(width: 3, height: 18)
+                                .padding(.leading, 4)
+                        }
+                    }
                     .animation(Motion.hover, value: isHovering)
                     .animation(Motion.snap, value: isSelected)
             )

@@ -60,6 +60,7 @@ struct BrowserView: View {
                     .transition(Motion.dissolving(.offset(y: 12).combined(with: .opacity)))
             }
         }
+        .fontDesign(.serif)
         .ignoresSafeArea()
         .sheet(item: $store.spaceDraft) { draft in
             SpaceEditor(draft: draft)
@@ -147,6 +148,11 @@ private struct SpaceBackdrop: View {
             }
         }
         return BlendedGradient(start: colors[0], end: colors[colors.count - 1])
+            .overlay {
+                Image(nsImage: Surface.grain)
+                    .resizable(resizingMode: .tile)
+                    .allowsHitTesting(false)
+            }
     }
 
     private func resolved(_ theme: Theme) -> [Color.Resolved] {
