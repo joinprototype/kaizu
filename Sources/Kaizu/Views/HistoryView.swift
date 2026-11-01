@@ -41,7 +41,7 @@ struct HistoryView: View {
             Divider()
             List(selection: $selection) {
                 ForEach(sections, id: \.title) { section in
-                    Section(section.title) {
+                    Section {
                         ForEach(section.entries) { entry in
                             HistoryRow(entry: entry)
                                 .tag(entry.url)
@@ -56,6 +56,9 @@ struct HistoryView: View {
                                     Button("Delete from History") { delete(entry, profile: profile.id) }
                                 }
                         }
+                    } header: {
+                        Text(section.title)
+                            .font(Typeface.water(17))
                     }
                 }
             }

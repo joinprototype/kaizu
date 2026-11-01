@@ -194,7 +194,7 @@ extension BrowserStore {
     ]
 
     /// "⇧⌘T" for a menu item's key equivalent.
-    private static func shortcut(of item: NSMenuItem) -> String? {
+    static func shortcut(of item: NSMenuItem) -> String? {
         guard !item.keyEquivalent.isEmpty else { return nil }
         let modifiers = item.keyEquivalentModifierMask
         var text = ""

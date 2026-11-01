@@ -12,6 +12,10 @@ enum UtilityWindows {
         show("About Kaizu", size: NSSize(width: 380, height: 470), app: app) { AboutView() }
     }
 
+    static func showKeyboardShortcuts(app: AppModel) {
+        show("Keyboard Shortcuts", size: NSSize(width: 720, height: 640), app: app) { KeyboardShortcutsView() }
+    }
+
     static func showSettings(app: AppModel) {
         show("Settings", size: NSSize(width: 560, height: 460), app: app) { SettingsView() }
     }

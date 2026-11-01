@@ -221,6 +221,8 @@ enum MainMenu {
 
     private static func helpMenu(_ app: AppModel) -> NSMenu {
         let menu = NSMenu(title: "Help")
+        menu.addItem(ActionMenuItem("Keyboard Shortcuts", key: "/") { UtilityWindows.showKeyboardShortcuts(app: app) })
+        menu.addItem(.separator())
         menu.addItem(ActionMenuItem("Report a Bug…") { UtilityWindows.showBugReport(app: app) })
         menu.addItem(ActionMenuItem("Report a Broken Site…") { app.front.reportBrokenSite() })
         return menu

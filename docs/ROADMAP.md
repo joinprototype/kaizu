@@ -243,6 +243,7 @@ modes, Quick Keys, inline action parameters.)
 - [x] Site settings popover from the address pill's lock (Safari's "Settings for this website"): blocking, zoom, camera/microphone/location (Ask/Allow/Block), clear the site's cookies and data **M**
 - [x] Learned ranking: the command bar puts what you usually pick for a query first (local, per profile; Clear History forgets it) **S**
 - [x] Every menu item findable in the command bar, read from the menus **S**
+- [x] Keyboard Shortcuts card (⌘/), read from the menus **S**
 - [x] Pinned tabs and favorites in the system Spotlight (Core Spotlight): ⌘Space → "Gmail" opens your pinned tab **S**
 - [ ] Watch page: pick part of a page, get a notification when it changes (price drop, restock) **M**
 

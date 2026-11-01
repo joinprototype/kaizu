@@ -76,6 +76,8 @@ struct KeyCap: View {
     var body: some View {
         Text(keys)
             .font(.system(size: size, weight: .semibold, design: .rounded))
+            // Key symbols only exist in the system font.
+            .fontDesign(.rounded)
             .padding(.horizontal, size * 0.55)
             .padding(.vertical, size * 0.2)
             .background(.quaternary.opacity(0.6), in: RoundedRectangle(cornerRadius: size * 0.4))
