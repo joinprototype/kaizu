@@ -19,6 +19,7 @@ Found a bug? Choose Help → Report a Bug in Kaizu, or write to
 - **Windows**: little windows for links from other apps, private windows, split view (up to 4; drag a tab onto the page), link peek, ⌃Tab recent-tab switcher
 - **Privacy, built in**: ads and trackers blocked (EasyList/EasyPrivacy, updated daily), YouTube ads, cookie pop-ups rejected automatically, tracking parameters stripped, HTTPS first, Global Privacy Control; per-site pause
 - **Light on the Mac**: idle tabs hibernate (and on memory pressure) and wake where you left them
+- **Import from Arc** (File menu): spaces, pinned tabs, folders, favorites and Today tabs, with a preview first; it reads Arc's sidebar on this Mac and never changes it
 - **Extensions**: "Add to Kaizu" on Chrome Web Store and Firefox Add-ons pages, or from a folder, a `.zip` or a Safari extension app
 - **Capture** (⇧⌘2): drag over part of the page to copy it as an image
 - **Hide Distracting Items**: click away banners and clutter; the site remembers
@@ -38,7 +39,7 @@ make icon                 # regenerate Resources/AppIcon.icns from scripts/make-
 You can also `open Package.swift` in Xcode and hit Run. The Info.plist is
 embedded into the binary, so WebKit gets a bundle identifier either way.
 
-Debug builds accept `KAIZU_DEBUG=commandbar|location|space|settings|history|private|peek|switcher|extension|nosidebar|reader|pin|split|splitdrop|capture|quickbar|open` to
+Debug builds accept `KAIZU_DEBUG=commandbar|location|space|settings|history|private|peek|switcher|extension|nosidebar|reader|pin|split|splitdrop|capture|quickbar|open|arcimport` to
 boot straight into a UI state (handy for screenshots), and
 `KAIZU_SUPPORT=/some/folder` to keep that launch's session and history out
 of your real ones. Settings and website data follow the bundle id: for a

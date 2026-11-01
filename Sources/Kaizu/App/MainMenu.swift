@@ -94,6 +94,7 @@ enum MainMenu {
         menu.addItem(ActionMenuItem("Open Little Window in Kaizu", key: "o") { store.keyLittleWindow?.promote() })
         menu.addItem(.separator())
         menu.addItem(ActionMenuItem("New Space…", key: "n", modifiers: [.command, .shift]) { store.beginNewSpace() })
+        menu.addItem(ActionMenuItem("Import from Arc…") { UtilityWindows.showArcImport(store: store) })
         menu.addItem(.separator())
         menu.addItem(ActionMenuItem("Capture…", key: "2", modifiers: [.command, .shift]) {
             store.commandTab.map { store.beginCapture(of: $0) }

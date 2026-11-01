@@ -162,7 +162,7 @@ cap depth (Zen 32, Ardia 64, Crest `FolderTree.MaximumDepth`). Arc auto-creates 
 | `tab` | `data.tab` exists | A tab (pinned, Today or favorite depending on ancestor container). Keys: `savedURL`, `savedTitle`, `savedMuteStatus`, `timeLastActiveAt`, `activeTabBeforeCreationID`, `referrerID`. **[V]** | yes |
 | `list` | `data.list` exists (value `{}`) | Folder. Name = `title`. Nests arbitrarily (child `list`s). Live GitHub/Bitbucket PR folders carry `data.list.automaticLiveFolderData` (Ardia `liveFolderRole`) **[U]**: treat as an empty folder or skip. | yes (folder) |
 | `itemContainer` | `data.itemContainer.containerType` | Root of a section. `containerType` is `{"spaceItems":{"_0":<spaceId>}}` or `{"topApps":{"_0":<profile tag>}}`. `parentID:null`. **[V]** | walk children only |
-| `splitView` | `data.splitView` | Split view; `childrenIds` are the tabs shown together (max 4). Fields `layoutOrientation` ("horizontal" = side by side), `itemWidthFactors`, `customInfo`, `focusItemID`. Appears in pinned, in folders, in favorites and Today. | Kaizu: flatten (import child tabs in place) or skip; **decision needed** |
+| `splitView` | `data.splitView` | Split view; `childrenIds` are the tabs shown together (max 4). Fields `layoutOrientation` ("horizontal" = side by side), `itemWidthFactors`, `customInfo`, `focusItemID`. Appears in pinned, in folders, in favorites and Today. | Kaizu flattens: child tabs stay in place, one after the other |
 | `easel` | `data.easel` | Easel whiteboard: `{easelID, title}`. No URL. **[V]** (leohku parser, Ora `EaselData`) | skip |
 | `arcDocument` | `data.arcDocument` | Arc Note: `{arcDocumentID}`. **[U]** (leohku parser only) | skip |
 | `welcomeToArc` | `data.welcomeToArc` | Onboarding item. **[U]** (jtotty fixture via kyuzen) | skip |
@@ -325,4 +325,4 @@ Read via secondary compilation (their line citations not independently re-verifi
 8. Profile display names location (`Local State` `profile.info_cache`); how to find "this Mac's" `machineID`.
 9. `automaticLiveFolderData` (live PR folders) shape.
 10. Whether `midTone` or `background...color` is the canonical space color.
-11. Everything here is from files produced by Arc up to ~2025-2026; behavior of the final Arc release before Dec 22, 2026 is not confirmed. Re-check against a real export before shipping.
+11. Everything here is from files produced by Arc up to ~2025-2026; behavior of the final Arc release before Dec 22, 2026 is not confirmed. Checked on 2026-10-31 against a real file from an Arc install last used Oct 26, 2026: small (one space, 12 items) but it covers `tab`, `list`, `splitView`, `itemContainer`, `welcomeToArc`, a space with no `title` key and `["unpinned", U, "pinned", P]` order, and the importer read it correctly.

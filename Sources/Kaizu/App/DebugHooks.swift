@@ -4,7 +4,7 @@ import BrowserCore
 import CoreSpotlight
 
 /// Lets screenshots / manual QA jump straight into a UI state:
-///   KAIZU_DEBUG=commandbar|location|space|settings|history|private|peek|switcher|extension|nosidebar|reader|pin|split|splitdrop|capture|quickbar|open|swipe|spotlight|spotlightreset|commands|learn|appearance|hide|hotkeys|tour|bugreport .build/debug/Kaizu
+///   KAIZU_DEBUG=commandbar|location|space|settings|history|private|peek|switcher|extension|nosidebar|reader|pin|split|splitdrop|capture|quickbar|open|swipe|spotlight|spotlightreset|commands|learn|appearance|hide|hotkeys|tour|bugreport|arcimport|arcimport-run .build/debug/Kaizu
 /// With `commandbar` or `quickbar`, KAIZU_TYPE="gi" types into it key by key (through
 /// the real field editor, so inline completion runs).
 /// `reader` shows Reader for the selected tab, or for KAIZU_URL.
@@ -16,8 +16,14 @@ import CoreSpotlight
 /// `splitdrop` calls the drop handlers directly; a real drag isn't simulated.
 /// `open` opens KAIZU_URL and logs whether the page is showing after 6 s.
 /// `bugreport` opens Report a Bug, then writes a report and logs its path.
+/// `arcimport` opens Import from Arc; `arcimport-run` imports without it and logs
+/// the result. KAIZU_ARC=/path/to/StorableSidebar.json reads that instead of Arc's.
 @MainActor
 enum DebugHooks {
+    private static var arcFile: URL {
+        ProcessInfo.processInfo.environment["KAIZU_ARC"].map { URL(fileURLWithPath: $0) } ?? ArcSidebar.fileURL
+    }
+
     static func apply(to store: BrowserStore) {
         switch ProcessInfo.processInfo.environment["KAIZU_DEBUG"] {
         case "open":
@@ -251,6 +257,33 @@ enum DebugHooks {
                 try? await Task.sleep(for: .seconds(3))
                 let zip = try? await BugReport.write(summary: "QA report", includingDiagnostics: true, store: store)
                 FileHandle.standardError.write(Data("QA report \(zip?.path ?? "failed")\n".utf8))
+            }
+        case "arcimport":
+            UtilityWindows.showArcImport(store: store, from: arcFile)
+            // KAIZU_SHOT=/path.png saves the window as a picture.
+            if let path = ProcessInfo.processInfo.environment["KAIZU_SHOT"] {
+                Task {
+                    try? await Task.sleep(for: .seconds(2))
+                    guard let view = NSApp.windows.first(where: { $0.title == "Import from Arc" })?.contentView,
+                          let picture = view.bitmapImageRepForCachingDisplay(in: view.bounds)
+                    else { return }
+                    view.cacheDisplay(in: view.bounds, to: picture)
+                    try? picture.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
+                }
+            }
+        case "arcimport-run":
+            do {
+                let plan = store.arcImport(of: try ArcSidebar.load(from: arcFile), includesToday: true)
+                store.importFromArc(plan)
+                store.save()
+                FileHandle.standardError.write(Data("QA arc \(plan.tabCount) tabs, spaces \(store.spaces.map(\.name))\n".utf8))
+                if ProcessInfo.processInfo.environment["KAIZU_ARC_UNDO"] != nil {
+                    store.toast?.undo?()
+                    store.save()
+                    FileHandle.standardError.write(Data("QA arc undone, spaces \(store.spaces.map(\.name)), tabs \(store.spaces.map(\.allTabs.count))\n".utf8))
+                }
+            } catch {
+                FileHandle.standardError.write(Data("QA arc failed: \(error)\n".utf8))
             }
         case "private":
             store.openPrivateWindow()

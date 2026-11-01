@@ -1,3 +1,4 @@
+import BrowserCore
 import SwiftUI
 
 /// A space with no tab open: chart paper, the name, and a few keys.
@@ -31,11 +32,19 @@ struct EmptyState: View {
                 }
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
+                if isFreshFromArc {
+                    Button("Import from Arc…") { UtilityWindows.showArcImport(store: store) }
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .contentShape(Rectangle())
         .onTapGesture { store.showCommandBar(.newTab) }
+    }
+
+    /// Nothing in Kaizu yet, and Arc's sidebar on this Mac to bring in.
+    private var isFreshFromArc: Bool {
+        store.spaces.allSatisfy { $0.allTabs.isEmpty } && FileManager.default.fileExists(atPath: ArcSidebar.fileURL.path)
     }
 
     private func hint(_ keys: String, _ label: String) -> some View {

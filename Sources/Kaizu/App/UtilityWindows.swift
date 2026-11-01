@@ -1,4 +1,5 @@
 import AppKit
+import BrowserCore
 import SwiftUI
 
 /// One-per-app windows (Settings, History): created on first use, then
@@ -21,6 +22,16 @@ enum UtilityWindows {
 
     static func closeBugReport() {
         windows["Report a Bug"]?.close()
+    }
+
+    static func showArcImport(store: BrowserStore, from source: URL = ArcSidebar.fileURL) {
+        show("Import from Arc", size: NSSize(width: 460, height: 420), store: store) { ArcImportView(source: source) }
+    }
+
+    /// Forgotten, not just closed: next time it reads Arc's sidebar afresh.
+    static func closeArcImport() {
+        windows["Import from Arc"]?.close()
+        windows["Import from Arc"] = nil
     }
 
     private static func show(

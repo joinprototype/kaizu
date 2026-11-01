@@ -49,7 +49,7 @@ Pulled forward from the phases below, in order:
    - [ ] evaluate Brave's adblock-rust converter vs ours (coverage, scriptlets)
 7. [ ] Find in page, history, Peek, split view **L** total
 8. [ ] Phase 1 motion pass on the core interactions **M**
-9. [ ] Arc importer from `StorableSidebar.json` with a preview + one-click import (format documented in research/arc-sidebar-format.md; fixture in Tests) **M**
+9. [x] Arc importer from `StorableSidebar.json` with a preview + one-click import (format documented in research/arc-sidebar-format.md; fixture in Tests) **M**
 10. [ ] Developer ID signing + notarization, apply for the passkey entitlement **M** (self-update and the test page at kaizu.joinprototype.com landed Oct 30)
 
 ## Product principles
@@ -92,7 +92,7 @@ default-browser capable · curated themes · app icon.
 | Extensions | Chrome Web Store | — | P4 | L | `WKWebExtension` ✓ (macOS 15.4+) |
 | Password managers | extensions | manual typing | P4 via extensions | L | 1Password/Bitwarden web extensions |
 | Passkeys | ✓ | blocked | P6 | — | needs Apple's browser passkey entitlement |
-| Import (Arc / Chrome / Safari) | ✓ | — | P4 | M | Arc keeps its sidebar in `StorableSidebar.json` |
+| Import (Arc / Chrome / Safari) | ✓ | Arc | P4 | M | Arc keeps its sidebar in `StorableSidebar.json` |
 | Boosts (per-site CSS/JS) | ✓ | — | P5 | M | `WKUserScript` ✓ |
 | AI features | Arc Max | — | P5, opt-in | M | side panel with the user's own claude.ai / ChatGPT login |
 | Settings window | ✓ | — | P2 | S | — |
@@ -216,7 +216,8 @@ What makes someone keep it as their default browser.
 - [x] Install from Chrome Web Store / Firefox Add-ons: "Add to Kaizu" on an extension's page (CRX unwrapped to its ZIP; XPI as is) **M**
 - [x] Import from Safari: Settings → Extensions lists Safari *web* extensions in /Applications and loads them via `WKWebExtension(appExtensionBundle:)` **M**
 - [ ] Chrome-style native messaging (reuse Chrome/Brave `NativeMessagingHosts` manifests) to unlock 1Password/Bitwarden desktop integration **M**. On hold: 1Password's app only talks to browsers it approves (it has a "trust this browser" option, but Orion, also WebKit, still failed with it per their forum); Bitwarden's app writes host manifests per known browser. Worth asking both vendors once Kaizu is public; their extensions work on their own meanwhile
-- [ ] Import from Arc (spaces, pinned tabs, folders), Chrome, Safari (bookmarks, history) **M**
+- [x] Import from Arc (spaces, pinned tabs, folders, favorites, Today tabs) **M**
+- [ ] Import from Chrome and Safari (bookmarks, history) **M**
 
 ## Phase 5: Kaizu's own magic
 

@@ -164,6 +164,7 @@ struct Command: Identifiable {
 | Privacy | `WebEngine/ContentBlocker.swift` (rule lists, page scripts, per-site pause), `FilterListUpdater.swift`, `BrowserCore/ContentBlocking/`, `TrackingParameters.swift` |
 | Extensions | `WebEngine/ExtensionHost.swift`, `ExtensionAdapters.swift`, `Views/ExtensionViews.swift` |
 | Reader | `BrowserStore+Reader.swift` (Readability in an isolated world), `Views/ReaderView.swift` |
+| Arc import | `BrowserCore/ArcSidebar.swift` (reads the file), `ArcImport.swift` (plans what to add, adds only), `Models/BrowserStore+ArcImport.swift`, `Views/ArcImportView.swift` |
 | Network fetches we make | filter lists (daily), favicons (http/https, 1 MB cap), ECB rates (on first currency query), search suggestions (opt-in) |
 | Bundled page scripts | `Resources/Scripts/` (see its README for sources and licenses) |
 
