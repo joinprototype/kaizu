@@ -133,7 +133,7 @@ extension BrowserStore {
         var neighborIndex = 0
         space.split.removeAll { $0 == tab.id }
         if let index = space.today.firstIndex(of: tab) {
-            app.closedTabs.append(ClosedTab(spaceID: space.id, record: tab.record))
+            closedTabs.append(ClosedTab(spaceID: space.id, record: tab.record))
             withAnimation(Motion.snap) {
                 _ = space.today.remove(at: index)
             }
@@ -204,7 +204,7 @@ extension BrowserStore {
         guard !cleared.isEmpty else { return }
         let ids = Set(cleared.map(\.id))
         for tab in cleared {
-            app.closedTabs.append(ClosedTab(spaceID: space.id, record: tab.record))
+            closedTabs.append(ClosedTab(spaceID: space.id, record: tab.record))
             extensions.didClose(tab)
         }
         withAnimation(Motion.snap, completionCriteria: .removed) {
@@ -225,13 +225,13 @@ extension BrowserStore {
                 space.today = cleared + space.today
             }
             cleared.forEach { self?.extensions.didOpen($0) }
-            self?.app.closedTabs.removeAll { ids.contains($0.record.id) }
+            self?.closedTabs.removeAll { ids.contains($0.record.id) }
             self?.scheduleSave()
         }
     }
 
     func reopenClosedTab() {
-        guard let closed = app.closedTabs.popLast() else { return }
+        guard let closed = closedTabs.popLast() else { return }
         let space = spaces.first { $0.id == closed.spaceID } ?? activeSpace
         openTab(closed.record.url, in: space).title = closed.record.title
     }
@@ -267,6 +267,7 @@ extension BrowserStore {
     /// ⌘D: pin a today tab, or send a favorite/pinned tab back to Today,
     /// with a small toast that can undo it.
     func togglePin(_ tab: BrowserTab) {
+        guard !isPrivate else { return }
         let space = activeSpace
         guard let original = place(of: tab) else { return }
         let pinnedURL = tab.pinnedURL
@@ -320,6 +321,7 @@ extension BrowserStore {
 
     /// Creates a folder at the top of the pinned section, optionally holding `tab`.
     func newFolder(with tab: BrowserTab? = nil) {
+        guard !isPrivate else { return }
         let folder = Folder(name: "New Folder")
         withAnimation(Motion.snap) {
             activeSpace.pinned.insert(.folder(folder), at: 0)

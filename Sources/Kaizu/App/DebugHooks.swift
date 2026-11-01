@@ -4,7 +4,7 @@ import BrowserCore
 import CoreSpotlight
 
 /// Lets screenshots / manual QA jump straight into a UI state:
-///   KAIZU_DEBUG=commandbar|location|space|settings|history|private|peek|switcher|extension|nosidebar|reader|pin|split|splitdrop|capture|quickbar|open|swipe|spotlight|spotlightreset|commands|learn|appearance|hide|hotkeys|tour|bugreport|brokensite|windows|browsingdata|arcimport|arcimport-run .build/debug/Kaizu
+///   KAIZU_DEBUG=commandbar|location|space|settings|history|private|peek|switcher|extension|nosidebar|reader|pin|split|splitdrop|capture|quickbar|open|swipe|spotlight|spotlightreset|commands|learn|appearance|hide|hotkeys|tour|bugreport|brokensite|windows|privatewindow|browsingdata|arcimport|arcimport-run .build/debug/Kaizu
 /// With `commandbar` or `quickbar`, KAIZU_TYPE="gi" types into it key by key (through
 /// the real field editor, so inline completion runs).
 /// `reader` shows Reader for the selected tab, or for KAIZU_URL.
@@ -20,6 +20,7 @@ import CoreSpotlight
 /// Report… to the form; KAIZU_SHOT=/path.png saves the form as a picture.
 /// `windows` drives several windows, logs each rule as ok or FAILED, saves and
 /// quits; run again on the same KAIZU_SUPPORT to check what came back.
+/// `privatewindow` drives a private window, logs each rule as ok or FAILED and quits.
 /// `browsingdata` opens Import Browsing Data; with KAIZU_IMPORT set to a profile
 /// folder, an export file, or "arc", it imports that, logs the result and undoes it.
 /// `arcimport` opens Import from Arc; `arcimport-run` imports without it and logs
@@ -32,12 +33,91 @@ enum DebugHooks {
 
     /// KAIZU_SHOT=/path.png saves the window as a picture.
     private static func saveShot(ofWindow title: String) {
+        saveShot(of: NSApp.windows.first { $0.title == title })
+    }
+
+    private static func saveShot(of window: NSWindow?) {
         guard let path = ProcessInfo.processInfo.environment["KAIZU_SHOT"],
-              let view = NSApp.windows.first(where: { $0.title == title })?.contentView,
+              let view = window?.contentView,
               let picture = view.bitmapImageRepForCachingDisplay(in: view.bounds)
         else { return }
         view.cacheDisplay(in: view.bounds, to: picture)
         try? picture.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
+    }
+
+    private static func qaPrivateWindow(_ store: BrowserStore) {
+        let app = store.app
+        func check(_ name: String, _ passed: Bool) {
+            FileHandle.standardError.write(Data("QA private \(passed ? "ok" : "FAILED"): \(name)\n".utf8))
+        }
+        func settle(_ seconds: Double = 0.5) async {
+            try? await Task.sleep(for: .seconds(seconds))
+        }
+        Task {
+            let site = URL(string: "https://example.org/")!
+            let regular = store.openTab(site)
+            await settle(3)
+            let hidden = app.openPrivateWindow()
+            await settle()
+            check("it's a window of its own, in front", hidden.isPrivate && app.front === hidden && app.regularFront === store)
+            check("its space isn't shared", !app.spaces.contains { $0 === hidden.activeSpace } && hidden.spaces.count == 1)
+            check("its profile is in memory", hidden.activeSpace.profile.isPrivate && !hidden.activeSpace.profile.dataStore.isPersistent)
+            check("it's dark", hidden.window?.appearance?.name == .darkAqua)
+
+            let one = hidden.openTab(URL(string: "https://example.org/private-page"))
+            await settle(3)
+            check("a page opens in it", hidden.selectedTab === one && one.webView.window === hidden.window)
+            let two = hidden.openTab(site, after: one, select: false)
+            check("and more tabs", hidden.activeSpace.today.count == 2 && two.profile === one.profile)
+
+            saveShot(of: hidden.window)
+            let cookie = "document.cookie = 'kaizu=private'; document.cookie"
+            _ = try? await one.webView.evaluateJavaScript(cookie)
+            let outside = (try? await regular.webView.evaluateJavaScript("document.cookie")) as? String ?? "?"
+            check("its cookies stay in it", !outside.contains("kaizu=private"))
+
+            hidden.close(two)
+            hidden.reopenClosedTab()
+            await settle()
+            check("⇧⌘T works inside it", hidden.activeSpace.today.count == 2 && app.closedTabs.isEmpty)
+
+            hidden.togglePin(one)
+            hidden.newFolder()
+            check("nothing pins there", hidden.activeSpace.pinned.isEmpty)
+            check("the archive isn't offered there", hidden.archive.isEmpty)
+
+            let count = hidden.activeSpace.today.count
+            app.regularFront.openExternal(URL(string: "https://example.org/from-another-app")!)
+            await settle()
+            check("links from other apps skip it", hidden.activeSpace.today.count == count)
+            let littleWindows = app.littleWindows.count
+            hidden.openLittleWindow(URL(string: "https://example.org/little"))
+            await settle()
+            check("a little window from it stays inside it", app.littleWindows.count == littleWindows && hidden.activeSpace.today.count == count + 1)
+
+            app.save()
+            let session = (try? String(contentsOf: AppPaths.support.appending(path: "session.json"), encoding: .utf8)) ?? ""
+            check("the session doesn't mention it", session.contains("example.org") && !session.contains("private-page") && !session.contains("\"Private\""))
+            let stored = await store.history?.search("private-page", profile: hidden.activeSpace.profile.id) ?? []
+            let shared = await store.history?.search("private-page", profile: store.activeSpace.profile.id) ?? []
+            check("history doesn't either", stored.isEmpty && shared.isEmpty)
+            app.updateSpotlight()
+            check("nor Spotlight", !app.spotlightIdentifiers.contains(one.id.uuidString))
+
+            let ordinary = app.openWindow()
+            await settle()
+            check("⌘N from it is an ordinary window", !ordinary.isPrivate && app.stores.contains { $0 === ordinary })
+            ordinary.window?.performClose(nil)
+            hidden.window?.makeKeyAndOrderFront(nil)
+            app.front = hidden
+            await settle()
+
+            hidden.window?.performClose(nil)
+            await settle()
+            check("closing it ends it", app.privateStores.isEmpty && one.isDiscarded && hidden.window == nil)
+            check("and the ordinary window is in front again", app.front === store)
+            NSApp.terminate(nil)
+        }
     }
 
     private static func qaBrowsingData(_ store: BrowserStore) {
@@ -290,6 +370,8 @@ enum DebugHooks {
             }
         case "windows":
             qaWindows(store)
+        case "privatewindow":
+            qaPrivateWindow(store)
         case "browsingdata":
             qaBrowsingData(store)
         case "commands":

@@ -15,7 +15,7 @@ extension AppModel {
 
         let pages = visits.isEmpty ? nil : visits.count.counted("page")
         let imported = [pages, bookmarks?.count.counted("bookmark")].compactMap(\.self).joined(separator: " and ")
-        front.showToast("Imported \(imported)", symbol: "square.and.arrow.down", undo: { [weak self] in
+        regularFront.showToast("Imported \(imported)", symbol: "square.and.arrow.down", undo: { [weak self] in
             guard let self else { return }
             // Pages that were here already stay, as they were left.
             Task { await self.history?.remove(added, profile: profile) }

@@ -2,12 +2,10 @@ import AppKit
 import SwiftUI
 
 /// Arc's "Little Arc": a small window for a quick look at a link, with one
-/// click to promote it to a full tab. Private windows reuse it with an
-/// in-memory profile that disappears when the window closes.
+/// click to promote it to a full tab.
 @MainActor
 final class LittleWindowController: NSWindowController, NSWindowDelegate {
     let tab: BrowserTab
-    var isPrivate: Bool { tab.profile.isPrivate }
     private unowned let app: AppModel
     private var isPromoted = false
 
@@ -27,7 +25,7 @@ final class LittleWindowController: NSWindowController, NSWindowDelegate {
         super.init(window: window)
 
         let view = LittleBrowserView(tab: tab) { [weak self] in self?.promote() }
-        window.title = tab.profile.isPrivate ? "Private" : "Little Window"
+        window.title = "Little Window"
         let hostingView = NSHostingView(rootView: FollowsFrontWindow(app: app, content: view))
         hostingView.sizingOptions = []
         window.contentView = hostingView
@@ -42,9 +40,8 @@ final class LittleWindowController: NSWindowController, NSWindowDelegate {
     }
 
     func promote() {
-        guard !isPrivate else { return }
         isPromoted = true
-        app.front.adopt(tab)
+        app.regularFront.adopt(tab)
         close()
     }
 

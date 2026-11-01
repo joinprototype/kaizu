@@ -551,7 +551,7 @@ extension BrowserTab: WKNavigationDelegate {
             // Shift-click peeks any link, from any tab.
             let opensElsewhere = navigationAction.modifierFlags.contains(.command) || navigationAction.buttonNumber == 2
             let wantsPeek = navigationAction.modifierFlags.contains(.shift)
-            if navigationAction.navigationType == .linkActivated, !opensElsewhere, !profile.isPrivate, let store, store.peek !== self,
+            if navigationAction.navigationType == .linkActivated, !opensElsewhere, let store, store.peek !== self,
                wantsPeek || (store.peeksLinks(from: self) && target.siteKey != webView.url?.siteKey) {
                 store.peek(TrackingParameters.stripped(target) ?? target, from: self)
                 return decisionHandler(.cancel)
@@ -573,7 +573,7 @@ extension BrowserTab: WKNavigationDelegate {
 
         // ⌘-click / middle-click opens in a background tab.
         let flags = navigationAction.modifierFlags
-        if navigationAction.navigationType == .linkActivated, !profile.isPrivate,
+        if navigationAction.navigationType == .linkActivated,
            flags.contains(.command) || navigationAction.buttonNumber == 2 {
             store?.openTab(TrackingParameters.stripped(target) ?? target, after: self, select: flags.contains(.shift))
             return decisionHandler(.cancel)
@@ -688,11 +688,6 @@ extension BrowserTab: WKUIDelegate {
         windowFeatures: WKWindowFeatures
     ) -> WKWebView? {
         guard let store else { return nil }
-        // Private popups (sign-in windows) open in another private window on
-        // the same in-memory profile, keeping `window.opener` working.
-        if profile.isPrivate {
-            return store.openLittleWindow(profile: profile, configuration: configuration).webView
-        }
         let tab = store.openTab(navigationAction.request.url, after: self, configuration: configuration)
         return tab.webView
     }

@@ -83,13 +83,13 @@ enum UtilityWindows {
     }
 }
 
-/// For windows that outlive any one browser window: the one in front is
-/// their store, whichever that is by now.
+/// For windows that outlive any one browser window: the ordinary one in
+/// front is their store, whichever that is by now.
 struct FollowsFrontWindow<Content: View>: View {
     let app: AppModel
     let content: Content
 
     var body: some View {
-        content.environment(app.front)
+        content.environment(app.regularFront)
     }
 }

@@ -28,26 +28,22 @@ extension BrowserStore {
             return false
         case .currentSpace:
             openTab(url)
+            app.front = self
             return true
         }
     }
 
-    /// `profile` defaults to the active space's; `configuration` is for
-    /// popups, which WebKit loads itself.
+    /// `configuration` is for popups, which WebKit loads itself. A private
+    /// window's profile doesn't leave it, so there it's a tab instead.
     @discardableResult
-    func openLittleWindow(_ url: URL? = nil, profile: Profile? = nil, configuration: WKWebViewConfiguration? = nil) -> BrowserTab {
-        let tab = BrowserTab(profile: profile ?? activeSpace.profile, app: app, url: url, configuration: configuration)
+    func openLittleWindow(_ url: URL? = nil, configuration: WKWebViewConfiguration? = nil) -> BrowserTab {
+        guard !isPrivate else { return openTab(url, configuration: configuration) }
+        let tab = BrowserTab(profile: activeSpace.profile, app: app, url: url, configuration: configuration)
         let controller = LittleWindowController(tab: tab, app: app)
         app.littleWindows.append(controller)
         controller.showWindow(nil)
         tab.activate()
         return tab
-    }
-
-    /// A window with its own in-memory profile: no history, nothing saved,
-    /// no extensions; everything is gone when it closes.
-    func openPrivateWindow() {
-        openLittleWindow(profile: Profile(name: "Private", isPrivate: true))
     }
 
     /// Moves a little window's page into the main window, live (no reload).

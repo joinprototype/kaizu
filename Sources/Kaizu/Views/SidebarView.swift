@@ -10,7 +10,7 @@ struct SidebarView: View {
         VStack(alignment: .leading, spacing: 12) {
             SidebarTopBar(tab: store.selectedTab(in: space))
             AddressPill(tab: store.selectedTab(in: space))
-            if !store.extensions.installed.isEmpty {
+            if !store.extensions.installed.isEmpty, !store.isPrivate {
                 ExtensionsBar()
             }
             // Favorites belong to the profile, so they stay put while spaces
@@ -79,7 +79,9 @@ private struct SpaceSection: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 2) {
-                PinnedSection(space: space)
+                if !space.profile.isPrivate {
+                    PinnedSection(space: space)
+                }
                 TodaySection(space: space)
             }
         }

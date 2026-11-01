@@ -15,6 +15,9 @@ final class AppModel {
     /// One per browser window, oldest first. Never empty: closing the last
     /// window only hides it, ready for a click on the Dock.
     private(set) var stores: [BrowserStore] = []
+    /// Private windows are kept apart: nothing that goes through `stores` or
+    /// `spaces` (the session, history, Spotlight, extensions) sees them.
+    private(set) var privateStores: [BrowserStore] = []
     /// Another app already holds the quick bar's shortcut.
     var isQuickBarKeyTaken = false
 
@@ -38,6 +41,7 @@ final class AppModel {
     @ObservationIgnored var memoryPressureSource: DispatchSourceMemoryPressure?
     @ObservationIgnored var saveTask: Task<Void, Never>?
     private weak var lastKeyStore: BrowserStore?
+    private weak var lastRegularStore: BrowserStore?
 
     init() {
         contentBlocker.standardScripts = [MediaEvents.script]
@@ -61,7 +65,18 @@ final class AppModel {
     /// one, or the last that was.
     var front: BrowserStore {
         get { lastKeyStore ?? stores[0] }
-        set { lastKeyStore = newValue }
+        set {
+            lastKeyStore = newValue
+            if !newValue.isPrivate {
+                lastRegularStore = newValue
+            }
+        }
+    }
+
+    /// `front`, for what must never land in a private window: links from
+    /// other apps, Spotlight, the quick bar, Settings and History.
+    var regularFront: BrowserStore {
+        lastRegularStore ?? stores[0]
     }
 
     @discardableResult
@@ -75,7 +90,7 @@ final class AppModel {
     /// The window `tab` is on screen in, if any: a tab's page can only be in
     /// one place at a time.
     func store(showing tab: BrowserTab) -> BrowserStore? {
-        stores.first { $0.isShowing(tab) }
+        stores.first { $0.isShowing(tab) } ?? privateStores.first { $0.isShowing(tab) }
     }
 
     /// Brings Kaizu's window forward, building the windows from the session
@@ -90,11 +105,34 @@ final class AppModel {
     /// ⌘N: another window on the same space, with nothing selected yet.
     @discardableResult
     func openWindow(on space: Space? = nil) -> BrowserStore {
-        let from = front
+        let from = regularFront
         let store = addWindow(WindowRecord(
             activeSpaceID: (space ?? from.activeSpace).id,
             isSidebarVisible: from.isSidebarVisible, sidebarWidth: from.sidebarWidth
         ))
+        show(store, besides: from)
+        scheduleSave()
+        return store
+    }
+
+    /// ⇧⌘P: a window with tabs of its own in an in-memory profile. No history,
+    /// nothing saved, no extensions, and it all goes when the window closes.
+    func openPrivateWindow() -> BrowserStore {
+        let from = front
+        let profile = Profile(name: "Private", isPrivate: true)
+        let space = Space(profile: profile, name: "Private", symbol: "eyeglasses", hue: 0.77)  // Heather
+        space.appearance = .dark
+        let store = BrowserStore(
+            app: self,
+            record: WindowRecord(isSidebarVisible: from.isSidebarVisible, sidebarWidth: from.sidebarWidth),
+            privateSpace: space
+        )
+        privateStores.append(store)
+        show(store, besides: from)
+        return store
+    }
+
+    private func show(_ store: BrowserStore, besides from: BrowserStore) {
         let controller = BrowserWindowController(store: store)
         if let window = controller.window, let frontWindow = from.window, !frontWindow.styleMask.contains(.fullScreen) {
             window.setFrame(frontWindow.frame, display: false)
@@ -102,20 +140,25 @@ final class AppModel {
         }
         controller.showWindow(nil)
         front = store
-        scheduleSave()
-        return store
     }
 
     /// A window closed by the user. The last one stays, hidden, so a click
     /// on the Dock brings back what it showed.
     func windowDidClose(_ store: BrowserStore) {
-        guard stores.count > 1 else { return }
-        stores.removeAll { $0 === store }
-        store.tearDown()
-        if lastKeyStore === store {
-            lastKeyStore = stores.last
+        if store.isPrivate {
+            privateStores.removeAll { $0 === store }
+        } else {
+            guard stores.count > 1 else { return }
+            stores.removeAll { $0 === store }
+            scheduleSave()
         }
-        scheduleSave()
+        store.tearDown()
+        if lastRegularStore === store {
+            lastRegularStore = stores.last
+        }
+        if lastKeyStore === store {
+            lastKeyStore = lastRegularStore
+        }
     }
 
     func windowDidBecomeKey(_ store: BrowserStore) {

@@ -77,7 +77,7 @@ extension AppModel {
             while true {
                 try? await Task.sleep(for: .seconds(10))
                 guard let self else { return }
-                for tab in self.spaces.flatMap(\.allTabs) where tab.isPlayingMedia {
+                for tab in (self.spaces + self.privateStores.flatMap(\.spaces)).flatMap(\.allTabs) where tab.isPlayingMedia {
                     await tab.refreshMediaState()
                 }
             }

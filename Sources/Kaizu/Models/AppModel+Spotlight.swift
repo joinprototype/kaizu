@@ -71,9 +71,9 @@ extension AppModel {
     func openSpotlightItem(_ identifier: String) {
         guard let id = UUID(uuidString: identifier) else { return }
         let owner = spaces.first { $0.pinned.tabs.contains { $0.id == id } }
-            ?? ([front.activeSpace] + spaces).first { $0.profile.favorites.contains { $0.id == id } }
+            ?? ([regularFront.activeSpace] + spaces).first { $0.profile.favorites.contains { $0.id == id } }
         let tab = owner?.tab(id: id)
-        let store = tab.flatMap(store(showing:)) ?? front
+        let store = tab.flatMap(store(showing:)) ?? regularFront
         store.window?.makeKeyAndOrderFront(nil)
         NSApp.activate()
         // Gone since it was indexed: Kaizu still comes forward.

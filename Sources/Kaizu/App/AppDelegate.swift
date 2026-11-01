@@ -56,9 +56,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
-        let showsMainWindow = urls.map { app.front.openExternal($0) }.contains(true)
+        let store = app.regularFront
+        let showsMainWindow = urls.map(store.openExternal).contains(true)
         // Also on launch from a link, before the windows exist.
-        if showsMainWindow || app.front.windowController == nil {
+        if showsMainWindow || store.windowController == nil {
             app.showFront()
         }
     }

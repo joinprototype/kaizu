@@ -145,6 +145,10 @@ extension BrowserStore {
     // MARK: - Editing
 
     func beginNewSpace() {
+        guard !isPrivate else {
+            app.regularFront.window?.makeKeyAndOrderFront(nil)
+            return app.regularFront.beginNewSpace()
+        }
         spaceDraft = SpaceDraft(
             name: "",
             hue: Theme.all[spaces.count % Theme.all.count].hue,

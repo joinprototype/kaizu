@@ -11,12 +11,19 @@ struct SpaceSwitcher: View {
         HStack(spacing: 4) {
             ForEach(Array(store.spaces.enumerated()), id: \.element.id) { index, space in
                 SpaceButton(space: space, isActive: space.id == store.activeSpaceID, indicator: activeIndicator)
-                    .help(index < 9 ? "\(space.name) (⌃\(index + 1))" : space.name)
+                    .help(store.isPrivate ? "Nothing here is saved" : index < 9 ? "\(space.name) (⌃\(index + 1))" : space.name)
                     .contextMenu {
-                        Button("Edit Space…") { store.beginEditing(space) }
-                        Button("Delete Space…", role: .destructive) { spaceToDelete = space }
-                            .disabled(store.spaces.count < 2)
+                        if !store.isPrivate {
+                            Button("Edit Space…") { store.beginEditing(space) }
+                            Button("Delete Space…", role: .destructive) { spaceToDelete = space }
+                                .disabled(store.spaces.count < 2)
+                        }
                     }
+            }
+            if store.isPrivate {
+                Text("Private")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.secondary)
             }
             Spacer()
             if TowelDay.isToday {
@@ -26,8 +33,10 @@ struct SpaceSwitcher: View {
                 DownloadsButton()
                     .transition(.scale(scale: 0.8).combined(with: .opacity))
             }
-            IconButton(systemName: "plus", help: "New Space (⇧⌘N)") {
-                store.beginNewSpace()
+            if !store.isPrivate {
+                IconButton(systemName: "plus", help: "New Space (⇧⌘N)") {
+                    store.beginNewSpace()
+                }
             }
         }
         // One disc that slides (and changes color) to the active space,

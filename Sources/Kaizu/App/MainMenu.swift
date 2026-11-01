@@ -252,14 +252,15 @@ final class SpacesMenu: NSMenu, NSMenuDelegate {
         for (index, space) in app.spaces.enumerated() {
             let key = index < 9 ? "\(index + 1)" : ""
             let item = ActionMenuItem(space.name, key: key, modifiers: .control) { [app] in
-                app.front.switchTo(space)
+                app.regularFront.window?.makeKeyAndOrderFront(nil)
+                app.regularFront.switchTo(space)
             }
-            item.state = space.id == app.front.activeSpaceID ? .on : .off
+            item.state = space.id == app.regularFront.activeSpaceID ? .on : .off
             addItem(item)
         }
         addItem(.separator())
         addItem(ActionMenuItem("New Space…") { [app] in app.front.beginNewSpace() })
-        addItem(ActionMenuItem("Edit Current Space…") { [app] in app.front.beginEditing(app.front.activeSpace) })
+        addItem(ActionMenuItem("Edit Current Space…") { [app] in app.regularFront.beginEditing(app.regularFront.activeSpace) })
     }
 }
 

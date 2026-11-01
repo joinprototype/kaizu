@@ -80,7 +80,7 @@ enum Updates {
             app.front.showToast(
                 "Kaizu \(release.version) is available",
                 symbol: "arrow.down.circle",
-                undo: { app.front.openTab(release.url) },
+                undo: { app.regularFront.openTab(release.url) },
                 actionTitle: "Download",
                 lasts: .seconds(15)
             )
@@ -186,7 +186,7 @@ enum Updates {
             alert.messageText = "Kaizu \(release.version) is available"
             alert.addButton(withTitle: "Download")
             alert.addButton(withTitle: "Later")
-            if alert.runModal() == .alertFirstButtonReturn { app.front.openTab(release.url) }
+            if alert.runModal() == .alertFirstButtonReturn { app.regularFront.openTab(release.url) }
         }
     }
 

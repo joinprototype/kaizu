@@ -44,7 +44,7 @@ struct EmptyState: View {
 
     /// Nothing in Kaizu yet, and Arc's sidebar on this Mac to bring in.
     private var isFreshFromArc: Bool {
-        store.spaces.allSatisfy { $0.allTabs.isEmpty } && FileManager.default.fileExists(atPath: ArcSidebar.fileURL.path)
+        !store.isPrivate && store.spaces.allSatisfy { $0.allTabs.isEmpty } && FileManager.default.fileExists(atPath: ArcSidebar.fileURL.path)
     }
 
     private func hint(_ keys: String, _ label: String) -> some View {

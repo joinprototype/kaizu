@@ -63,6 +63,8 @@ struct ClosedTab {
 @MainActor @Observable
 final class BrowserStore {
     unowned let app: AppModel
+    /// Set for a private window: the only space it sees, and nothing else sees it.
+    let privateSpace: Space?
     var activeSpaceID: UUID {
         didSet { if activeSpaceID != oldValue { updateWindowAppearance() } }
     }
@@ -126,9 +128,13 @@ final class BrowserStore {
     @ObservationIgnored private var toastTask: Task<Void, Never>?
     @ObservationIgnored private var peekTask: Task<Void, Never>?
 
-    init(app: AppModel, record: WindowRecord) {
+    /// What a private window closed, for ⇧⌘T there; gone with the window.
+    @ObservationIgnored private var privateClosedTabs: [ClosedTab] = []
+
+    init(app: AppModel, record: WindowRecord, privateSpace: Space? = nil) {
         self.app = app
-        activeSpaceID = app.spaces.first { $0.id == record.activeSpaceID }?.id ?? app.spaces[0].id
+        self.privateSpace = privateSpace
+        activeSpaceID = privateSpace?.id ?? app.spaces.first { $0.id == record.activeSpaceID }?.id ?? app.spaces[0].id
         selectedTabIDs = record.selectedTabIDs
         isSidebarVisible = record.isSidebarVisible
         sidebarWidth = record.sidebarWidth
@@ -149,6 +155,9 @@ final class BrowserStore {
         // Its views let go of the pages, so another window can take them.
         window?.contentView = nil
         windowController = nil
+        if let privateSpace {
+            app.discard(privateSpace.allTabs)
+        }
     }
 
     /// For this window's events only.
@@ -164,17 +173,31 @@ final class BrowserStore {
 
     // MARK: - Shared by every window
 
+    var isPrivate: Bool { privateSpace != nil }
+
     var profiles: [Profile] {
-        get { app.profiles }
+        get { privateSpace.map { [$0.profile] } ?? app.profiles }
         set { app.profiles = newValue }
     }
 
     var spaces: [Space] {
-        get { app.spaces }
+        get { privateSpace.map { [$0] } ?? app.spaces }
         set { app.spaces = newValue }
     }
 
-    var archive: [ArchivedTabRecord] { app.archive }
+    var archive: [ArchivedTabRecord] { isPrivate ? [] : app.archive }
+
+    var closedTabs: [ClosedTab] {
+        get { isPrivate ? privateClosedTabs : app.closedTabs }
+        set {
+            if isPrivate {
+                privateClosedTabs = newValue
+            } else {
+                app.closedTabs = newValue
+            }
+        }
+    }
+
     var settings: Settings { app.settings }
     var contentBlocker: ContentBlocker { app.contentBlocker }
     var extensions: ExtensionHost { app.extensions }
@@ -240,9 +263,15 @@ final class BrowserStore {
         }
     }
 
-    /// ⌘N: a window on this space, asking where to go first.
+    /// ⌘N: a window on this space, asking where to go first. From a
+    /// private window, an ordinary one.
     func openNewWindow() {
         app.openWindow().showCommandBar(.newTab)
+    }
+
+    /// ⇧⌘P.
+    func openPrivateWindow() {
+        app.openPrivateWindow().showCommandBar(.newTab)
     }
 
     // MARK: - Command bar

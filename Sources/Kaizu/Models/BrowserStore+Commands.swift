@@ -102,6 +102,9 @@ extension BrowserStore {
                 },
             ]
         }
+        if isPrivate {
+            commands.removeAll { ["folder.new", "tab.pin"].contains($0.id) }
+        }
         commands += spaces.enumerated().filter { $0.element.id != activeSpaceID }.map { index, space in
             PaletteCommand(
                 id: "space.\(space.id)", title: "Switch to \(space.name)", symbol: space.symbol, keywords: ["space"],

@@ -181,25 +181,27 @@ private struct TabContextMenu: View {
         let isFavorite = tab.profile.favorites.contains(tab)
         let isToday = space.today.contains(tab)
 
-        if isToday {
-            Button("Pin Tab") { store.move(tab, to: .pinned(folder: nil, before: nil)) }
-        } else {
-            Button("Move to Today") { store.move(tab, to: .today(before: space.today.first?.id)) }
-        }
-        if !isFavorite {
-            Button("Add to Favorites") { store.move(tab, to: .favorites(before: nil)) }
-            Menu("Move to Folder") {
-                Button("New Folder") { store.newFolder(with: tab) }
-                let folders = space.pinned.folders
-                if !folders.isEmpty {
-                    Divider()
-                }
-                ForEach(folders) { folder in
-                    Button(folder.name) { store.move(tab, to: .pinned(folder: folder, before: nil)) }
+        if !store.isPrivate {
+            if isToday {
+                Button("Pin Tab") { store.move(tab, to: .pinned(folder: nil, before: nil)) }
+            } else {
+                Button("Move to Today") { store.move(tab, to: .today(before: space.today.first?.id)) }
+            }
+            if !isFavorite {
+                Button("Add to Favorites") { store.move(tab, to: .favorites(before: nil)) }
+                Menu("Move to Folder") {
+                    Button("New Folder") { store.newFolder(with: tab) }
+                    let folders = space.pinned.folders
+                    if !folders.isEmpty {
+                        Divider()
+                    }
+                    ForEach(folders) { folder in
+                        Button(folder.name) { store.move(tab, to: .pinned(folder: folder, before: nil)) }
+                    }
                 }
             }
+            Divider()
         }
-        Divider()
         if store.isInSplit(tab) {
             Button("Remove from Split View") { store.removeFromSplit(tab) }
         } else if tab !== store.selectedTab {
@@ -219,7 +221,9 @@ private struct TabContextMenu: View {
             .disabled(tab.url == nil)
         Button("Duplicate Tab") { store.openTab(tab.url, after: tab) }
             .disabled(tab.url == nil)
-        Button("Move to New Window") { store.moveToNewWindow(tab) }
+        if !store.isPrivate {
+            Button("Move to New Window") { store.moveToNewWindow(tab) }
+        }
         Divider()
         Button(isToday ? "Close Tab" : "Reset Tab") { store.close(tab) }
     }

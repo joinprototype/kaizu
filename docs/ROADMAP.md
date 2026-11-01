@@ -182,7 +182,7 @@ What makes someone keep it as their default browser.
 - [x] Built-in ad/tracker blocking with `WKContentRuleList` (see note below) **M**
 - [x] Downloads panel (progress ring in the sidebar, list with progress, Show in Finder, double-click to open, clear) **S**
 - [x] Settings window: search engine, default browser button, archive timing, blocker toggles, paused sites, link rules **S**
-- [x] Private window (⇧⌘P): in-memory profile, no history/favicon cache/session, no extensions, links stay inside **M**
+- [x] Private window (⇧⌘P): a full window with tabs, split and Reader on its own in-memory profile; no history/favicon cache/session, no extensions, gone when it closes **M**
 - [x] Multiple full browser windows (⌘N, Move to New Window): windows on a space share its sidebar and each shows its own tab; a tab's page is in one window at a time, so picking it elsewhere brings that window forward; all reopen on launch **M**
 - [x] Restore back/forward history per tab (WebKit interaction state, saved on quit and every 5 min) **S**
 - [x] Tab hibernation: background tabs idle 30 min (not playing media / using camera) and all of them on memory pressure **S**

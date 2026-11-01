@@ -97,8 +97,13 @@ WindowModel (one per window; today's `BrowserStore`)
   no two windows keep the same tab selected. This is Arc's model, kept on
   purpose: Arc tried separate Today tabs per window and went back in 1.5.
   `AppModel.front` is the window
-  menus, shortcuts and links from other apps act on: the key one, or the last
-  that was. Closing the last window only hides it.
+  menus and shortcuts act on: the key one, or the last that was. Closing the
+  last window only hides it.
+- A private window is a `BrowserStore` with a `privateSpace`, kept in
+  `AppModel.privateStores`: its `spaces` is that one space, so everything else
+  a window does just works, and whatever goes through `AppModel.spaces` and
+  `stores` (session, history sweeps, Spotlight, extensions) never sees it.
+  Links from other apps, Spotlight and Settings use `regularFront`.
 
 ## Commands
 

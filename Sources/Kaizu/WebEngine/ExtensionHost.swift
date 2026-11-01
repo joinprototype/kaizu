@@ -136,7 +136,7 @@ final class ExtensionHost: NSObject {
             }
             activate(webExtension, record: record)
             persist()
-            app?.front.showToast("Added \(webExtension.displayName ?? "extension")", symbol: "puzzlepiece.extension")
+            app?.regularFront.showToast("Added \(webExtension.displayName ?? "extension")", symbol: "puzzlepiece.extension")
         } catch {
             let alert = NSAlert(error: error)
             alert.messageText = "Couldn't add the extension"
@@ -201,14 +201,17 @@ final class ExtensionHost: NSObject {
     // MARK: - Window events
 
     func didOpen(_ store: BrowserStore) {
+        guard !store.isPrivate else { return }
         controller.didOpenWindow(store.extensionWindow)
     }
 
     func didClose(_ store: BrowserStore) {
+        guard !store.isPrivate else { return }
         controller.didCloseWindow(store.extensionWindow)
     }
 
     func didFocus(_ store: BrowserStore) {
+        guard !store.isPrivate else { return }
         controller.didFocusWindow(store.extensionWindow)
     }
 
@@ -312,11 +315,11 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
     func webExtensionController(_ controller: WKWebExtensionController, openWindowsFor extensionContext: WKWebExtensionContext) -> [any WKWebExtensionWindow] {
         // Front window first, as the API asks.
         guard let app else { return [] }
-        return ([app.front] + app.stores.filter { $0 !== app.front }).map(\.extensionWindow)
+        return ([app.regularFront] + app.stores.filter { $0 !== app.regularFront }).map(\.extensionWindow)
     }
 
     func webExtensionController(_ controller: WKWebExtensionController, focusedWindowFor extensionContext: WKWebExtensionContext) -> (any WKWebExtensionWindow)? {
-        app?.front.extensionWindow
+        app?.regularFront.extensionWindow
     }
 
     func webExtensionController(
@@ -325,7 +328,7 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
         for extensionContext: WKWebExtensionContext,
         completionHandler: @escaping ((any WKWebExtensionTab)?, (any Error)?) -> Void
     ) {
-        let tab = app?.front.openTab(configuration.url, select: configuration.shouldBeActive)
+        let tab = app?.regularFront.openTab(configuration.url, select: configuration.shouldBeActive)
         completionHandler(tab, nil)
     }
 
@@ -348,7 +351,7 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
         completionHandler: @escaping ((any Error)?) -> Void
     ) {
         if let url = extensionContext.optionsPageURL {
-            app?.front.openTab(url)
+            app?.regularFront.openTab(url)
         }
         completionHandler(nil)
     }
@@ -395,7 +398,7 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
         for context: WKWebExtensionContext,
         completionHandler: @escaping ((any Error)?) -> Void
     ) {
-        guard let popover = action.popupPopover, let view = app?.front.window?.contentView else {
+        guard let popover = action.popupPopover, let view = app?.regularFront.window?.contentView else {
             return completionHandler(CocoaError(.featureUnsupported))
         }
         popover.show(relativeTo: popupAnchor, of: view, preferredEdge: .maxY)
