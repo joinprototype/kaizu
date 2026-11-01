@@ -23,7 +23,11 @@ extension BrowserStore {
         reader = nil
         closePeek()
         endHidingItems()
-        space.selectedTab?.activate()
+        // Another window on this space may have taken the tab since.
+        if let tab = selectedTab(in: space), !isFree(tab) {
+            selectedTabIDs[space.id] = nil
+        }
+        selectedTab(in: space)?.activate()
         focusWebView()
         scheduleSave()
     }
@@ -63,7 +67,7 @@ extension BrowserStore {
     /// a flick or a swipe past halfway carries on into the next space at the
     /// fingers' speed; otherwise it springs back.
     func installSpaceSwipeMonitor() {
-        NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+        addEventMonitor(matching: .scrollWheel) { [weak self] event in
             guard let self, event.window === self.window, self.isSidebarVisible || self.isSidebarPeeking,
                   event.locationInWindow.x < self.sidebarWidth
             else { return event }
@@ -180,6 +184,7 @@ extension BrowserStore {
             space.hue = draft.hue
             space.symbol = draft.symbol
             space.appearance = draft.appearance
+            app.stores.forEach { $0.updateWindowAppearance() }
         } else {
             let space = Space(profile: profile(for: draft.profile, name: name), name: name, symbol: draft.symbol, hue: draft.hue)
             space.appearance = draft.appearance
@@ -216,11 +221,14 @@ extension BrowserStore {
             extensions.didClose(tab)
             tab.discard()
         }
-        closedTabs.removeAll { $0.spaceID == space.id }
-        archive.removeAll { $0.spaceID == space.id }
+        app.closedTabs.removeAll { $0.spaceID == space.id }
+        app.archive.removeAll { $0.spaceID == space.id }
         settings.linkRoutes.removeAll { $0.spaceID == space.id }
-        if space.id == activeSpaceID {
-            switchTo(spaces[index == 0 ? 1 : index - 1])
+        for store in app.stores {
+            if space.id == store.activeSpaceID {
+                store.switchTo(spaces[index == 0 ? 1 : index - 1])
+            }
+            store.selectedTabIDs[space.id] = nil
         }
         withAnimation(Motion.snap) {
             _ = spaces.remove(at: index)
@@ -228,7 +236,7 @@ extension BrowserStore {
         if deletingProfile {
             removeWebsiteData(of: space.profile)
         }
-        saveArchive()
+        app.saveArchive()
         scheduleSave()
     }
 
@@ -236,7 +244,7 @@ extension BrowserStore {
         profiles.removeAll { $0 === profile }
         let id = profile.id
         Task { await history?.removeAll(profile: id) }
-        forgetChoices(of: id)
+        app.forgetChoices(of: id)
         Task {
             // WebKit refuses while the store is still in use; give it a moment to let go.
             for _ in 0..<5 {

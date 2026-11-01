@@ -73,6 +73,46 @@ import Testing
         #expect(decoded == record)
     }
 
+    @Test func extraWindowsRoundTrip() throws {
+        let second = WindowRecord(
+            activeSpaceID: Self.profileID, isSidebarVisible: false, sidebarWidth: 320,
+            selectedTabIDs: [Self.profileID: Self.pinnedID], frame: "10 20 800 600 0 0 1440 900"
+        )
+        var record = Self.session(selectedTabID: Self.tabID)
+        record.extraWindows = [second]
+        let (decoded, _) = try SessionRecord.decode(try record.encoded())
+        #expect(decoded == record)
+        #expect(decoded.windows.count == 2)
+        #expect(decoded.windows[1] == second)
+    }
+
+    /// One window's session is the same file it always was.
+    @Test func firstWindowComesFromTheTopLevelFields() throws {
+        let record = Self.session(selectedTabID: Self.tabID)
+        let json = String(decoding: try record.encoded(), as: UTF8.self)
+        #expect(!json.contains("extraWindows"))
+        let windows = try SessionRecord.decode(try record.encoded()).record.windows
+        #expect(windows == [WindowRecord(
+            activeSpaceID: Self.profileID, isSidebarVisible: false, sidebarWidth: 300,
+            selectedTabIDs: [Self.profileID: Self.tabID]
+        )])
+    }
+
+    @Test func spaceWithNothingSelectedHasNoSelectionInItsWindow() {
+        #expect(Self.session(selectedTabID: nil).windows[0].selectedTabIDs.isEmpty)
+    }
+
+    private static func session(selectedTabID: UUID?) -> SessionRecord {
+        SessionRecord(
+            activeSpaceID: profileID, isSidebarVisible: false, sidebarWidth: 300,
+            profiles: [ProfileRecord(id: profileID, name: "Personal", favorites: [])],
+            spaces: [SpaceRecord(
+                id: profileID, name: "Personal", symbol: "star.fill", hue: 0.6, profileID: profileID,
+                selectedTabID: selectedTabID, pinned: [], today: []
+            )]
+        )
+    }
+
     @Test func folderEntriesEncodeWithReadableKeys() throws {
         let json = String(decoding: try JSONCoding.encoder.encode([SidebarItemRecord.folder(
             FolderRecord(id: Self.tabID, name: "Work", isExpanded: true, children: [])

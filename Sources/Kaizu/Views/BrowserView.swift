@@ -11,6 +11,7 @@ struct BrowserView: View {
 
         ZStack(alignment: .topLeading) {
             SpaceBackdrop()
+            WindowTitle()
 
             HStack(spacing: 0) {
                 if store.isSidebarVisible {
@@ -86,6 +87,20 @@ struct BrowserView: View {
                 .onHover { store.setSidebarPeeking($0) }
                 .transition(store.sidebarDocksFromPeek ? .identity : .move(edge: .leading).combined(with: .opacity))
         }
+    }
+}
+
+/// Names the window after its page, for the Window menu and Mission Control.
+/// A view of its own, so a page retitling itself redraws only this.
+private struct WindowTitle: View {
+    @Environment(BrowserStore.self) private var store
+
+    var body: some View {
+        let title = store.selectedTab?.displayTitle ?? store.activeSpace.name
+        Color.clear
+            .allowsHitTesting(false)
+            .onAppear { store.window?.title = title }
+            .onChange(of: title) { store.window?.title = title }
     }
 }
 

@@ -56,19 +56,22 @@ struct ClosedTab {
     let record: TabRecord
 }
 
-/// App state and the actions views call. Split by concern across
-/// `BrowserStore+*.swift`: tabs, spaces, split, recents (⌃Tab, now playing),
-/// archive, hibernation, find, peek, external links, persistence, privacy.
+/// One browser window: which space and tab it shows, its sidebar and
+/// overlays, and the actions views call. What windows share lives in
+/// `AppModel`. Split by concern across `BrowserStore+*.swift`: tabs, spaces,
+/// split, recents (⌃Tab, now playing), find, peek, external links, privacy.
 @MainActor @Observable
 final class BrowserStore {
-    var profiles: [Profile] = []
-    var spaces: [Space] = []
-    var activeSpaceID = UUID() {
+    unowned let app: AppModel
+    var activeSpaceID: UUID {
         didSet { if activeSpaceID != oldValue { updateWindowAppearance() } }
     }
-    var isSidebarVisible = true
+    /// The tab each space shows in this window, by space. Each window keeps
+    /// its own, and no two windows keep the same tab.
+    var selectedTabIDs: [UUID: UUID]
+    var isSidebarVisible: Bool
     var isSidebarPeeking = false
-    var sidebarWidth = 248.0
+    var sidebarWidth: Double
     var commandBar: CommandBarMode?
     var find: FindState?
     /// A link preview over the page (see BrowserStore+Peek).
@@ -92,17 +95,13 @@ final class BrowserStore {
     var toast: Toast?
     /// Briefly true after Copy Link, so the address pill can flash "Copied".
     var didCopyLink = false
-    /// Today tabs swept away after sitting unused, newest first.
-    var archive: [ArchivedTabRecord] = []
-
-    let settings = Settings()
-    let contentBlocker = ContentBlocker()
-    let extensions = ExtensionHost()
-    let history = try? HistoryStore(fileURL: AppPaths.support.appending(path: "history.sqlite"))
 
     @ObservationIgnored weak var window: NSWindow?
-    @ObservationIgnored var closedTabs: [ClosedTab] = []
-    @ObservationIgnored var littleWindows: [LittleWindowController] = []
+    @ObservationIgnored var windowController: BrowserWindowController?
+    /// Where the session last had this window; nil lets the system place it.
+    @ObservationIgnored let savedFrame: String?
+    /// This window as extensions see it.
+    @ObservationIgnored private(set) lazy var extensionWindow = MainWindowAdapter(store: self)
     /// The peek card is growing into a tab (see expandPeek).
     var isPeekExpanding = false
     /// The tab whose items are being picked to hide.
@@ -116,57 +115,103 @@ final class BrowserStore {
     /// ⌘S while the sidebar peeks: it docks where it is instead of one
     /// sidebar sliding out while another slides in.
     var sidebarDocksFromPeek = false
-    @ObservationIgnored var quickBar: QuickBarController?
-    @ObservationIgnored var quickBarHotKey: GlobalHotKey?
-    /// What Spotlight was last given (see BrowserStore+Spotlight); nil
-    /// until the first update of this launch.
-    @ObservationIgnored var spotlightSignature: [String]?
-    @ObservationIgnored var spotlightIdentifiers: Set<String> = []
-    @ObservationIgnored var spotlightUpdate: Task<Void, Never>?
-    @ObservationIgnored var menuCommandCache: (time: Date, commands: [PaletteCommand])?
-    /// What the command bar has learned you pick, per profile.
-    @ObservationIgnored var choices: [UUID: ChoiceMemory] = [:]
-    /// Another app already holds the quick bar's shortcut.
-    var isQuickBarKeyTaken = false
     /// Horizontal travel of the current two-finger swipe; nil once it switched spaces.
     @ObservationIgnored var spaceSwipeTravel: CGFloat?
     /// The swipe's recent (time, travel), for its speed when the fingers lift.
     @ObservationIgnored var spaceSwipeSamples: [(time: TimeInterval, travel: CGFloat)] = []
     /// Counts swipes, so one's spring-back can't tidy up after the next.
     @ObservationIgnored var spaceSwipeGeneration = 0
-    @ObservationIgnored var memoryPressureSource: DispatchSourceMemoryPressure?
-    @ObservationIgnored var saveTask: Task<Void, Never>?
+    /// Removed with the window; each store's only look at its own events.
+    @ObservationIgnored private var eventMonitors: [Any] = []
     @ObservationIgnored private var toastTask: Task<Void, Never>?
     @ObservationIgnored private var peekTask: Task<Void, Never>?
 
-    init() {
-        contentBlocker.standardScripts = [MediaEvents.script]
-        contentBlocker.start()
-        extensions.store = self
-        Task {
-            await extensions.loadInstalled()
-            spaces.flatMap(\.allTabs).forEach { $0.reopenExtensionPage() }
-        }
-        restore()
-        loadChoices()
-        startArchiving()
-        startHibernating()
-        startMediaMonitoring()
+    init(app: AppModel, record: WindowRecord) {
+        self.app = app
+        activeSpaceID = app.spaces.first { $0.id == record.activeSpaceID }?.id ?? app.spaces[0].id
+        selectedTabIDs = record.selectedTabIDs
+        isSidebarVisible = record.isSidebarVisible
+        sidebarWidth = record.sidebarWidth
+        savedFrame = record.frame
         installEscapeMonitor()
         installSplitFocusMonitor()
         installSpaceSwipeMonitor()
         installTabSwitcherMonitor()
-        DownloadManager.shared.onFinish = { [weak self] filename in
-            self?.showToast("Downloaded \(filename)")
+    }
+
+    /// The window is gone for good. Its tabs stay in their spaces.
+    func tearDown() {
+        eventMonitors.forEach(NSEvent.removeMonitor)
+        eventMonitors = []
+        peek?.discard()
+        peek = nil
+        app.extensions.didClose(self)
+        // Its views let go of the pages, so another window can take them,
+        // and the autosaved frame is free for the next first window.
+        window?.contentView = nil
+        window?.setFrameAutosaveName("")
+        windowController = nil
+    }
+
+    func addEventMonitor(matching mask: NSEvent.EventTypeMask, handler: @escaping (NSEvent) -> NSEvent?) {
+        if let monitor = NSEvent.addLocalMonitorForEvents(matching: mask, handler: handler) {
+            eventMonitors.append(monitor)
         }
     }
+
+    // MARK: - Shared by every window
+
+    var profiles: [Profile] {
+        get { app.profiles }
+        set { app.profiles = newValue }
+    }
+
+    var spaces: [Space] {
+        get { app.spaces }
+        set { app.spaces = newValue }
+    }
+
+    var archive: [ArchivedTabRecord] { app.archive }
+    var settings: Settings { app.settings }
+    var contentBlocker: ContentBlocker { app.contentBlocker }
+    var extensions: ExtensionHost { app.extensions }
+    var history: HistoryStore? { app.history }
+
+    func scheduleSave() {
+        app.scheduleSave()
+    }
+
+    // MARK: - What this window shows
 
     var activeSpace: Space {
         spaces.first { $0.id == activeSpaceID } ?? spaces[0]
     }
 
     var selectedTab: BrowserTab? {
-        activeSpace.selectedTab
+        selectedTab(in: activeSpace)
+    }
+
+    func selectedTab(in space: Space) -> BrowserTab? {
+        guard let id = selectedTabIDs[space.id] else { return nil }
+        return space.allTabs.first { $0.id == id }
+    }
+
+    /// The panes on screen: the selected tab, or all of the split it's in.
+    private var shownTabs: [BrowserTab] {
+        guard let tab = selectedTab else { return [] }
+        let split = activeSpace.splitTabs
+        return split.contains(tab) ? split : [tab]
+    }
+
+    func isShowing(_ tab: BrowserTab) -> Bool {
+        tab === peek || shownTabs.contains(tab)
+    }
+
+    var record: WindowRecord {
+        WindowRecord(
+            activeSpaceID: activeSpaceID, isSidebarVisible: isSidebarVisible, sidebarWidth: sidebarWidth,
+            selectedTabIDs: selectedTabIDs, frame: window?.frameDescriptor ?? savedFrame
+        )
     }
 
     func focusWebView() {
@@ -177,6 +222,11 @@ final class BrowserStore {
                 window.makeFirstResponder(webView)
             }
         }
+    }
+
+    /// ⌘N: a window on this space, asking where to go first.
+    func openNewWindow() {
+        app.openWindow().showCommandBar(.newTab)
     }
 
     // MARK: - Command bar
@@ -197,7 +247,7 @@ final class BrowserStore {
 
     func perform(_ suggestion: Suggestion, mode: CommandBarMode) {
         if mode == .quick {
-            quickBar?.hide()
+            app.quickBar?.hide()
             // From the quick bar, pages get a little window; tabs, commands
             // and the archive need the main window.
             switch suggestion {

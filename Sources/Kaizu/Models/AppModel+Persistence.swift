@@ -2,7 +2,7 @@ import BrowserCore
 import Foundation
 
 /// Session save/restore (`~/Library/Application Support/Kaizu/session.json`).
-extension BrowserStore {
+extension AppModel {
     private static var sessionURL: URL {
         AppPaths.support.appending(path: "session.json")
     }
@@ -20,12 +20,14 @@ extension BrowserStore {
     }
 
     func save() {
+        let first = stores[0]
         let record = SessionRecord(
-            activeSpaceID: activeSpaceID,
-            isSidebarVisible: isSidebarVisible,
-            sidebarWidth: sidebarWidth,
+            activeSpaceID: first.activeSpaceID,
+            isSidebarVisible: first.isSidebarVisible,
+            sidebarWidth: first.sidebarWidth,
             profiles: profiles.map(\.record),
-            spaces: spaces.map(\.record)
+            spaces: spaces.map { $0.record(selectedTabID: first.selectedTabIDs[$0.id]) },
+            extraWindows: stores.count > 1 ? stores.dropFirst().map(\.record) : nil
         )
         do {
             try record.encoded().write(to: Self.sessionURL, options: .atomic)
@@ -36,25 +38,26 @@ extension BrowserStore {
     }
 
     func restore() {
-        if let (session, migrated) = loadSession() {
-            apply(session)
-            if migrated {
-                scheduleSave()  // write the upgraded format right away
-            }
+        let session = loadSession()
+        if let session {
+            apply(session.record)
         }
         if spaces.isEmpty {
             createDefaultSpace()
         }
-        if !spaces.contains(where: { $0.id == activeSpaceID }) {
-            activeSpaceID = spaces[0].id
+        for record in session?.record.windows ?? [WindowRecord()] {
+            _ = addWindow(record)
+        }
+        if session?.migrated == true {
+            scheduleSave()  // write the upgraded format right away
         }
         loadArchive()
-        selectedTab?.activate()
+        stores.forEach { $0.selectedTab?.activate() }
     }
 
     func makeTab(_ record: TabRecord, profile: Profile) -> BrowserTab {
         let tab = BrowserTab(
-            id: record.id, profile: profile, store: self, url: record.url, title: record.title,
+            id: record.id, profile: profile, app: self, url: record.url, title: record.title,
             pinnedURL: record.pinnedURL, lastActiveAt: record.lastActiveAt
         )
         tab.savedState = savedTabState(for: record.id)
@@ -102,15 +105,11 @@ extension BrowserStore {
             let space = Space(id: record.id, profile: profile, name: record.name, symbol: record.symbol, hue: record.hue)
             space.pinned = record.pinned.map { makeItem($0, profile: profile) }
             space.today = record.today.map { makeTab($0, profile: profile) }
-            space.selectedTabID = record.selectedTabID
             space.split = record.split ?? []
             space.splitWidths = record.splitWidths ?? []
             space.appearance = record.appearance.flatMap(Space.Appearance.init) ?? .auto
             return space
         }
-        activeSpaceID = session.activeSpaceID ?? activeSpaceID
-        isSidebarVisible = session.isSidebarVisible
-        sidebarWidth = session.sidebarWidth
     }
 
     private func createDefaultSpace() {
@@ -118,6 +117,5 @@ extension BrowserStore {
         let space = Space(profile: profile, name: "Personal", symbol: Space.symbols[0], hue: Theme.all[0].hue)
         profiles.append(profile)
         spaces.append(space)
-        activeSpaceID = space.id
     }
 }

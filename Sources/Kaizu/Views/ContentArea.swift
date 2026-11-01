@@ -11,7 +11,7 @@ struct ContentArea: View {
 
     var body: some View {
         Group {
-            if let tab = space.selectedTab {
+            if let tab = store.selectedTab(in: space) {
                 let split = space.splitTabs
                 SplitContent(space: space, panes: split.contains(tab) ? split : [tab], focused: tab)
             } else {
@@ -178,8 +178,13 @@ final class WebContainerView: NSView {
 
     private let dropCatcher = TabDropCatcher()
 
+    /// The page it was last told to show. Told again, it does nothing: on
+    /// its way out it hears once more, after another window has taken the page.
+    private weak var hosted: WKWebView?
+
     func host(_ webView: WKWebView) {
-        guard webView.superview !== self else { return }
+        guard webView !== hosted else { return }
+        hosted = webView
         subviews.filter { $0 !== dropCatcher }.forEach { $0.removeFromSuperview() }
         webView.frame = bounds
         webView.autoresizingMask = [.width, .height]

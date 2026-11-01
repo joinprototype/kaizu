@@ -2,7 +2,7 @@ import AppKit
 import Carbon.HIToolbox
 
 /// Quick search from any app: the command bar over whatever you're in.
-extension BrowserStore {
+extension AppModel {
     /// Registers the shortcut chosen in Settings (or none), replacing the old one.
     func applyQuickBarKey() {
         quickBarHotKey?.unregister()
@@ -20,11 +20,12 @@ extension BrowserStore {
 
     /// Inside Kaizu's own window the shortcut is just ⌘T.
     func toggleQuickBar() {
-        if NSApp.isActive, window?.isKeyWindow == true {
-            return commandBar == nil ? showCommandBar(.newTab) : dismissCommandBar()
+        let store = front
+        if NSApp.isActive, store.window?.isKeyWindow == true {
+            return store.commandBar == nil ? store.showCommandBar(.newTab) : store.dismissCommandBar()
         }
         if quickBar == nil {
-            quickBar = QuickBarController(store: self)
+            quickBar = QuickBarController(app: self)
         }
         quickBar?.toggle()
     }

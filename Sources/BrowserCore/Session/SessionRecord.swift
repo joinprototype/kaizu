@@ -13,13 +13,19 @@ public struct SessionRecord: Codable, Equatable, Sendable {
     public var sidebarWidth: Double
     public var profiles: [ProfileRecord]
     public var spaces: [SpaceRecord]
+    /// Windows after the first, which the fields above and each space's
+    /// `selectedTabID` describe. Optional so files from before multiple
+    /// windows still decode without a migration, and older builds can read
+    /// these.
+    public var extraWindows: [WindowRecord]?
 
     public init(
         activeSpaceID: UUID?,
         isSidebarVisible: Bool,
         sidebarWidth: Double,
         profiles: [ProfileRecord],
-        spaces: [SpaceRecord]
+        spaces: [SpaceRecord],
+        extraWindows: [WindowRecord]? = nil
     ) {
         self.schemaVersion = Self.currentVersion
         self.activeSpaceID = activeSpaceID
@@ -27,6 +33,40 @@ public struct SessionRecord: Codable, Equatable, Sendable {
         self.sidebarWidth = sidebarWidth
         self.profiles = profiles
         self.spaces = spaces
+        self.extraWindows = extraWindows
+    }
+
+    /// Every window to reopen, first one first.
+    public var windows: [WindowRecord] {
+        let selected = spaces.compactMap { space in space.selectedTabID.map { (space.id, $0) } }
+        let first = WindowRecord(
+            activeSpaceID: activeSpaceID, isSidebarVisible: isSidebarVisible, sidebarWidth: sidebarWidth,
+            selectedTabIDs: Dictionary(selected) { first, _ in first }
+        )
+        return [first] + (extraWindows ?? [])
+    }
+}
+
+/// What differs between browser windows on the same spaces.
+public struct WindowRecord: Codable, Equatable, Sendable {
+    public var activeSpaceID: UUID?
+    public var isSidebarVisible: Bool
+    public var sidebarWidth: Double
+    /// The tab each space shows here, by space.
+    public var selectedTabIDs: [UUID: UUID]
+    /// `NSWindow.frameDescriptor`. Nil for the first window, whose frame is
+    /// autosaved in the defaults.
+    public var frame: String?
+
+    public init(
+        activeSpaceID: UUID? = nil, isSidebarVisible: Bool = true, sidebarWidth: Double = 248,
+        selectedTabIDs: [UUID: UUID] = [:], frame: String? = nil
+    ) {
+        self.activeSpaceID = activeSpaceID
+        self.isSidebarVisible = isSidebarVisible
+        self.sidebarWidth = sidebarWidth
+        self.selectedTabIDs = selectedTabIDs
+        self.frame = frame
     }
 }
 

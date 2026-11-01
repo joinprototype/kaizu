@@ -8,8 +8,8 @@ struct SidebarView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SidebarTopBar(tab: space.selectedTab)
-            AddressPill(tab: space.selectedTab)
+            SidebarTopBar(tab: store.selectedTab(in: space))
+            AddressPill(tab: store.selectedTab(in: space))
             if !store.extensions.installed.isEmpty {
                 ExtensionsBar()
             }
@@ -269,6 +269,7 @@ private struct CompassNeedle: View {
 
 /// Big icon tiles for the profile's most-used sites, shared by its spaces.
 private struct FavoritesGrid: View {
+    @Environment(BrowserStore.self) private var store
     let space: Space
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 4)
@@ -276,7 +277,7 @@ private struct FavoritesGrid: View {
     var body: some View {
         LazyVGrid(columns: columns, spacing: 8) {
             ForEach(space.profile.favorites) { tab in
-                FavoriteTile(tab: tab, isSelected: tab.id == space.selectedTabID)
+                FavoriteTile(tab: tab, isSelected: tab.id == store.selectedTabIDs[space.id])
                     .tabDropTarget(.favorites(before: tab.id))
             }
         }
@@ -318,7 +319,7 @@ private struct TodaySection: View {
         .tabDropTarget(.today(before: space.today.first?.id))
         NewTabRow()
         ForEach(space.today) { tab in
-            TabRow(tab: tab, isSelected: tab.id == space.selectedTabID)
+            TabRow(tab: tab, isSelected: tab.id == store.selectedTabIDs[space.id])
                 .tabDropTarget(.today(before: tab.id), opensGap: true)
                 .transition(Motion.row)
         }

@@ -38,10 +38,7 @@ final class ExtensionHost: NSObject {
     }
 
     @ObservationIgnored let controller = WKWebExtensionController(configuration: .default())
-    @ObservationIgnored let mainWindow = MainWindowAdapter()
-    @ObservationIgnored weak var store: BrowserStore? {
-        didSet { mainWindow.store = store }
-    }
+    @ObservationIgnored weak var app: AppModel?
     /// Where the next action popup should anchor (the clicked toolbar button), in window coordinates.
     @ObservationIgnored var popupAnchor: CGRect = .zero
 
@@ -139,7 +136,7 @@ final class ExtensionHost: NSObject {
             }
             activate(webExtension, record: record)
             persist()
-            store?.showToast("Added \(webExtension.displayName ?? "extension")", symbol: "puzzlepiece.extension")
+            app?.front.showToast("Added \(webExtension.displayName ?? "extension")", symbol: "puzzlepiece.extension")
         } catch {
             let alert = NSAlert(error: error)
             alert.messageText = "Couldn't add the extension"
@@ -166,14 +163,14 @@ final class ExtensionHost: NSObject {
 
     // MARK: - Actions
 
-    func action(for item: Installed) -> WKWebExtension.Action? {
+    func action(for item: Installed, on tab: BrowserTab?) -> WKWebExtension.Action? {
         _ = actionRevision  // observe action updates
-        return item.context.action(for: store?.selectedTab)
+        return item.context.action(for: tab)
     }
 
-    func performAction(for item: Installed, anchor: CGRect) {
+    func performAction(for item: Installed, on tab: BrowserTab?, anchor: CGRect) {
         popupAnchor = anchor
-        item.context.performAction(for: store?.selectedTab)
+        item.context.performAction(for: tab)
     }
 
     // MARK: - Tab events
@@ -199,6 +196,20 @@ final class ExtensionHost: NSObject {
     func didChange(_ properties: WKWebExtension.TabChangedProperties, for tab: BrowserTab) {
         guard !tab.profile.isPrivate else { return }
         controller.didChangeTabProperties(properties, for: tab)
+    }
+
+    // MARK: - Window events
+
+    func didOpen(_ store: BrowserStore) {
+        controller.didOpenWindow(store.extensionWindow)
+    }
+
+    func didClose(_ store: BrowserStore) {
+        controller.didCloseWindow(store.extensionWindow)
+    }
+
+    func didFocus(_ store: BrowserStore) {
+        controller.didFocusWindow(store.extensionWindow)
     }
 
     // MARK: - Private
@@ -299,11 +310,13 @@ final class ExtensionHost: NSObject {
 
 extension ExtensionHost: WKWebExtensionControllerDelegate {
     func webExtensionController(_ controller: WKWebExtensionController, openWindowsFor extensionContext: WKWebExtensionContext) -> [any WKWebExtensionWindow] {
-        [mainWindow]
+        // Front window first, as the API asks.
+        guard let app else { return [] }
+        return ([app.front] + app.stores.filter { $0 !== app.front }).map(\.extensionWindow)
     }
 
     func webExtensionController(_ controller: WKWebExtensionController, focusedWindowFor extensionContext: WKWebExtensionContext) -> (any WKWebExtensionWindow)? {
-        mainWindow
+        app?.front.extensionWindow
     }
 
     func webExtensionController(
@@ -312,7 +325,7 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
         for extensionContext: WKWebExtensionContext,
         completionHandler: @escaping ((any WKWebExtensionTab)?, (any Error)?) -> Void
     ) {
-        let tab = store?.openTab(configuration.url, select: configuration.shouldBeActive)
+        let tab = app?.front.openTab(configuration.url, select: configuration.shouldBeActive)
         completionHandler(tab, nil)
     }
 
@@ -322,11 +335,11 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
         for extensionContext: WKWebExtensionContext,
         completionHandler: @escaping ((any WKWebExtensionWindow)?, (any Error)?) -> Void
     ) {
-        // One window for now: open the requested pages as tabs in it.
+        let store = app?.openWindow()
         for url in configuration.tabURLs {
             store?.openTab(url, select: configuration.shouldBeFocused)
         }
-        completionHandler(mainWindow, nil)
+        completionHandler(store?.extensionWindow, nil)
     }
 
     func webExtensionController(
@@ -335,7 +348,7 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
         completionHandler: @escaping ((any Error)?) -> Void
     ) {
         if let url = extensionContext.optionsPageURL {
-            store?.openTab(url)
+            app?.front.openTab(url)
         }
         completionHandler(nil)
     }
@@ -382,7 +395,7 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
         for context: WKWebExtensionContext,
         completionHandler: @escaping ((any Error)?) -> Void
     ) {
-        guard let popover = action.popupPopover, let view = store?.window?.contentView else {
+        guard let popover = action.popupPopover, let view = app?.front.window?.contentView else {
             return completionHandler(CocoaError(.featureUnsupported))
         }
         popover.show(relativeTo: popupAnchor, of: view, preferredEdge: .maxY)

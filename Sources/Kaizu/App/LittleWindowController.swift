@@ -8,12 +8,12 @@ import SwiftUI
 final class LittleWindowController: NSWindowController, NSWindowDelegate {
     let tab: BrowserTab
     var isPrivate: Bool { tab.profile.isPrivate }
-    private weak var store: BrowserStore?
+    private unowned let app: AppModel
     private var isPromoted = false
 
-    init(tab: BrowserTab, store: BrowserStore) {
+    init(tab: BrowserTab, app: AppModel) {
         self.tab = tab
-        self.store = store
+        self.app = app
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 960, height: 680),
             styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
@@ -28,7 +28,7 @@ final class LittleWindowController: NSWindowController, NSWindowDelegate {
 
         let view = LittleBrowserView(tab: tab) { [weak self] in self?.promote() }
         window.title = tab.profile.isPrivate ? "Private" : "Little Window"
-        let hostingView = NSHostingView(rootView: view.environment(store))
+        let hostingView = NSHostingView(rootView: view.environment(app.front))
         hostingView.sizingOptions = []
         window.contentView = hostingView
         window.delegate = self
@@ -44,7 +44,7 @@ final class LittleWindowController: NSWindowController, NSWindowDelegate {
     func promote() {
         guard !isPrivate else { return }
         isPromoted = true
-        store?.adopt(tab)
+        app.front.adopt(tab)
         close()
     }
 
@@ -52,6 +52,6 @@ final class LittleWindowController: NSWindowController, NSWindowDelegate {
         if !isPromoted {
             tab.discard()
         }
-        store?.littleWindowDidClose(self)
+        app.littleWindows.removeAll { $0 === self }
     }
 }

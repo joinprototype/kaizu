@@ -18,7 +18,6 @@ final class Space: Identifiable {
     var hue: Double
     var pinned: [SidebarItem] = []
     var today: [BrowserTab] = []
-    var selectedTabID: UUID?
     /// Tabs shown side by side (2–4); see BrowserStore+Split.
     var split: [UUID] = [] {
         didSet { if split != oldValue { splitWidths = [] } }
@@ -59,12 +58,8 @@ final class Space: Identifiable {
         return tabs.count > 1 ? tabs : []
     }
 
-    var selectedTab: BrowserTab? {
-        guard let selectedTabID else { return nil }
-        return allTabs.first { $0.id == selectedTabID }
-    }
-
-    var record: SpaceRecord {
+    /// `selectedTabID` is the first window's: each window keeps its own.
+    func record(selectedTabID: UUID? = nil) -> SpaceRecord {
         SpaceRecord(
             id: id, name: name, symbol: symbol, hue: hue, profileID: profile.id,
             selectedTabID: selectedTabID, pinned: pinned.map(\.record), today: today.map(\.record),

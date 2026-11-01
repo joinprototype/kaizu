@@ -25,6 +25,9 @@ extension BrowserStore {
             PaletteCommand(id: "sidebar", title: "Toggle Sidebar", symbol: "sidebar.left", keywords: ["hide", "show"], shortcut: "⌘S") {
                 self.toggleSidebar()
             },
+            PaletteCommand(id: "window.new", title: "New Window", symbol: "macwindow.on.rectangle", shortcut: "⌘N") {
+                self.openNewWindow()
+            },
             PaletteCommand(id: "little", title: "New Little Window", symbol: "macwindow", shortcut: "⌥⌘N") {
                 self.openLittleWindow()
             },
@@ -130,7 +133,7 @@ extension BrowserStore {
     /// ("View" for Actual Size) so either word finds them.
     private func menuCommands() -> [PaletteCommand] {
         // Typing asks on every keystroke (several times per render).
-        if let cache = menuCommandCache, Date.now.timeIntervalSince(cache.time) < 1 { return cache.commands }
+        if let cache = app.menuCommandCache, Date.now.timeIntervalSince(cache.time) < 1 { return cache.commands }
         guard let mainMenu = NSApp.mainMenu else { return [] }
         var commands: [PaletteCommand] = []
         func collect(_ menu: NSMenu, path: [String]) {
@@ -163,7 +166,7 @@ extension BrowserStore {
         for item in mainMenu.items {
             if let submenu = item.submenu { collect(submenu, path: [item.title]) }
         }
-        menuCommandCache = (.now, commands)
+        app.menuCommandCache = (.now, commands)
         return commands
     }
 

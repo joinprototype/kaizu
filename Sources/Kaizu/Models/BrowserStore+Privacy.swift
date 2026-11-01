@@ -43,7 +43,7 @@ extension BrowserStore {
         alert.addButton(withTitle: "Cancel")
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         Task { await history?.removeAll() }
-        forgetChoices()
+        app.forgetChoices()
         showToast("History cleared")
     }
 

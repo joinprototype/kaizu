@@ -78,8 +78,8 @@ AppModel (one per app, @MainActor @Observable)
 ├── services: history, downloads, favicons, extensions, session store
 └── windows: [WindowModel]
 
-WindowModel (one per window)
-├── activeSpaceID, selectedTabID(s) (split view = several)
+WindowModel (one per window; today's `BrowserStore`)
+├── activeSpaceID, selectedTabIDs (one per space)
 ├── sidebar: visible / peeking / width
 ├── commandBar, toast, find bar, peek
 ```
@@ -93,6 +93,12 @@ WindowModel (one per window)
   `BrowserTab`.
 - A `WKWebView` can only be in one view hierarchy, so a tab is shown in at most
   one window/pane at a time; selecting it elsewhere moves focus to it.
+- Windows on the same space list the same sidebar and each selects its own tab;
+  no two windows keep the same tab selected. This is Arc's model, kept on
+  purpose: Arc tried separate Today tabs per window and went back in 1.5.
+  `AppModel.front` is the window
+  menus, shortcuts and links from other apps act on: the key one, or the last
+  that was. Closing the last window only hides it.
 
 ## Commands
 
@@ -162,7 +168,8 @@ struct Command: Identifiable {
 
 | Concern | Files |
 |---|---|
-| App state and actions | `Models/BrowserStore.swift` + `BrowserStore+Tabs/Spaces/Split/Recents/Archive/Hibernation/Find/Peek/Reader/External/Persistence/Privacy/Commands.swift` |
+| Shared state | `Models/AppModel.swift` + `AppModel+Persistence/Archive/Hibernation/Choices/Spotlight/QuickBar.swift` |
+| A window's state and actions | `Models/BrowserStore.swift` + `BrowserStore+Tabs/Spaces/Split/Recents/Find/Peek/Reader/External/Privacy/Commands.swift`, `App/BrowserWindowController.swift` |
 | A tab and its web view | `Models/BrowserTab.swift` (navigation and UI delegates, permissions, mute, picture in picture, `MediaEvents`) |
 | Command bar | `Views/CommandBar.swift`, `Views/KeyTextField.swift` (inline completion); answers in `BrowserCore/QuickAnswer.swift`, `CurrencyConversion.swift`, `SearchShortcut.swift`, `InlineCompletion.swift`; command registry in `BrowserStore+Commands.swift` |
 | Privacy | `WebEngine/ContentBlocker.swift` (rule lists, page scripts, per-site pause), `FilterListUpdater.swift`, `BrowserCore/ContentBlocking/`, `TrackingParameters.swift` |
@@ -186,8 +193,7 @@ Today: one target, folders `App/ Models/ Views/ Support/ DesignSystem/`, with
 2. Extract `DesignSystem` target (no deps, easy win).
 3. Extract `WebEngine`: split `BrowserTab` into `Tab` + `PageController`.
 4. Extract `BrowserCore` models + `Storage`; add `schemaVersion`.
-5. Split `BrowserStore` into `AppModel` + `WindowModel`; introduce `Command`s
-   and generate menus from them. (Partly: the store is split by concern into
-   `BrowserStore+Tabs/Spaces/Archive/Persistence/Privacy.swift`.)
+5. Introduce `Command`s and generate menus from them. (`AppModel` split off
+   for multiple windows; `BrowserStore` is the window model, name unchanged.)
 6. ~~Session v2: Profile/Space split with migration.~~ Done: records and the
    v1→v2 migration live in `BrowserCore/Session` with tests.

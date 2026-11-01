@@ -1,13 +1,26 @@
 import AppKit
 import WebKit
 
-/// The main window as extensions see it (`chrome.windows`): its tabs are the
-/// active space's sidebar tabs.
+/// A browser window as extensions see it (`chrome.windows`): its tabs are
+/// the active space's sidebar tabs. Windows on the same space list the same
+/// sidebar, but extensions expect a tab in one window: the one showing it,
+/// else the first on its space.
 @MainActor
 final class MainWindowAdapter: NSObject, WKWebExtensionWindow {
     weak var store: BrowserStore?
 
-    var tabs: [BrowserTab] { store?.activeSpace.allTabs ?? [] }
+    init(store: BrowserStore) {
+        self.store = store
+    }
+
+    var tabs: [BrowserTab] {
+        guard let store else { return [] }
+        let isFirstOnSpace = store === store.app.stores.first { $0.activeSpaceID == store.activeSpaceID }
+        return store.activeSpace.allTabs.filter { tab in
+            guard let showing = store.app.store(showing: tab) else { return isFirstOnSpace }
+            return showing === store
+        }
+    }
 
     func tabs(for context: WKWebExtensionContext) -> [any WKWebExtensionTab] { tabs }
 
@@ -35,7 +48,10 @@ final class MainWindowAdapter: NSObject, WKWebExtensionWindow {
 
 /// A tab as extensions see it (`chrome.tabs`).
 extension BrowserTab: WKWebExtensionTab {
-    private var extensionWindow: MainWindowAdapter? { store?.extensions.mainWindow }
+    private var extensionWindow: MainWindowAdapter? {
+        guard let app else { return nil }
+        return (app.store(showing: self) ?? app.stores.first { $0.activeSpace.allTabs.contains(self) })?.extensionWindow
+    }
 
     func window(for context: WKWebExtensionContext) -> (any WKWebExtensionWindow)? { extensionWindow }
 
@@ -48,7 +64,7 @@ extension BrowserTab: WKWebExtensionTab {
     func title(for context: WKWebExtensionContext) -> String? { displayTitle }
 
     func isPinned(for context: WKWebExtensionContext) -> Bool {
-        !(store?.space(containing: self)?.today.contains(self) ?? false)
+        !(app?.spaces.contains { $0.today.contains(self) } ?? false)
     }
 
     func isPlayingAudio(for context: WKWebExtensionContext) -> Bool { isPlayingMedia }

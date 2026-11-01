@@ -77,7 +77,7 @@ struct CommandBar: View {
         let archived = store.archive.filter { Self.matches(query, title: $0.tab.title, url: $0.tab.url) }
         results += archived.prefix(3).map(Suggestion.archived)
         // What you usually pick for this leads (after an instant answer).
-        if let top = store.topChoice(for: query, among: results), let index = results.firstIndex(where: { $0.id == top.id }) {
+        if let top = store.app.topChoice(for: query, among: results, in: store.activeSpace.profile), let index = results.firstIndex(where: { $0.id == top.id }) {
             let lead = results.remove(at: index)
             let afterAnswer = results.first.map { if case .answer = $0 { true } else { false } } ?? false
             results.insert(lead, at: afterAnswer ? 1 : 0)
@@ -86,7 +86,7 @@ struct CommandBar: View {
     }
 
     private func choose(_ suggestion: Suggestion) {
-        store.learn(suggestion, for: text)
+        store.app.learn(suggestion, for: text, in: store.activeSpace.profile)
         store.perform(suggestion, mode: mode)
     }
 
@@ -247,7 +247,7 @@ struct CommandBar: View {
 
     private func dismiss() {
         if mode == .quick {
-            store.quickBar?.hide()
+            store.app.quickBar?.hide()
         } else {
             store.dismissCommandBar()
         }

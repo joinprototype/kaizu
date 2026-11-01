@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Arc-style auto-archive: today tabs left alone (12 hours by default) are put
 /// away, and stay searchable (and reopenable) from the command bar.
-extension BrowserStore {
+extension AppModel {
     static let archiveLimit = 500
     private static let sweepInterval: Duration = .seconds(15 * 60)
 
@@ -26,8 +26,9 @@ extension BrowserStore {
         var archived: [ArchivedTabRecord] = []
         for space in spaces {
             // Anything on screen or audible stays, however long it's been.
+            let selected = Set(stores.compactMap { $0.selectedTabIDs[space.id] })
             let stale = space.today.filter { tab in
-                tab.id != space.selectedTabID && !space.split.contains(tab.id) && tab !== peek && !tab.isPlayingMedia
+                !selected.contains(tab.id) && !space.split.contains(tab.id) && !tab.isPlayingMedia
                     && (tab.lastActiveAt ?? now) < cutoff
             }
             guard !stale.isEmpty else { continue }
@@ -46,13 +47,6 @@ extension BrowserStore {
         scheduleSave()
     }
 
-    func reopen(_ archived: ArchivedTabRecord) {
-        archive.removeAll { $0.id == archived.id }
-        let space = spaces.first { $0.id == archived.spaceID } ?? activeSpace
-        openTab(archived.tab.url, in: space).title = archived.tab.title
-        saveArchive()
-    }
-
     func loadArchive() {
         guard let data = try? Data(contentsOf: Self.archiveURL) else { return }
         archive = (try? JSONCoding.decoder.decode([ArchivedTabRecord].self, from: data)) ?? []
@@ -64,5 +58,14 @@ extension BrowserStore {
         } catch {
             Log.session.error("Couldn't save archived tabs: \(error.localizedDescription, privacy: .public)")
         }
+    }
+}
+
+extension BrowserStore {
+    func reopen(_ archived: ArchivedTabRecord) {
+        app.archive.removeAll { $0.id == archived.id }
+        let space = spaces.first { $0.id == archived.spaceID } ?? activeSpace
+        openTab(archived.tab.url, in: space).title = archived.tab.title
+        app.saveArchive()
     }
 }

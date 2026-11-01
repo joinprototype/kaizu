@@ -57,7 +57,7 @@ struct ArcImportView: View {
                 Button("Cancel") { UtilityWindows.closeArcImport() }
                     .keyboardShortcut(.cancelAction)
                 Button(plan.tabCount == 0 ? "Nothing New" : "Import \(plan.tabCount) \(plan.tabCount == 1 ? "Tab" : "Tabs")") {
-                    store.importFromArc(plan)
+                    store.app.front.importFromArc(plan)
                     UtilityWindows.closeArcImport()
                 }
                 .keyboardShortcut(.defaultAction)

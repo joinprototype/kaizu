@@ -2,6 +2,7 @@ import SwiftUI
 
 /// A pinned-section entry, rendered recursively so folders can nest.
 struct SidebarItemView: View {
+    @Environment(BrowserStore.self) private var store
     let item: SidebarItem
     let space: Space
     let depth: Int
@@ -11,7 +12,7 @@ struct SidebarItemView: View {
     var body: some View {
         switch item {
         case .tab(let tab):
-            TabRow(tab: tab, isSelected: tab.id == space.selectedTabID, depth: depth)
+            TabRow(tab: tab, isSelected: tab.id == store.selectedTabIDs[space.id], depth: depth)
                 .tabDropTarget(.pinned(folder: parent, before: tab.id), opensGap: true)
         case .folder(let folder):
             FolderRow(folder: folder, depth: depth)
@@ -218,6 +219,7 @@ private struct TabContextMenu: View {
             .disabled(tab.url == nil)
         Button("Duplicate Tab") { store.openTab(tab.url, after: tab) }
             .disabled(tab.url == nil)
+        Button("Move to New Window") { store.moveToNewWindow(tab) }
         Divider()
         Button(isToday ? "Close Tab" : "Reset Tab") { store.close(tab) }
     }

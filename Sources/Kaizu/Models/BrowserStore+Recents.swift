@@ -12,7 +12,7 @@ extension BrowserStore {
     static let switcherLimit = 8
 
     func installTabSwitcherMonitor() {
-        NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { [weak self] event in
+        addEventMonitor(matching: [.keyDown, .flagsChanged]) { [weak self] event in
             guard let self, event.window === self.window else { return event }
             if event.type == .keyDown, event.keyCode == 48, event.modifierFlags.contains(.control) {  // Tab
                 self.advanceTabSwitcher(backwards: event.modifierFlags.contains(.shift))
@@ -38,7 +38,7 @@ extension BrowserStore {
         }
         let current = selectedTab
         let others = activeSpace.allTabs
-            .filter { $0 !== current }
+            .filter { $0 !== current && isFree($0) }
             .sorted { ($0.lastActiveAt ?? .distantPast) > ($1.lastActiveAt ?? .distantPast) }
         let tabs = (current.map { [$0] } ?? []) + others
         guard tabs.count > 1 else { return }
@@ -60,6 +60,14 @@ extension BrowserStore {
 
     // MARK: - Now playing
 
+    /// A playing tab that isn't on screen in any window, for the sidebar's
+    /// mini player.
+    var backgroundMediaTab: BrowserTab? {
+        activeSpace.allTabs.first { $0.isPlayingMedia && app.store(showing: $0) == nil }
+    }
+}
+
+extension AppModel {
     /// Media state is event-driven (see `MediaEvents`). This only re-checks
     /// tabs already marked as playing, every 10 s, for players that stop
     /// without a DOM event (detached `Audio` objects, Web Audio).
@@ -73,10 +81,5 @@ extension BrowserStore {
                 }
             }
         }
-    }
-
-    /// A playing tab other than the one in front, for the sidebar's mini player.
-    var backgroundMediaTab: BrowserTab? {
-        activeSpace.allTabs.first { $0.isPlayingMedia && $0 !== selectedTab }
     }
 }

@@ -80,7 +80,7 @@ default-browser capable · curated themes · app icon.
 | History | ✓ | — | P2 | M | WebKit has no global history; we store it (SQLite+FTS5) |
 | Find in page | ✓ | — | P2 | S | `findString(_:configuration:)` ✓ |
 | Downloads panel | ✓ | silent save | P2 | S | `WKDownload` progress ✓ |
-| Multiple / private windows | ✓ | one window | P2 | M | `WKWebsiteDataStore.nonPersistent()` |
+| Multiple / private windows | ✓ | ✓ | P2 | M | `WKWebsiteDataStore.nonPersistent()` |
 | Back/forward kept across restarts | ✓ | URL only | P2 | S | `interactionState` ✓ |
 | Ad + tracker blocking | via extensions | — | P2 built-in | M | `WKContentRuleList` ✓ (same engine as Safari content blockers) |
 | Split view | ✓ | — | P3 | L | several page views per window |
@@ -107,7 +107,8 @@ Make the codebase ready to grow (details in [ARCHITECTURE.md](ARCHITECTURE.md)).
 - [ ] CI (build + test + `swift format lint`); needs a runner with the macOS 27 SDK **S**
 - [x] `Tests/` with Swift Testing: filter conversion, sessions, history, URL input, quick answers, completion (53 tests) **S**
 - [ ] Split into modules: DesignSystem → WebEngine → BrowserCore + Storage **M**
-- [ ] `BrowserStore` → `AppModel` + `WindowModel`; `Command` registry drives menus **M**
+- [x] `AppModel` (what windows share) + one `BrowserStore` per window **M**
+- [ ] `Command` registry drives menus **S**
 - [x] Session `schemaVersion` + migrator; Profile/Space split (v2) **M**
 - [x] `Motion` tokens; ad-hoc animation literals removed (`Metrics` still to do) **S**
 
@@ -182,7 +183,7 @@ What makes someone keep it as their default browser.
 - [x] Downloads panel (progress ring in the sidebar, list with progress, Show in Finder, double-click to open, clear) **S**
 - [x] Settings window: search engine, default browser button, archive timing, blocker toggles, paused sites, link rules **S**
 - [x] Private window (⇧⌘P): in-memory profile, no history/favicon cache/session, no extensions, links stay inside **M**
-- [ ] Multiple full browser windows **M**
+- [x] Multiple full browser windows (⌘N, Move to New Window): windows on a space share its sidebar and each shows its own tab; a tab's page is in one window at a time, so picking it elsewhere brings that window forward; all reopen on launch **M**
 - [x] Restore back/forward history per tab (WebKit interaction state, saved on quit and every 5 min) **S**
 - [x] Tab hibernation: background tabs idle 30 min (not playing media / using camera) and all of them on memory pressure **S**
 - [x] Camera and microphone permissions remembered per site (forget in Settings → Privacy) **S**

@@ -27,7 +27,9 @@ final class BrowserTab: NSObject, Identifiable {
 
     /// Last time the tab was in front; today tabs left alone get archived.
     @ObservationIgnored var lastActiveAt: Date?
-    @ObservationIgnored weak var store: BrowserStore?
+    @ObservationIgnored weak var app: AppModel?
+    /// The window showing this tab, or the one in front.
+    var store: BrowserStore? { app.map { $0.store(showing: self) ?? $0.front } }
     @ObservationIgnored private var _webView: WKWebView?
     /// This tab's own controller, so content blocking can differ per site.
     @ObservationIgnored private var contentController: WKUserContentController?
@@ -55,7 +57,7 @@ final class BrowserTab: NSObject, Identifiable {
     init(
         id: UUID = UUID(),
         profile: Profile,
-        store: BrowserStore?,
+        app: AppModel?,
         url: URL?,
         title: String = "",
         pinnedURL: URL? = nil,
@@ -64,7 +66,7 @@ final class BrowserTab: NSObject, Identifiable {
     ) {
         self.id = id
         self.profile = profile
-        self.store = store
+        self.app = app
         self.url = url
         self.title = title
         self.pinnedURL = pinnedURL
@@ -102,17 +104,17 @@ final class BrowserTab: NSObject, Identifiable {
         // must be used as-is, and WebKit performs the load itself.
         let isPopup = pendingConfiguration != nil
         // Extension pages (options, onboarding) need their extension's own configuration.
-        let extensionContext = isPopup || profile.isPrivate ? nil : url.flatMap { store?.extensions.controller.extensionContext(for: $0) }
+        let extensionContext = isPopup || profile.isPrivate ? nil : url.flatMap { app?.extensions.controller.extensionContext(for: $0) }
         extensionBaseURL = extensionContext?.baseURL
         let configuration: WKWebViewConfiguration
         if let extensionConfiguration = extensionContext?.webViewConfiguration {
             configuration = extensionConfiguration
             contentController = nil
         } else {
-            let controller = store?.contentBlocker.makeUserContentController()
+            let controller = app?.contentBlocker.makeUserContentController()
             configuration = pendingConfiguration ?? Self.makeConfiguration(for: profile)
             // Like other browsers, extensions stay out of private windows.
-            configuration.webExtensionController = profile.isPrivate ? nil : store?.extensions.controller
+            configuration.webExtensionController = profile.isPrivate ? nil : app?.extensions.controller
             // Popups get a copy of the opener's configuration; give them their own
             // controller too, so pausing blocking on one site can't leak across tabs.
             if let controller {
@@ -153,7 +155,7 @@ final class BrowserTab: NSObject, Identifiable {
                     webView.load(URLRequest(url: url))
                 }
             }
-            if let blocker = store?.contentBlocker {
+            if let blocker = app?.contentBlocker {
                 blocker.whenReady(start)
             } else {
                 start()
@@ -221,7 +223,7 @@ final class BrowserTab: NSObject, Identifiable {
     private func setZoom(_ zoom: Double) {
         _webView?.pageZoom = zoom
         if !profile.isPrivate {
-            store?.settings.setZoom(zoom, for: url)
+            app?.settings.setZoom(zoom, for: url)
         }
         if self === store?.selectedTab {
             store?.showToast("\(Int((zoom * 100).rounded()))%", symbol: "magnifyingglass")
@@ -441,16 +443,16 @@ final class BrowserTab: NSObject, Identifiable {
     private func sync(with webView: WKWebView) {
         if let newTitle = webView.title, !newTitle.isEmpty, newTitle != title {
             title = newTitle
-            store?.scheduleSave()
-            store?.extensions.didChange(.title, for: self)
+            app?.scheduleSave()
+            app?.extensions.didChange(.title, for: self)
         }
         if let newURL = webView.url, newURL != url {
             if newURL.host() != url?.host() {
                 favicon = newURL.host().flatMap { FaviconStore.shared.cachedImage(for: $0) }
             }
             url = newURL
-            store?.scheduleSave()
-            store?.extensions.didChange(.URL, for: self)
+            app?.scheduleSave()
+            app?.extensions.didChange(.URL, for: self)
         }
         update(\.isLoading, webView.isLoading)
         update(\.progress, webView.estimatedProgress)
@@ -531,7 +533,7 @@ extension BrowserTab: WKNavigationDelegate {
         if navigationAction.targetFrame?.isMainFrame == true {
             // Crossing between web pages and extension pages needs a web view
             // built for the other side (WebKit cancels the load otherwise).
-            let targetExtension = store?.extensions.controller.extensionContext(for: target)?.baseURL
+            let targetExtension = app?.extensions.controller.extensionContext(for: target)?.baseURL
             // An extension page restored before its extension has loaded:
             // wait (`reopenExtensionPage()` runs once extensions are in).
             if target.scheme == "webkit-extension", targetExtension == nil {
@@ -565,7 +567,7 @@ extension BrowserTab: WKNavigationDelegate {
                 return
             }
             if let contentController {
-                store?.contentBlocker.prepare(contentController, for: target)
+                app?.contentBlocker.prepare(contentController, for: target)
             }
         }
 
@@ -605,7 +607,7 @@ extension BrowserTab: WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         // Each site keeps its own zoom.
-        let zoom = store?.settings.zoom(for: webView.url) ?? 1
+        let zoom = app?.settings.zoom(for: webView.url) ?? 1
         if webView.pageZoom != zoom { webView.pageZoom = zoom }
         // A new page: forget the old one's frames, and stay muted.
         mediaFrames = []
@@ -622,7 +624,7 @@ extension BrowserTab: WKNavigationDelegate {
     /// The site's hidden items, as early as the page allows and again once
     /// it's in (in case it replaced its head).
     private func applyHiddenItems(in webView: WKWebView) {
-        let selectors = store?.settings.hiddenItems(on: webView.url) ?? []
+        let selectors = app?.settings.hiddenItems(on: webView.url) ?? []
         if !selectors.isEmpty {
             HiddenItems.apply(selectors, in: webView)
         }
@@ -632,7 +634,7 @@ extension BrowserTab: WKNavigationDelegate {
         lastStrippedURL = nil
         sync(with: webView)
         applyHiddenItems(in: webView)
-        if let history = store?.history, let url = webView.url, !profile.isPrivate {
+        if let history = app?.history, let url = webView.url, !profile.isPrivate {
             let (profileID, title) = (profile.id, webView.title ?? "")
             Task { await history.recordVisit(profile: profileID, url: url, title: title) }
         }
@@ -795,7 +797,7 @@ extension BrowserTab: WKUIDelegate {
         devices: [String],
         decisionHandler: @escaping @MainActor @Sendable (WKPermissionDecision) -> Void
     ) {
-        guard let settings = store?.settings else { return decisionHandler(.prompt) }
+        guard let settings = app?.settings else { return decisionHandler(.prompt) }
         let remembers = !profile.isPrivate
         if remembers {
             let remembered = devices.map { settings.sitePermissions[host]?[$0] }

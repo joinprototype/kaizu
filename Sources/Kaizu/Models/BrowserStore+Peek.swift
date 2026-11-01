@@ -13,7 +13,7 @@ extension BrowserStore {
         // A link while the last peek grows into a tab waits for it.
         guard !isPeekExpanding else { return }
         peek?.discard()
-        let tab = BrowserTab(profile: opener.profile, store: self, url: url)
+        let tab = BrowserTab(profile: opener.profile, app: app, url: url)
         withAnimation(Motion.pop) {
             peek = tab
         }
@@ -65,7 +65,7 @@ extension BrowserStore {
     /// Esc closes a capture, item hiding, peek or Reader even while the page
     /// has keyboard focus; Enter finishes a capture.
     func installEscapeMonitor() {
-        NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+        addEventMonitor(matching: .keyDown) { [weak self] event in
             // Only in the main window, and not while the command bar or a sheet wants the key.
             guard let self, event.window === self.window, self.commandBar == nil, self.window?.attachedSheet == nil
             else { return event }

@@ -5,7 +5,7 @@ import SwiftUI
 extension BrowserStore {
     func arcImport(of sidebar: ArcSidebar, includesToday: Bool) -> ArcImport {
         ArcImport(
-            sidebar, profiles: profiles.map(\.record), spaces: spaces.map(\.record), includesToday: includesToday,
+            sidebar, profiles: profiles.map(\.record), spaces: spaces.map { $0.record() }, includesToday: includesToday,
             hues: Theme.all.map(\.hue), symbols: Space.symbols
         )
     }
@@ -13,20 +13,20 @@ extension BrowserStore {
     func importFromArc(_ plan: ArcImport) {
         profiles += plan.newProfiles.map { record in
             let profile = Profile(id: record.id, name: record.name)
-            profile.favorites = record.favorites.map { makeTab($0, profile: profile) }
+            profile.favorites = record.favorites.map { app.makeTab($0, profile: profile) }
             return profile
         }
         var favorites: [(profile: Profile, ids: Set<UUID>)] = []
         for (id, records) in plan.favorites {
             guard let profile = profiles.first(where: { $0.id == id }) else { continue }
-            let tabs = records.map { makeTab($0, profile: profile) }
+            let tabs = records.map { app.makeTab($0, profile: profile) }
             profile.favorites += tabs
             favorites.append((profile, Set(tabs.map(\.id))))
         }
         var sections: [(space: Space, ids: Set<UUID>)] = []
         for space in spaces {
-            let items = (plan.pinned[space.id] ?? []).map { makeItem($0, profile: space.profile) }
-            let today = (plan.today[space.id] ?? []).map { makeTab($0, profile: space.profile) }
+            let items = (plan.pinned[space.id] ?? []).map { app.makeItem($0, profile: space.profile) }
+            let today = (plan.today[space.id] ?? []).map { app.makeTab($0, profile: space.profile) }
             space.pinned += items
             space.today += today
             if !items.isEmpty || !today.isEmpty {
@@ -44,8 +44,8 @@ extension BrowserStore {
         let newSpaces = plan.newSpaces.compactMap { record -> Space? in
             guard let profile = profiles.first(where: { $0.id == record.profileID }) else { return nil }
             let space = Space(id: record.id, profile: profile, name: record.name, symbol: record.symbol, hue: record.hue)
-            space.pinned = record.pinned.map { makeItem($0, profile: profile) }
-            space.today = record.today.map { makeTab($0, profile: profile) }
+            space.pinned = record.pinned.map { app.makeItem($0, profile: profile) }
+            space.today = record.today.map { app.makeTab($0, profile: profile) }
             return space
         }
         withAnimation(Motion.snap) { spaces += newSpaces }

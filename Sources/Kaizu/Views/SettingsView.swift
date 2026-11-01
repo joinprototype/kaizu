@@ -69,9 +69,9 @@ private struct GeneralSettings: View {
                     Text("Off").tag(Settings.QuickBarKey?.none)
                     ForEach(Settings.QuickBarKey.allCases, id: \.self) { Text($0.title).tag(Optional($0)) }
                 }
-                .onChange(of: settings.quickBarKey) { store.applyQuickBarKey() }
+                .onChange(of: settings.quickBarKey) { store.app.applyQuickBarKey() }
             } footer: {
-                if let key = settings.quickBarKey, store.isQuickBarKeyTaken {
+                if let key = settings.quickBarKey, store.app.isQuickBarKeyTaken {
                     FooterText("\(key.title) is already used by macOS or another app. Pick a different shortcut.")
                 } else {
                     FooterText("Like Spotlight, for the web: the command bar comes up over whatever you're doing. Answers show right there; pages open in a little window.")

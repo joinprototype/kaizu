@@ -3,19 +3,23 @@ import CoreSpotlight
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    let store = BrowserStore()
-    private var windowController: BrowserWindowController?
+    let app = AppModel()
+
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        // Kaizu's windows are spaces and tabs, never system tabs of each other.
+        NSWindow.allowsAutomaticWindowTabbing = false
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Log.app.notice("Kaizu \(Diagnostics.appVersion, privacy: .public) on \(Diagnostics.macOSVersion, privacy: .public)")
         Diagnostics.shared.start()
-        NSApp.mainMenu = MainMenu.make(store: store)
-        showWindow()
+        NSApp.mainMenu = MainMenu.make(app: app)
+        app.showFront()
         NSApp.activate()
-        store.applyQuickBarKey()
-        Updates.start(store: store)
+        app.applyQuickBarKey()
+        Updates.start(app: app)
         #if DEBUG
-        DebugHooks.apply(to: store)
+        DebugHooks.apply(to: app.front)
         #endif
     }
 
@@ -24,7 +28,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        if !flag { showWindow() }
+        if !flag { app.showFront() }
         return true
     }
 
@@ -34,8 +38,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         Log.app.notice("Quitting")
-        store.save()
-        store.saveTabStates()
+        app.save()
+        app.saveTabStates()
         Updates.installIfReady()
     }
 
@@ -47,22 +51,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard userActivity.activityType == CSSearchableItemActionType,
               let identifier = userActivity.userInfo?[CSSearchableItemActivityIdentifier] as? String
         else { return false }
-        store.openSpotlightItem(identifier)
+        app.openSpotlightItem(identifier)
         return true
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
-        let showsMainWindow = urls.map(store.openExternal).contains(true)
-        if showsMainWindow || windowController == nil {
-            showWindow()
+        let showsMainWindow = urls.map { app.front.openExternal($0) }.contains(true)
+        // Also on launch from a link, before the windows exist.
+        if showsMainWindow || app.front.windowController == nil {
+            app.showFront()
         }
-    }
-
-    private func showWindow() {
-        if windowController == nil {
-            windowController = BrowserWindowController(store: store)
-        }
-        windowController?.showWindow(nil)
-        windowController?.window?.makeKeyAndOrderFront(nil)
     }
 }

@@ -5,7 +5,7 @@ import UniformTypeIdentifiers
 /// Pinned tabs and favorites in the system Spotlight: ⌘Space, "Gmail",
 /// Return opens the pinned Gmail tab, where it already is. Only what you
 /// chose to keep (never Today tabs or history), never private windows.
-extension BrowserStore {
+extension AppModel {
     private static let spotlightDomain = "com.joinprototype.kaizu.pinned"
 
     /// Re-indexes when the pinned set changed; called after every save.
@@ -71,12 +71,14 @@ extension BrowserStore {
     func openSpotlightItem(_ identifier: String) {
         guard let id = UUID(uuidString: identifier) else { return }
         let owner = spaces.first { $0.pinned.tabs.contains { $0.id == id } }
-            ?? ([activeSpace] + spaces).first { $0.profile.favorites.contains { $0.id == id } }
-        window?.makeKeyAndOrderFront(nil)
+            ?? ([front.activeSpace] + spaces).first { $0.profile.favorites.contains { $0.id == id } }
+        let tab = owner?.allTabs.first { $0.id == id }
+        let store = tab.flatMap(store(showing:)) ?? front
+        store.window?.makeKeyAndOrderFront(nil)
         NSApp.activate()
         // Gone since it was indexed: Kaizu still comes forward.
-        guard let space = owner, let tab = space.allTabs.first(where: { $0.id == id }) else { return }
-        switchTo(space)
-        select(tab, in: space)
+        guard let space = owner, let tab else { return }
+        store.switchTo(space)
+        store.select(tab, in: space)
     }
 }

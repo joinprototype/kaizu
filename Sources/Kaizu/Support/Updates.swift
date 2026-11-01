@@ -43,26 +43,26 @@ enum Updates {
     }
 
     /// Checks shortly after launch, then a few times a day for Macs left running.
-    static func start(store: BrowserStore) {
+    static func start(app: AppModel) {
         // Anything here is left from an earlier run: an update that went in, or never did.
         try? FileManager.default.removeItem(at: stagingRoot)
         Task {
             try? await Task.sleep(for: firstCheck)
             while !Task.isCancelled {
                 if let release = try? await latest(), release.build > currentBuild, staged?.build != release.build {
-                    await offer(release, store: store)
+                    await offer(release, app: app)
                 }
                 try? await Task.sleep(for: between)
             }
         }
     }
 
-    private static func offer(_ release: UpdateRelease, store: BrowserStore) async {
+    private static func offer(_ release: UpdateRelease, app: AppModel) async {
         do {
             let ready = try await prepare(release)
             guard announced != ready.build else { return }
             announced = ready.build
-            store.showToast(
+            app.front.showToast(
                 "Kaizu \(ready.version) is ready",
                 symbol: "arrow.down.circle",
                 undo: { restart() },
@@ -77,10 +77,10 @@ enum Updates {
             log.error("Update \(release.build) not staged: \(String(describing: error), privacy: .public)")
             guard announced != release.build else { return }
             announced = release.build
-            store.showToast(
+            app.front.showToast(
                 "Kaizu \(release.version) is available",
                 symbol: "arrow.down.circle",
-                undo: { store.openTab(release.url) },
+                undo: { app.front.openTab(release.url) },
                 actionTitle: "Download",
                 lasts: .seconds(15)
             )
@@ -146,7 +146,7 @@ enum Updates {
     }
 
     /// Kaizu ▸ Check for Updates…: always answers, even when there's nothing new.
-    static func checkNow(store: BrowserStore) {
+    static func checkNow(app: AppModel) {
         Task {
             do {
                 let release = try await latest()
@@ -158,9 +158,9 @@ enum Updates {
                     return
                 }
                 if staged?.build != release.build {
-                    store.showToast("Downloading Kaizu \(release.version)…", symbol: "arrow.down.circle")
+                    app.front.showToast("Downloading Kaizu \(release.version)…", symbol: "arrow.down.circle")
                 }
-                await answer(release, store: store)
+                await answer(release, app: app)
             } catch {
                 log.error("Update check failed: \(error.localizedDescription, privacy: .public)")
                 let alert = NSAlert()
@@ -172,7 +172,7 @@ enum Updates {
     }
 
     /// The menu's answer: Restart once it's staged, Download if it can't be.
-    private static func answer(_ release: UpdateRelease, store: BrowserStore) async {
+    private static func answer(_ release: UpdateRelease, app: AppModel) async {
         let alert = NSAlert()
         alert.informativeText = "You have \(currentVersion). Your tabs and logins stay as they are."
         do {
@@ -186,7 +186,7 @@ enum Updates {
             alert.messageText = "Kaizu \(release.version) is available"
             alert.addButton(withTitle: "Download")
             alert.addButton(withTitle: "Later")
-            if alert.runModal() == .alertFirstButtonReturn { store.openTab(release.url) }
+            if alert.runModal() == .alertFirstButtonReturn { app.front.openTab(release.url) }
         }
     }
 

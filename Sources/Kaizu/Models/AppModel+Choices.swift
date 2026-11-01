@@ -3,7 +3,7 @@ import Foundation
 
 /// The command bar learning what you pick (see ChoiceMemory), per profile,
 /// kept in Choices.json next to the session. Clear History forgets it.
-extension BrowserStore {
+extension AppModel {
     private static var choicesURL: URL {
         AppPaths.support.appending(path: "Choices.json")
     }
@@ -15,17 +15,16 @@ extension BrowserStore {
         choices = saved
     }
 
-    /// `suggestion` was picked after typing `query`.
-    func learn(_ suggestion: Suggestion, for query: String) {
-        let profile = activeSpace.profile
+    /// `suggestion` was picked after typing `query` in `profile`.
+    func learn(_ suggestion: Suggestion, for query: String, in profile: Profile) {
         guard !profile.isPrivate, let key = suggestion.memoryKey else { return }
         choices[profile.id, default: ChoiceMemory()].record(query: query, choice: key)
         saveChoices()
     }
 
     /// What to lead with for `query`, among the suggestions on offer.
-    func topChoice(for query: String, among suggestions: [Suggestion]) -> Suggestion? {
-        guard let memory = choices[activeSpace.profile.id] else { return nil }
+    func topChoice(for query: String, among suggestions: [Suggestion], in profile: Profile) -> Suggestion? {
+        guard let memory = choices[profile.id] else { return nil }
         let keys = Set(suggestions.compactMap(\.memoryKey))
         guard let key = memory.topChoice(for: query, among: keys) else { return nil }
         return suggestions.first { $0.memoryKey == key }

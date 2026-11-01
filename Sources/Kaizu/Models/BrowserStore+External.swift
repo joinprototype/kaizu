@@ -16,7 +16,10 @@ extension BrowserStore {
         let routes = settings.linkRoutes.filter { route in spaces.contains { $0.id == route.spaceID } }
         if let route = routes.first(matching: url),
            let space = spaces.first(where: { $0.id == route.spaceID }) {
-            openTab(url, in: space)
+            // In this window if it's on that space, else in one that is.
+            let store = activeSpaceID == space.id ? self : app.stores.first { $0.activeSpaceID == space.id } ?? self
+            store.openTab(url, in: space)
+            app.front = store
             return true
         }
         switch settings.externalLinks {
@@ -33,9 +36,9 @@ extension BrowserStore {
     /// popups, which WebKit loads itself.
     @discardableResult
     func openLittleWindow(_ url: URL? = nil, profile: Profile? = nil, configuration: WKWebViewConfiguration? = nil) -> BrowserTab {
-        let tab = BrowserTab(profile: profile ?? activeSpace.profile, store: self, url: url, configuration: configuration)
-        let controller = LittleWindowController(tab: tab, store: self)
-        littleWindows.append(controller)
+        let tab = BrowserTab(profile: profile ?? activeSpace.profile, app: app, url: url, configuration: configuration)
+        let controller = LittleWindowController(tab: tab, app: app)
+        app.littleWindows.append(controller)
         controller.showWindow(nil)
         tab.activate()
         return tab
@@ -59,13 +62,9 @@ extension BrowserStore {
         scheduleSave()
     }
 
-    func littleWindowDidClose(_ controller: LittleWindowController) {
-        littleWindows.removeAll { $0 === controller }
-    }
-
     /// The little window in front, if one is the key window.
     var keyLittleWindow: LittleWindowController? {
-        littleWindows.first { $0.window?.isKeyWindow == true }
+        app.littleWindows.first { $0.window?.isKeyWindow == true }
     }
 
     /// The tab menu commands (reload, back, zoom, copy link…) act on: the key

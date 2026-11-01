@@ -25,10 +25,10 @@ private struct ExtensionButton: View {
     @State private var isHovering = false
 
     var body: some View {
-        let action = store.extensions.action(for: item)
+        let action = store.extensions.action(for: item, on: store.selectedTab)
         let icon = action?.icon(for: CGSize(width: 16, height: 16)) ?? item.icon
         Button {
-            store.extensions.performAction(for: item, anchor: frame)
+            store.extensions.performAction(for: item, on: store.selectedTab, anchor: frame)
         } label: {
             Group {
                 if let icon {

@@ -18,7 +18,7 @@ extension BrowserStore {
         // A tab opened from a little window or a peek isn't in a space: it
         // goes to one on the opener's profile, so it keeps its cookies.
         let space = space ?? opener.flatMap { self.space(containing: $0) ?? self.space(on: $0.profile) } ?? activeSpace
-        let tab = BrowserTab(profile: space.profile, store: self, url: url, configuration: configuration)
+        let tab = BrowserTab(profile: space.profile, app: app, url: url, configuration: configuration)
         withAnimation(Motion.pop) {
             if let opener, let index = space.today.firstIndex(of: opener) {
                 space.today.insert(tab, at: index + 1)
@@ -34,10 +34,25 @@ extension BrowserStore {
         return tab
     }
 
+    /// A page can only be in one window: selecting a tab that's showing in
+    /// another brings that window forward instead.
     func select(_ tab: BrowserTab, in space: Space? = nil) {
         let space = space ?? self.space(containing: tab) ?? activeSpace
+        let panes = space.splitTabs.contains(tab) ? space.splitTabs : [tab]
+        if let other = panes.lazy.compactMap(app.store(showing:)).first(where: { $0 !== self }) {
+            other.window?.makeKeyAndOrderFront(nil)
+            app.front = other
+            return other.show(tab, in: other.space(containing: tab) ?? other.activeSpace)
+        }
+        for other in app.stores where other !== self {
+            other.selectedTabIDs = other.selectedTabIDs.filter { $0.value != tab.id }
+        }
+        show(tab, in: space)
+    }
+
+    private func show(_ tab: BrowserTab, in space: Space) {
         let now = Date()
-        let previous = space.selectedTab
+        let previous = selectedTab(in: space)
         previous?.captureThumbnail()
         if let previous, previous !== tab, previous.isPlayingMedia, settings.autoPictureInPicture,
            !space.splitTabs.contains(previous) {
@@ -60,7 +75,7 @@ extension BrowserStore {
             endHidingItems()
         }
         activeSpaceID = space.id
-        space.selectedTabID = tab.id
+        selectedTabIDs[space.id] = tab.id
         tab.activate()
         if previous !== tab {
             extensions.didActivate(tab, previous: previous)
@@ -82,6 +97,11 @@ extension BrowserStore {
         activeSpace.profile === profile ? activeSpace : spaces.first { $0.profile === profile }
     }
 
+    /// Not on screen in another window, so this one can show it.
+    func isFree(_ tab: BrowserTab) -> Bool {
+        app.store(showing: tab).map { $0 === self } ?? true
+    }
+
     func selectTab(number: Int) {
         let tabs = activeSpace.visibleTabs
         guard !tabs.isEmpty else { return }
@@ -92,9 +112,9 @@ extension BrowserStore {
     }
 
     func selectAdjacentTab(_ offset: Int) {
-        let tabs = activeSpace.visibleTabs
+        let tabs = activeSpace.visibleTabs.filter(isFree)
         guard !tabs.isEmpty else { return }
-        guard let current = tabs.firstIndex(where: { $0.id == activeSpace.selectedTabID }) else {
+        guard let current = tabs.firstIndex(where: { $0.id == selectedTabIDs[activeSpace.id] }) else {
             return select(tabs[0])
         }
         select(tabs[(current + offset + tabs.count) % tabs.count])
@@ -110,18 +130,18 @@ extension BrowserStore {
     /// Today tabs close for good (⇧⌘T brings them back); favorites and pinned
     /// tabs stay and reset to their saved address, like Arc.
     func close(_ tab: BrowserTab) {
-        if let littleWindow = littleWindows.first(where: { $0.tab === tab }) {
+        if let littleWindow = app.littleWindows.first(where: { $0.tab === tab }) {
             return littleWindow.close()
         }
         let space = space(containing: tab) ?? activeSpace
-        let wasSelected = space.selectedTabID == tab.id
-        if hidingItemsTabID == tab.id {
-            endHidingItems()
+        let showing = app.stores.filter { $0.selectedTabIDs[space.id] == tab.id }
+        for store in app.stores where store.hidingItemsTabID == tab.id {
+            store.endHidingItems()
         }
         var neighborIndex = 0
         space.split.removeAll { $0 == tab.id }
         if let index = space.today.firstIndex(of: tab) {
-            closedTabs.append(ClosedTab(spaceID: space.id, record: tab.record))
+            app.closedTabs.append(ClosedTab(spaceID: space.id, record: tab.record))
             withAnimation(Motion.snap) {
                 _ = space.today.remove(at: index)
             }
@@ -131,15 +151,43 @@ extension BrowserStore {
         } else {
             tab.unload()
         }
-        if wasSelected {
-            let next = space.today.indices.contains(neighborIndex) ? space.today[neighborIndex] : space.today.last
-            if let next {
-                select(next, in: space)
-            } else {
-                space.selectedTabID = nil
-            }
+        for store in showing {
+            store.selectNeighbor(of: neighborIndex, in: space)
         }
         scheduleSave()
+    }
+
+    /// `tab` has stopped being this window's: the nearest today tab at or
+    /// after `index` takes over, unless another window is showing it. Only
+    /// remembered if the window is on another space right now.
+    func selectNeighbor(of index: Int, in space: Space, excluding tab: BrowserTab? = nil) {
+        let free = space.today.enumerated().filter { $0.element !== tab && isFree($0.element) }
+        let next = (free.first { $0.offset >= index } ?? free.last)?.element
+        if let next, space.id == activeSpaceID {
+            select(next, in: space)
+        } else {
+            selectedTabIDs[space.id] = next?.id
+        }
+    }
+
+    /// The tab's page goes to a window of its own; this space's sidebars
+    /// keep listing it.
+    func moveToNewWindow(_ tab: BrowserTab) {
+        let space = space(containing: tab) ?? activeSpace
+        if isInSplit(tab) {
+            removeFromSplit(tab)
+        }
+        let store = app.openWindow(on: space)
+        release(tab, in: space)
+        store.select(tab, in: space)
+    }
+
+    /// Whichever window shows `tab` moves on, so another can take its page.
+    func release(_ tab: BrowserTab, in space: Space) {
+        let index = space.today.firstIndex(of: tab) ?? 0
+        for store in app.stores where store.isShowing(tab) {
+            store.selectNeighbor(of: index, in: space, excluding: tab)
+        }
     }
 
     func closeSelectedTab() {
@@ -161,9 +209,9 @@ extension BrowserStore {
     func clearToday(in space: Space) {
         let cleared = space.today
         guard !cleared.isEmpty else { return }
-        let wasTodaySelected = space.selectedTab.map(cleared.contains) ?? false
+        let ids = Set(cleared.map(\.id))
         for tab in cleared {
-            closedTabs.append(ClosedTab(spaceID: space.id, record: tab.record))
+            app.closedTabs.append(ClosedTab(spaceID: space.id, record: tab.record))
             extensions.didClose(tab)
         }
         withAnimation(Motion.snap, completionCriteria: .removed) {
@@ -175,8 +223,8 @@ extension BrowserStore {
                 tab.hibernate()
             }
         }
-        if wasTodaySelected {
-            space.selectedTabID = nil
+        for store in app.stores where store.selectedTabIDs[space.id].map(ids.contains) == true {
+            store.selectedTabIDs[space.id] = nil
         }
         scheduleSave()
         showToast("Closed \(cleared.count) \(cleared.count == 1 ? "tab" : "tabs")", symbol: "xmark.circle") { [weak self] in
@@ -184,14 +232,13 @@ extension BrowserStore {
                 space.today = cleared + space.today
             }
             cleared.forEach { self?.extensions.didOpen($0) }
-            let ids = Set(cleared.map(\.id))
-            self?.closedTabs.removeAll { ids.contains($0.record.id) }
+            self?.app.closedTabs.removeAll { ids.contains($0.record.id) }
             self?.scheduleSave()
         }
     }
 
     func reopenClosedTab() {
-        guard let closed = closedTabs.popLast() else { return }
+        guard let closed = app.closedTabs.popLast() else { return }
         let space = spaces.first { $0.id == closed.spaceID } ?? activeSpace
         openTab(closed.record.url, in: space).title = closed.record.title
     }

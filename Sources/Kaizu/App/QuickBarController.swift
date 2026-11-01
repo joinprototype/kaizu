@@ -9,12 +9,12 @@ import SwiftUI
 final class QuickBarController: NSObject, NSWindowDelegate {
     private let panel: QuickBarPanel
     private let hostingView = NSHostingView(rootView: AnyView(EmptyView()))
-    private weak var store: BrowserStore?
+    private unowned let app: AppModel
     /// Room around the bar for its shadow.
     static let margin: CGFloat = 48
 
-    init(store: BrowserStore) {
-        self.store = store
+    init(app: AppModel) {
+        self.app = app
         panel = QuickBarPanel(
             contentRect: NSRect(x: 0, y: 0, width: 620 + Self.margin * 2, height: 640),
             styleMask: [.borderless, .nonactivatingPanel],
@@ -44,9 +44,8 @@ final class QuickBarController: NSObject, NSWindowDelegate {
     /// On the screen with the pointer, a little above the middle, where
     /// Spotlight sits.
     func show() {
-        guard let store else { return }
         // A new identity each time: empty, nothing selected.
-        hostingView.rootView = AnyView(CommandBar(mode: .quick, initialText: "").id(UUID()).environment(store))
+        hostingView.rootView = AnyView(CommandBar(mode: .quick, initialText: "").id(UUID()).environment(app.front))
         let mouse = NSEvent.mouseLocation
         if let screen = NSScreen.screens.first(where: { $0.frame.contains(mouse) }) ?? NSScreen.main {
             let visible = screen.visibleFrame

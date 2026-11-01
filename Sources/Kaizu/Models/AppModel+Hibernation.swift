@@ -4,7 +4,7 @@ import Foundation
 /// for half an hour hibernate (their web view is freed), everything
 /// hibernates on a system memory warning, and each tab's back/forward state
 /// is saved so it survives hibernation and relaunches.
-extension BrowserStore {
+extension AppModel {
     static let hibernateAfter: TimeInterval = 30 * 60
     private static let hibernationSweep: Duration = .seconds(5 * 60)
 
@@ -40,7 +40,7 @@ extension BrowserStore {
     }
 
     private func isOnScreen(_ tab: BrowserTab) -> Bool {
-        tab === selectedTab || tab === peek || activeSpace.splitTabs.contains(tab)
+        stores.contains { $0.selectedTab === tab || $0.peek === tab || $0.activeSpace.splitTabs.contains(tab) }
     }
 
     // MARK: - Saved tab state
