@@ -30,8 +30,10 @@ final class BrowserTab: NSObject, Identifiable {
     /// Last time the tab was in front; today tabs left alone get archived.
     @ObservationIgnored var lastActiveAt: Date?
     @ObservationIgnored weak var app: AppModel?
-    /// The window showing this tab, or the one in front.
-    var store: BrowserStore? { app.map { $0.store(showing: self) ?? $0.front } }
+    /// The window showing this tab, or the one it belongs to while it's off
+    /// screen. Never simply the one in front: a private page's popup could
+    /// land outside its window, with its cookies and into the session.
+    var store: BrowserStore? { app.map { $0.store(showing: self) ?? $0.store(for: profile) } }
     @ObservationIgnored private var _webView: WKWebView?
     /// This tab's own controller, so content blocking can differ per site.
     @ObservationIgnored private var contentController: WKUserContentController?

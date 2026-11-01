@@ -29,7 +29,15 @@ final class FaviconStore {
     /// Hosts with no icon on disk, so lists (History) don't re-check per render.
     private var misses: Set<String> = []
     private let directory: URL
-    private let session = URLSession(configuration: .ephemeral)
+    /// Icons for every profile, private windows' too, so no cookies at all:
+    /// one jar would carry what a site set from one profile to the others.
+    private let session: URLSession = {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.httpCookieAcceptPolicy = .never
+        configuration.httpShouldSetCookies = false
+        configuration.httpCookieStorage = nil
+        return URLSession(configuration: configuration)
+    }()
 
     private init() {
         directory = AppPaths.support.appending(path: "Favicons", directoryHint: .isDirectory)

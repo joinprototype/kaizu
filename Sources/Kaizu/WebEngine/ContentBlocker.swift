@@ -39,6 +39,8 @@ final class ContentBlocker {
     private(set) var isCookieRejectionEnabled: Bool
     /// Sites (and their subdomains) where the user turned blocking off.
     private(set) var pausedSites: Set<String>
+    /// Paused from a private window: never saved, gone with the last of them.
+    private(set) var temporaryPauses: Set<String> = []
 
     @ObservationIgnored private var ruleLists: [(name: String, list: WKContentRuleList)] = []
     @ObservationIgnored private var listGeneration = 0
@@ -106,10 +108,13 @@ final class ContentBlocker {
 
     /// Pauses or resumes blocking on the URL's site. Returns the new paused state.
     @discardableResult
-    func togglePause(on url: URL) -> Bool {
+    func togglePause(on url: URL, temporarily: Bool = false) -> Bool {
         guard let site = Self.site(for: url) else { return false }
         if let entry = pausedEntry(for: site) {
             resume(entry)
+        } else if temporarily {
+            temporaryPauses.insert(site)
+            installEverywhere()
         } else {
             updatePausedSites { _ = $0.insert(site) }
         }
@@ -117,7 +122,17 @@ final class ContentBlocker {
     }
 
     func resume(_ site: String) {
-        updatePausedSites { _ = $0.remove(site) }
+        if temporaryPauses.remove(site) != nil {
+            installEverywhere()
+        } else {
+            updatePausedSites { _ = $0.remove(site) }
+        }
+    }
+
+    func forgetTemporaryPauses() {
+        guard !temporaryPauses.isEmpty else { return }
+        temporaryPauses = []
+        installEverywhere()
     }
 
     private func updatePausedSites(_ change: (inout Set<String>) -> Void) {
@@ -133,7 +148,7 @@ final class ContentBlocker {
 
     private func pausedEntry(for site: String?) -> String? {
         guard let site else { return nil }
-        return pausedSites.first { site == $0 || site.hasSuffix("." + $0) }
+        return pausedSites.union(temporaryPauses).first { site == $0 || site.hasSuffix("." + $0) }
     }
 
     // MARK: - Tabs

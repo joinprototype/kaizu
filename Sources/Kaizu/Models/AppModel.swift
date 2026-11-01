@@ -57,8 +57,9 @@ final class AppModel {
         startArchiving()
         startHibernating()
         startMediaMonitoring()
-        DownloadManager.shared.onFinish = { [weak self] filename in
-            self?.front.showToast("Downloaded \(filename)")
+        DownloadManager.shared.onFinish = { [weak self] item in
+            guard let self, !item.isPrivate || self.front.isPrivate else { return }
+            self.front.showToast("Downloaded \(item.filename)")
         }
     }
 
@@ -86,6 +87,14 @@ final class AppModel {
         stores.append(store)
         extensions.didOpen(store)
         return store
+    }
+
+    /// Every browser window, for what a private one has to go through too.
+    var allStores: [BrowserStore] { stores + privateStores }
+
+    /// A private profile's own window, else the ordinary window in front.
+    func store(for profile: Profile) -> BrowserStore {
+        privateStores.first { $0.privateSpace?.profile === profile } ?? regularFront
     }
 
     /// The window `tab` is on screen in, if any: a tab's page can only be in
@@ -159,6 +168,9 @@ final class AppModel {
     func windowDidClose(_ store: BrowserStore) {
         if store.isPrivate {
             privateStores.removeAll { $0 === store }
+            if privateStores.isEmpty {
+                contentBlocker.forgetTemporaryPauses()
+            }
         } else {
             guard stores.count > 1 else { return }
             stores.removeAll { $0 === store }

@@ -15,16 +15,19 @@ final class DownloadManager: NSObject, WKDownloadDelegate {
 
         let id = UUID()
         let destination: URL
+        /// The private window's website data it came from, if it did.
+        var privateData: ObjectIdentifier?
         var progress = 0.0
         var state = State.downloading
 
         var filename: String { destination.lastPathComponent }
+        var isPrivate: Bool { privateData != nil }
     }
 
     /// Newest first.
     private(set) var items: [Item] = []
 
-    @ObservationIgnored var onFinish: ((String) -> Void)?
+    @ObservationIgnored var onFinish: ((Item) -> Void)?
     @ObservationIgnored private var active: [ObjectIdentifier: (itemID: UUID, observation: NSKeyValueObservation)] = [:]
 
     var activeItems: [Item] { items.filter { $0.state == .downloading } }
@@ -48,6 +51,11 @@ final class DownloadManager: NSObject, WKDownloadDelegate {
         items.removeAll { $0.state != .downloading }
     }
 
+    /// A private window closed: the files stay in Downloads, the names go.
+    func forget(_ data: WKWebsiteDataStore) {
+        items.removeAll { $0.privateData == ObjectIdentifier(data) && $0.state != .downloading }
+    }
+
     // MARK: - WKDownloadDelegate
 
     func download(
@@ -56,7 +64,11 @@ final class DownloadManager: NSObject, WKDownloadDelegate {
         suggestedFilename: String,
         completionHandler: @escaping @MainActor @Sendable (URL?) -> Void
     ) {
-        let item = Item(destination: uniqueDestination(for: (suggestedFilename as NSString).lastPathComponent))
+        let data = download.webView?.configuration.websiteDataStore
+        let item = Item(
+            destination: uniqueDestination(for: (suggestedFilename as NSString).lastPathComponent),
+            privateData: data.flatMap { $0.isPersistent ? nil : ObjectIdentifier($0) }
+        )
         items.insert(item, at: 0)
         items = Array(items.prefix(Self.listLimit))
         let itemID = item.id
@@ -83,7 +95,7 @@ final class DownloadManager: NSObject, WKDownloadDelegate {
             name: Notification.Name("com.apple.DownloadFileFinished"),
             object: item.destination.path
         )
-        onFinish?(item.filename)
+        onFinish?(item)
     }
 
     func download(_ download: WKDownload, didFailWithError error: any Error, resumeData: Data?) {

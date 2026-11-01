@@ -7,6 +7,8 @@ import SwiftUI
 @MainActor
 enum UtilityWindows {
     private static var windows: [String: NSWindow] = [:]
+    /// Whose page the open broken-site report is about.
+    private static weak var reportedProfile: Profile?
 
     static func showAbout(app: AppModel) {
         show("About Kaizu", size: NSSize(width: 380, height: 470), app: app) { AboutView() }
@@ -34,6 +36,7 @@ enum UtilityWindows {
 
     static func showBrokenSiteReport(tab: BrowserTab, url: URL, app: AppModel) {
         closeBrokenSiteReport()
+        reportedProfile = tab.profile
         show("Report a Broken Site", size: NSSize(width: 480, height: 500), app: app) { BrokenSiteReportView(tab: tab, url: url) }
     }
 
@@ -58,6 +61,13 @@ enum UtilityWindows {
     /// Forgotten: next time it looks for browsers afresh.
     static func closeBrowsingDataImport() {
         forget("Import Browsing Data")
+    }
+
+    /// A private window closed: nothing of it stays behind on screen.
+    static func closeBrokenSiteReport(in profile: Profile) {
+        if reportedProfile === profile {
+            closeBrokenSiteReport()
+        }
     }
 
     private static func forget(_ title: String) {

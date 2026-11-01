@@ -46,7 +46,7 @@ struct BrokenSiteReportView: View {
                         Toggle("Block ads and trackers here", isOn: Binding(
                             get: { !store.contentBlocker.isPaused(on: url) },
                             set: { _ in
-                                store.contentBlocker.togglePause(on: url)
+                                store.contentBlocker.togglePause(on: url, temporarily: tab.profile.isPrivate)
                                 tab.reload()
                             }
                         ))

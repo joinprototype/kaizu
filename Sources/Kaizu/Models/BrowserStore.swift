@@ -164,6 +164,8 @@ final class BrowserStore {
         windowController = nil
         if let privateSpace {
             app.discard(privateSpace.allTabs)
+            DownloadManager.shared.forget(privateSpace.profile.dataStore)
+            UtilityWindows.closeBrokenSiteReport(in: privateSpace.profile)
         }
     }
 

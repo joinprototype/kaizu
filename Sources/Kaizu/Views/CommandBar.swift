@@ -94,7 +94,7 @@ struct CommandBar: View {
     /// anything that looks like an address or a shortcut, which can be private.
     private func fetchEngineSuggestions() async -> [String] {
         let query = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard store.settings.searchSuggestions, query.count > 1, !Self.looksLikeAddress(query),
+        guard store.settings.searchSuggestions, !store.isPrivate, query.count > 1, !Self.looksLikeAddress(query),
               SearchShortcut.match(query, in: store.settings.searchShortcuts) == nil,
               let url = store.settings.searchEngine.suggestionsURL(for: query)
         else { return [] }

@@ -11,7 +11,7 @@ extension BrowserStore {
     /// `tab` defaults to the selected tab; the menu passes the key window's.
     func toggleBlockingOnCurrentSite(_ tab: BrowserTab? = nil) {
         guard let tab = tab ?? selectedTab, let url = tab.url, let site = ContentBlocker.site(for: url) else { return }
-        if contentBlocker.togglePause(on: url) {
+        if contentBlocker.togglePause(on: url, temporarily: tab.profile.isPrivate) {
             // Pausing usually means the page broke: the best moment to ask.
             showToast("Blocking paused on \(site)", undo: { [weak self] in self?.reportBrokenSite(tab) }, actionTitle: "Report…")
         } else {

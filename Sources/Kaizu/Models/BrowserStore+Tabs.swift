@@ -126,8 +126,8 @@ extension BrowserStore {
             return littleWindow.close()
         }
         let space = space(containing: tab) ?? activeSpace
-        let showing = app.stores.filter { $0.selectedTabIDs[space.id] == tab.id }
-        for store in app.stores where store.hidingItemsTabID == tab.id {
+        let showing = app.allStores.filter { $0.selectedTabIDs[space.id] == tab.id }
+        for store in app.allStores where store.hidingItemsTabID == tab.id {
             store.endHidingItems()
         }
         var neighborIndex = 0
@@ -221,7 +221,7 @@ extension BrowserStore {
                 tab.hibernate()
             }
         }
-        for store in app.stores where store.selectedTabIDs[space.id].map(ids.contains) == true {
+        for store in app.allStores where store.selectedTabIDs[space.id].map(ids.contains) == true {
             store.setSelected(nil, in: space)
         }
         scheduleSave()

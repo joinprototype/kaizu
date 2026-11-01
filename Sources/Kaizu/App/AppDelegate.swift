@@ -29,7 +29,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        if !flag { app.showFront() }
+        // A private window on screen doesn't count: the ordinary one comes back.
+        if !app.stores.contains(where: { $0.window?.isVisible == true }) {
+            app.front = app.regularFront
+            app.showFront()
+        }
         return true
     }
 

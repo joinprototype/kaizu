@@ -51,12 +51,16 @@ struct SiteSettingsView: View {
                             IconButton(systemName: "plus", help: "Zoom In") { tab.zoom(by: 0.1) }
                         }
                     }
-                    permissionRow("Camera", device: "camera", host: host)
-                    permissionRow("Microphone", device: "microphone", host: host)
-                    permissionRow("Location", device: "location", host: host)
+                    // Saved answers would name the site: a private window asks each time.
+                    if !tab.profile.isPrivate {
+                        permissionRow("Camera", device: "camera", host: host)
+                        permissionRow("Microphone", device: "microphone", host: host)
+                        permissionRow("Location", device: "location", host: host)
+                    }
                 }
                 .font(.system(size: 13))
                 Divider()
+                if !tab.profile.isPrivate {
                 HStack {
                     Button("Hide Distracting Items…") {
                         dismiss()
@@ -72,6 +76,7 @@ struct SiteSettingsView: View {
                     }
                 }
                 .font(.system(size: 13))
+                }
                 Button("Report a Broken Site…") {
                     dismiss()
                     store.reportBrokenSite(tab)

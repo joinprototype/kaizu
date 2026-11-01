@@ -89,6 +89,30 @@ enum DebugHooks {
             await settle()
             check("⇧⌘T works inside it", hidden.activeSpace.today.count == 2 && app.closedTabs.isEmpty)
 
+            let secret = URL(string: "https://example.org/private-page")!
+            hidden.select(two)
+            app.front = store
+            check("a page off screen stays with its private window", one.store === hidden)
+            check("an ordinary one with the ordinary windows", store.selectedTab !== regular || regular.store === store)
+            let others = app.openPrivateWindow()
+            others.window?.performClose(nil)
+            await settle()
+            check("and a second private window doesn't take it", one.store === hidden)
+            hidden.window?.makeKeyAndOrderFront(nil)
+            app.front = hidden
+            hidden.select(one)
+            await settle()
+
+            hidden.toggleBlockingOnCurrentSite(one)
+            let saved = UserDefaults.standard.stringArray(forKey: "blockingPausedSites") ?? []
+            check("pausing blocking there isn't saved", store.contentBlocker.isPaused(on: secret) && !saved.contains("example.org") && !store.contentBlocker.pausedSites.contains("example.org"))
+
+            let closing = hidden.openTab(URL(string: "https://example.org/closing"))
+            await settle()
+            hidden.close(closing)
+            await settle()
+            check("closing a tab there moves to its neighbor", hidden.selectedTab != nil)
+
             hidden.togglePin(one)
             hidden.newFolder()
             check("nothing pins there", hidden.activeSpace.pinned.isEmpty)
@@ -124,6 +148,7 @@ enum DebugHooks {
             await settle()
             check("closing it ends it", app.privateStores.isEmpty && one.isDiscarded && hidden.window == nil)
             check("and the ordinary window is in front again", app.front === store)
+            check("a site paused there is forgotten", !store.contentBlocker.isPaused(on: secret))
             NSApp.terminate(nil)
         }
     }
@@ -221,6 +246,16 @@ enum DebugHooks {
             try? await Task.sleep(for: .seconds(8))
             shoot("page-light")
 
+            for (index, theme) in Theme.all.enumerated() where ["verdigris", "navy", "ochre"].contains(theme.id) {
+                let other = store.spaces[1]
+                other.hue = theme.hue
+                other.appearance = index % 2 == 0 ? .dark : .light
+                store.switchTo(other)
+                try? await Task.sleep(for: .seconds(1.5))
+                shoot("theme-\(theme.id)")
+                store.switchTo(space)
+                try? await Task.sleep(for: .seconds(0.6))
+            }
             store.showCommandBar(.newTab)
             try? await Task.sleep(for: .seconds(1))
             shoot("commandbar-light")
