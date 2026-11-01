@@ -1,4 +1,5 @@
 import AppKit
+import BrowserCore
 
 extension BrowserStore {
     func toggleContentBlocking() {
@@ -10,9 +11,22 @@ extension BrowserStore {
     /// `tab` defaults to the selected tab; the menu passes the key window's.
     func toggleBlockingOnCurrentSite(_ tab: BrowserTab? = nil) {
         guard let tab = tab ?? selectedTab, let url = tab.url, let site = ContentBlocker.site(for: url) else { return }
-        let paused = contentBlocker.togglePause(on: url)
-        showToast(paused ? "Blocking paused on \(site)" : "Blocking back on for \(site)")
+        if contentBlocker.togglePause(on: url) {
+            // Pausing usually means the page broke: the best moment to ask.
+            showToast("Blocking paused on \(site)", undo: { [weak self] in self?.reportBrokenSite(tab) }, actionTitle: "Report…")
+        } else {
+            showToast("Blocking back on for \(site)")
+        }
         tab.reload()
+    }
+
+    /// Off a website there's no site to report, so a plain bug report instead.
+    func reportBrokenSite(_ tab: BrowserTab? = nil) {
+        guard let tab = tab ?? commandTab ?? selectedTab, let url = tab.url, BrokenSiteReport.site(of: url) != nil else {
+            UtilityWindows.showBugReport(store: self)
+            return
+        }
+        UtilityWindows.showBrokenSiteReport(tab: tab, url: url, store: self)
     }
 
     func toggleCookieRejection() {

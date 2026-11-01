@@ -4,7 +4,7 @@ import BrowserCore
 import CoreSpotlight
 
 /// Lets screenshots / manual QA jump straight into a UI state:
-///   KAIZU_DEBUG=commandbar|location|space|settings|history|private|peek|switcher|extension|nosidebar|reader|pin|split|splitdrop|capture|quickbar|open|swipe|spotlight|spotlightreset|commands|learn|appearance|hide|hotkeys|tour|bugreport|arcimport|arcimport-run .build/debug/Kaizu
+///   KAIZU_DEBUG=commandbar|location|space|settings|history|private|peek|switcher|extension|nosidebar|reader|pin|split|splitdrop|capture|quickbar|open|swipe|spotlight|spotlightreset|commands|learn|appearance|hide|hotkeys|tour|bugreport|brokensite|arcimport|arcimport-run .build/debug/Kaizu
 /// With `commandbar` or `quickbar`, KAIZU_TYPE="gi" types into it key by key (through
 /// the real field editor, so inline completion runs).
 /// `reader` shows Reader for the selected tab, or for KAIZU_URL.
@@ -16,12 +16,24 @@ import CoreSpotlight
 /// `splitdrop` calls the drop handlers directly; a real drag isn't simulated.
 /// `open` opens KAIZU_URL and logs whether the page is showing after 6 s.
 /// `bugreport` opens Report a Bug, then writes a report and logs its path.
+/// `brokensite` opens KAIZU_URL, pauses blocking there and takes the toast's
+/// Report… to the form; KAIZU_SHOT=/path.png saves the form as a picture.
 /// `arcimport` opens Import from Arc; `arcimport-run` imports without it and logs
 /// the result. KAIZU_ARC=/path/to/StorableSidebar.json reads that instead of Arc's.
 @MainActor
 enum DebugHooks {
     private static var arcFile: URL {
         ProcessInfo.processInfo.environment["KAIZU_ARC"].map { URL(fileURLWithPath: $0) } ?? ArcSidebar.fileURL
+    }
+
+    /// KAIZU_SHOT=/path.png saves the window as a picture.
+    private static func saveShot(ofWindow title: String) {
+        guard let path = ProcessInfo.processInfo.environment["KAIZU_SHOT"],
+              let view = NSApp.windows.first(where: { $0.title == title })?.contentView,
+              let picture = view.bitmapImageRepForCachingDisplay(in: view.bounds)
+        else { return }
+        view.cacheDisplay(in: view.bounds, to: picture)
+        try? picture.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
     }
 
     static func apply(to store: BrowserStore) {
@@ -258,18 +270,23 @@ enum DebugHooks {
                 let zip = try? await BugReport.write(summary: "QA report", includingDiagnostics: true, store: store)
                 FileHandle.standardError.write(Data("QA report \(zip?.path ?? "failed")\n".utf8))
             }
+        case "brokensite":
+            guard let url = ProcessInfo.processInfo.environment["KAIZU_URL"].flatMap(URL.init(string:)) else { break }
+            let tab = store.openTab(url)
+            Task {
+                try? await Task.sleep(for: .seconds(4))
+                store.toggleBlockingOnCurrentSite(tab)
+                store.toast?.undo?()
+                try? await Task.sleep(for: .seconds(2))
+                saveShot(ofWindow: "Report a Broken Site")
+                let details = BugReport.siteDetails(for: url, store: store).joined(separator: "; ")
+                FileHandle.standardError.write(Data("QA broken site: \(details)\n".utf8))
+            }
         case "arcimport":
             UtilityWindows.showArcImport(store: store, from: arcFile)
-            // KAIZU_SHOT=/path.png saves the window as a picture.
-            if let path = ProcessInfo.processInfo.environment["KAIZU_SHOT"] {
-                Task {
-                    try? await Task.sleep(for: .seconds(2))
-                    guard let view = NSApp.windows.first(where: { $0.title == "Import from Arc" })?.contentView,
-                          let picture = view.bitmapImageRepForCachingDisplay(in: view.bounds)
-                    else { return }
-                    view.cacheDisplay(in: view.bounds, to: picture)
-                    try? picture.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
-                }
+            Task {
+                try? await Task.sleep(for: .seconds(2))
+                saveShot(ofWindow: "Import from Arc")
             }
         case "arcimport-run":
             do {

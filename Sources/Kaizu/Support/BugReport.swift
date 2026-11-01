@@ -38,15 +38,42 @@ enum BugReport {
     /// A Mail draft to `recipient` with the zip attached. False if this Mac
     /// can't compose mail.
     static func compose(summary: String, attachment: URL) -> Bool {
-        guard let service = NSSharingService(named: .composeEmail) else { return false }
         let summary = summary.trimmingCharacters(in: .whitespacesAndNewlines)
         let firstLine = summary.split(whereSeparator: \.isNewline).first.map(String.init) ?? ""
+        return compose(
+            subject: "Kaizu bug: \(firstLine.prefix(60))",
+            items: ["\(summary)\n\nKaizu \(Diagnostics.appVersion), \(Diagnostics.macOSVersion)\n", attachment]
+        )
+    }
+
+    static func compose(subject: String, items: [Any]) -> Bool {
+        guard let service = NSSharingService(named: .composeEmail) else { return false }
         service.recipients = [recipient]
-        service.subject = "Kaizu bug: \(firstLine.prefix(60))"
-        let items: [Any] = ["\(summary)\n\nKaizu \(Diagnostics.appVersion), \(Diagnostics.macOSVersion)\n", attachment]
+        service.subject = subject
         guard service.canPerform(withItems: items) else { return false }
         service.perform(withItems: items)
         return true
+    }
+
+    /// The setup that most often explains a broken site.
+    static func siteDetails(for url: URL, store: BrowserStore) -> [String] {
+        let blocker = store.contentBlocker
+        let paused = blocker.isPaused(on: url) ? ", paused on this site" : ""
+        let extensions = store.extensions.installed.map(\.name)
+        var lines = [
+            "Kaizu \(Diagnostics.appVersion)",
+            Diagnostics.macOSVersion,
+            "Blocking: ads \(blocker.isEnabled ? "on" : "off"), cookie pop-ups \(blocker.isCookieRejectionEnabled ? "on" : "off")\(paused)",
+            "Extensions: \(extensions.isEmpty ? "none" : extensions.joined(separator: ", "))",
+        ]
+        if let updated = FilterListUpdater.lastChanged {
+            lines.append("Filter lists: \(updated.formatted(.iso8601.year().month().day()))")
+        }
+        let hidden = store.settings.hiddenItems(on: url).count
+        if hidden > 0 {
+            lines.append("Hidden items on this site: \(hidden)")
+        }
+        return lines
     }
 
     /// Versions always; with `full`, the setup that most often explains a bug.

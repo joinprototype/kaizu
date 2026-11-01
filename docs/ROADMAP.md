@@ -44,10 +44,10 @@ Pulled forward from the phases below, in order:
    - [ ] autoconsent v2: isolated content world + native rule filtering (DDG-style), smaller per-frame cost. Measure first: the 600 KB script is parsed in every frame; moving to an isolated world needs a native bridge for the rules that `eval` page state (DDG evaluates those in the page world), and must be checked on real CMPs before it replaces v1
    - [x] filter list auto-updates (daily; newer of downloaded vs bundled wins)
    - [x] per-site "pause blocking" (shield in address pill, per-tab controllers, no recompiles)
-   - [ ] broken-site reporting
+   - [x] broken-site reporting (site popover, Help menu, the toast after pausing): a Mail draft with the site's name, never the page unless asked; records whether turning blocking off fixed it
    - [x] strip tracking parameters (utm_*, fbclid, gclid…) on navigation and Copy Link
    - [ ] evaluate Brave's adblock-rust converter vs ours (coverage, scriptlets)
-7. [ ] Find in page, history, Peek, split view **L** total
+7. [x] Find in page, history, Peek, split view **L** total
 8. [ ] Phase 1 motion pass on the core interactions **M**
 9. [x] Arc importer from `StorableSidebar.json` with a preview + one-click import (format documented in research/arc-sidebar-format.md; fixture in Tests) **M**
 10. [ ] Developer ID signing + notarization, apply for the passkey entitlement **M** (self-update and the test page at kaizu.joinprototype.com landed Oct 30)

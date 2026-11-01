@@ -28,6 +28,18 @@ enum FilterListUpdater {
         return candidates.lazy.compactMap { try? String(contentsOf: $0, encoding: .utf8) }.first
     }
 
+    /// When the newest list in use last changed, for reports.
+    static var lastChanged: Date? {
+        sources.keys
+            .flatMap { name in
+                [directory.appending(path: "\(name).txt"), BundledResource.url(named: name, extension: "txt", in: "Filters")]
+            }
+            .compactMap { $0 }
+            .map(modificationDate)
+            .filter { $0 != .distantPast }
+            .max()
+    }
+
     /// Fetches lists if the last check was over a day ago. Returns true when
     /// at least one list changed (so rules need recompiling).
     @MainActor

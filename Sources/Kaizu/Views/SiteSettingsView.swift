@@ -72,6 +72,12 @@ struct SiteSettingsView: View {
                     }
                 }
                 .font(.system(size: 13))
+                Button("Report a Broken Site…") {
+                    dismiss()
+                    store.reportBrokenSite(tab)
+                }
+                .buttonStyle(.plain)
+                .font(.system(size: 13))
                 Button("Clear Cookies and Site Data…", role: .destructive) {
                     dismiss()
                     store.clearSiteData(for: tab)

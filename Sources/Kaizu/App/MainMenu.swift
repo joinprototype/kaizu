@@ -220,6 +220,7 @@ enum MainMenu {
     private static func helpMenu(_ store: BrowserStore) -> NSMenu {
         let menu = NSMenu(title: "Help")
         menu.addItem(ActionMenuItem("Report a Bug…") { UtilityWindows.showBugReport(store: store) })
+        menu.addItem(ActionMenuItem("Report a Broken Site…") { store.reportBrokenSite() })
         return menu
     }
 

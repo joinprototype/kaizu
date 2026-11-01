@@ -24,6 +24,17 @@ enum UtilityWindows {
         windows["Report a Bug"]?.close()
     }
 
+    static func showBrokenSiteReport(tab: BrowserTab, url: URL, store: BrowserStore) {
+        closeBrokenSiteReport()
+        show("Report a Broken Site", size: NSSize(width: 480, height: 500), store: store) { BrokenSiteReportView(tab: tab, url: url) }
+    }
+
+    /// Forgotten, not just closed: each report starts from its own page.
+    static func closeBrokenSiteReport() {
+        windows["Report a Broken Site"]?.close()
+        windows["Report a Broken Site"] = nil
+    }
+
     static func showArcImport(store: BrowserStore, from source: URL = ArcSidebar.fileURL) {
         show("Import from Arc", size: NSSize(width: 460, height: 420), store: store) { ArcImportView(source: source) }
     }

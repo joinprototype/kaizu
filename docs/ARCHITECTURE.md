@@ -132,6 +132,10 @@ struct Command: Identifiable {
   `Kaizu.log` (read back with `OSLogStore`) and two weeks of crash reports to a
   temporary folder, zips it, and opens a Mail draft. Nothing leaves the Mac
   unless the user sends that draft.
+- Report a Broken Site: `BrokenSiteReport` (BrowserCore, tested) builds the text,
+  the form shows it word for word, and it goes out as a Mail draft with no
+  attachment. The site's name only; the full address is opt-in, without
+  tracking parameters or logins. No log, so it holds nothing beyond that text.
 
 ## Design system
 
