@@ -160,8 +160,8 @@ struct Command: Identifiable {
   sections (`water`, in italics); New York everywhere else, from
   `fontDesign(.serif)` at the root of each window.
 - `CompassRose`, `RhumbWeb`, `Neatline`, `Graticule`: the chart Kaizu is drawn
-  on. Static art, cached (`drawingGroup`) where it moves, so turning the rose
-  is a transform and costs nothing per frame.
+  on. The rose and rhumb lines are drawn once into pictures: live vector art
+  is redrawn whenever anything in the window animates.
 - `Motion`: named springs (`.snap` for chrome, `.pop` for small moments of delight,
   `.glide` for layout) plus Reduce Motion handling in one place.
 - `Metrics`: radii, spacing, sidebar dimensions.

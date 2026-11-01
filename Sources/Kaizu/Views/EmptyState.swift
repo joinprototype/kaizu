@@ -13,8 +13,7 @@ struct EmptyState: View {
             // A clearing in the lines for the name, like a chart's cartouche.
             RadialGradient(colors: [Surface.paper(scheme), Surface.paper(scheme).opacity(0)], center: .center, startRadius: 120, endRadius: 340)
             VStack(spacing: 20) {
-                CompassRose()
-                    .frame(width: 190, height: 190)
+                CompassRose(size: 190)
                 VStack(spacing: 4) {
                     Text("Kaizu")
                         .font(Typeface.display(76))

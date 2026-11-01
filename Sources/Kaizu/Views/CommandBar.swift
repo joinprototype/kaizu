@@ -165,8 +165,7 @@ struct CommandBar: View {
         return VStack(spacing: 0) {
             HStack(spacing: 12) {
                 // The needle swings as you type.
-                CompassRose()
-                    .frame(width: 34, height: 34)
+                CompassRose(size: 34)
                     .rotationEffect(.degrees(Double(text.count) * 22.5))
                     .animation(Motion.snap, value: text.count)
                 KeyTextField(

@@ -27,3 +27,10 @@ youtube.com##.ytp-suggested-action-badge
 ! would keep blocking the page).
 youtube.com##ytd-enforcement-message-view-model
 youtube.com##tp-yt-paper-dialog:has(ytd-enforcement-message-view-model)
+!
+! --- Everywhere ---
+! Google's "Sign in with Google" prompt, which floats over a page you only came
+! to read. Sites' own Sign in with Google buttons are /gsi/button and stay.
+||accounts.google.com/gsi/iframe/select$subdocument
+###credential_picker_container
+###credential_picker_iframe

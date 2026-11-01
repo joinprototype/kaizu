@@ -86,9 +86,8 @@ private struct SidebarChart: View {
             let side = min(geometry.size.width * 1.06, 300)
             let center = CGPoint(x: geometry.size.width * 0.68, y: geometry.size.height - side * 0.36)
             ZStack {
-                RhumbWeb(center: center, strength: 0.55)
-                TurningRose()
-                    .frame(width: side, height: side)
+                RhumbWeb(size: geometry.size, center: center, strength: 0.55)
+                TurningRose(size: side)
                     .position(center)
             }
         }
@@ -102,12 +101,12 @@ private struct TurningRose: View {
     @Environment(BrowserStore.self) private var store
     /// Not a whole number of points: every space points somewhere new.
     private static let turn = 67.5
+    let size: CGFloat
 
     var body: some View {
         let index = store.spaces.firstIndex { $0.id == store.activeSpaceID } ?? 0
         let swipe = Double(store.spaceSwipeOffset / max(store.sidebarWidth, 1))
-        CompassRose()
-            .drawingGroup()
+        CompassRose(size: size)
             // An empty page has its own rose.
             .opacity(store.selectedTab == nil ? 0 : 0.3)
             .animation(Motion.hover, value: store.selectedTab == nil)

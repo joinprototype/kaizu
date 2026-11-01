@@ -2,10 +2,44 @@ import AppKit
 import CoreText
 import SwiftUI
 
+/// Chart art, drawn once into a picture and kept. Live, its paths would be
+/// redrawn on every frame anything in the window moves: turning a picture is
+/// nothing to the GPU, while a rose and its rhumb lines cost a space switch
+/// a third of its frames (measured with KAIZU_DEBUG=tour).
+@MainActor
+private enum Engraving {
+    private static var plates: [String: Image] = [:]
+
+    static func plate(_ key: String, size: CGSize, scheme: ColorScheme, drawing: () -> some View) -> Image? {
+        let key = "\(key) \(size) \(scheme)"
+        if let plate = plates[key] { return plate }
+        let scale = NSScreen.main?.backingScaleFactor ?? 2
+        let renderer = ImageRenderer(content: drawing().frame(width: size.width, height: size.height).environment(\.colorScheme, scheme))
+        renderer.scale = scale
+        guard let image = renderer.cgImage else { return nil }
+        // Dragging the sidebar's edge asks for a new size at every step.
+        if plates.count > 24 {
+            plates.removeAll()
+        }
+        let plate = Image(decorative: image, scale: scale)
+        plates[key] = plate
+        return plate
+    }
+}
+
 /// The rose from Kaizu's icon, with its fleur-de-lis at north: navy cardinal
-/// points, gilt half-winds, oxblood quarter-winds. Drawn once; turn it with
-/// `rotationEffect`.
+/// points, gilt half-winds, oxblood quarter-winds. Turn it with `rotationEffect`.
 struct CompassRose: View {
+    @Environment(\.colorScheme) private var scheme
+    let size: CGFloat
+
+    var body: some View {
+        Engraving.plate("rose", size: CGSize(width: size, height: size), scheme: scheme) { RoseDrawing() }
+            .frame(width: size, height: size)
+    }
+}
+
+private struct RoseDrawing: View {
     @Environment(\.colorScheme) private var scheme
 
     private struct Inks {
@@ -109,8 +143,22 @@ struct CompassRose: View {
 /// put: on a real compass it's the card that turns.
 struct RhumbWeb: View {
     @Environment(\.colorScheme) private var scheme
+    let size: CGSize
     let center: CGPoint
     var strength = 1.0
+
+    var body: some View {
+        Engraving.plate("rhumbs \(center) \(strength)", size: size, scheme: scheme) {
+            RhumbDrawing(center: center, strength: strength)
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+private struct RhumbDrawing: View {
+    @Environment(\.colorScheme) private var scheme
+    let center: CGPoint
+    let strength: Double
 
     var body: some View {
         let dark = Ink.iron(scheme).opacity(0.13 * strength)
@@ -129,7 +177,6 @@ struct RhumbWeb: View {
             context.stroke(lines[1], with: .color(green), lineWidth: 0.5)
             context.stroke(lines[2], with: .color(red), lineWidth: 0.5)
         }
-        .allowsHitTesting(false)
     }
 }
 

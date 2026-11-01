@@ -333,8 +333,11 @@ enum DebugHooks {
         let probe = """
             JSON.stringify({text: document.body ? document.body.innerText.trim().length : -1,
               nodes: document.querySelectorAll('*').length, images: document.images.length,
-              height: document.documentElement.scrollHeight})
+              height: document.documentElement.scrollHeight,
+              consent: (window.autoconsentStandalone?.messages ?? []).filter(m => m.type != 'eval').map(m => m.type + (m.cmp ? ':' + m.cmp : '') + (m.result !== undefined ? '=' + m.result : '')).slice(-6),
+              oneTap: !!document.querySelector('iframe[src*="accounts.google.com/gsi/iframe/select"]') && getComputedStyle(document.querySelector('iframe[src*="accounts.google.com/gsi/iframe/select"]')).display != 'none'})
             """
+        let settling = environment["KAIZU_SITE_WAIT"].flatMap(Double.init) ?? 2.5
         Task {
             for line in text.split(separator: "\n") {
                 guard let url = URL(string: String(line)) else { continue }
@@ -345,7 +348,7 @@ enum DebugHooks {
                     try? await Task.sleep(for: .milliseconds(250))
                 }
                 let loaded = (ContinuousClock.now - start).components.seconds
-                try? await Task.sleep(for: .seconds(2.5))
+                try? await Task.sleep(for: .seconds(settling))
                 let result = (try? await tab.webView.evaluateJavaScript(probe)) as? String ?? "{}"
                 let name = url.host() ?? "site"
                 FileHandle.standardError.write(Data("QA site \(name) | \(tab.url?.host() ?? "none") | \(loaded)s\(tab.isLoading ? " still loading" : "") | \(result) | \(tab.title.prefix(50))\n".utf8))
