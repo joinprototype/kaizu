@@ -127,13 +127,14 @@ private struct ReaderWebView: NSViewRepresentable {
         <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src * data:; media-src *; style-src 'unsafe-inline'">
         <title>\(article.title.htmlEscaped)</title>
         <style>
+          \(Typeface.webFontFaces)
           :root { color-scheme: light dark; --paper: #F4EFE3; --ink: #2B2620; --muted: #7A6F60; --rule: #D9CFBC; --link: #6B2E2A; }
           @media (prefers-color-scheme: dark) { :root { --paper: #1C1A17; --ink: #E8E1D3; --muted: #9A8F7E; --rule: #3A352E; --link: #D9A08B; } }
           html { background: var(--paper); }
           body { font: 20px/1.62 ui-serif, "New York", Georgia, serif; color: var(--ink); max-width: 36em; margin: 0 auto; padding: 72px 32px 120px; -webkit-font-smoothing: antialiased; }
           header { border-bottom: 1px solid var(--rule); margin-bottom: 2em; padding-bottom: 1.2em; }
-          .site { font: 600 11px/1 -apple-system, system-ui; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
-          h1 { font-size: 1.9em; line-height: 1.18; margin: .45em 0 .3em; font-weight: 600; letter-spacing: -.01em; }
+          .site { font: italic 17px/1.2 "Fell", ui-serif, serif; color: var(--muted); }
+          h1 { font: 2.3em/1.12 "Fell", ui-serif, serif; margin: .3em 0 .3em; }
           .byline { font-style: italic; color: var(--muted); }
           h2, h3 { line-height: 1.25; margin-top: 1.6em; }
           img, video, figure, iframe { max-width: 100%; height: auto; }

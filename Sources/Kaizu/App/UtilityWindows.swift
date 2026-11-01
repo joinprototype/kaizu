@@ -8,6 +8,10 @@ import SwiftUI
 enum UtilityWindows {
     private static var windows: [String: NSWindow] = [:]
 
+    static func showAbout(app: AppModel) {
+        show("About Kaizu", size: NSSize(width: 380, height: 470), app: app) { AboutView() }
+    }
+
     static func showSettings(app: AppModel) {
         show("Settings", size: NSSize(width: 560, height: 460), app: app) { SettingsView() }
     }
@@ -86,10 +90,14 @@ enum UtilityWindows {
 /// For windows that outlive any one browser window: the ordinary one in
 /// front is their store, whichever that is by now.
 struct FollowsFrontWindow<Content: View>: View {
+    @Environment(\.colorScheme) private var scheme
     let app: AppModel
     let content: Content
 
     var body: some View {
-        content.environment(app.regularFront).fontDesign(.serif)
+        content
+            .environment(app.regularFront)
+            .fontDesign(.serif)
+            .tint(app.regularFront.activeSpace.theme.accent(scheme))
     }
 }

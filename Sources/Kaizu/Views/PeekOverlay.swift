@@ -33,13 +33,13 @@ struct PeekOverlay: View {
                 .padding([.horizontal, .bottom], isExpanding ? 0 : 6)
         }
         .background(
-            Surface.elevated(scheme).opacity(isExpanding ? 0 : 1),
+            Surface.card(scheme).opacity(isExpanding ? 0 : 1),
             in: RoundedRectangle(cornerRadius: isExpanding ? 10 : 14, style: .continuous)
         )
-        .overlay(
-            RoundedRectangle(cornerRadius: isExpanding ? 10 : 14, style: .continuous)
-                .strokeBorder(Surface.hairline(scheme).opacity(isExpanding ? 0 : 1))
-        )
+        .overlay {
+            Neatline(cornerRadius: isExpanding ? 10 : 14)
+                .opacity(isExpanding ? 0 : 1)
+        }
         .shadow(color: .black.opacity(isExpanding ? 0 : 0.3), radius: 30, y: 12)
         .padding(.horizontal, isExpanding ? 0 : 44)
         .padding(.vertical, isExpanding ? 0 : 24)

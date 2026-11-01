@@ -61,10 +61,12 @@ struct BrowserView: View {
             }
         }
         .fontDesign(.serif)
+        .tint(space.theme.accent(scheme))
         .ignoresSafeArea()
         .sheet(item: $store.spaceDraft) { draft in
             SpaceEditor(draft: draft)
                 .environment(store)
+                .fontDesign(.serif)
         }
     }
 

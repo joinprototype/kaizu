@@ -118,7 +118,7 @@ struct SpaceEditor: View {
                     .background(Circle().fill(theme.accent(scheme)))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(isNew ? "New Space" : "Edit Space")
-                        .font(.title3.weight(.semibold))
+                        .font(Typeface.display(24))
                     Text("Spaces keep their own tabs and look.")
                         .font(.callout)
                         .foregroundStyle(.secondary)
@@ -196,6 +196,7 @@ struct SpaceEditor: View {
                     .keyboardShortcut(.cancelAction)
                 Button(isNew ? "Create Space" : "Save") { store.commit(draft) }
                     .keyboardShortcut(.defaultAction)
+                    .tint(theme.accent(scheme))
                     .disabled(draft.name.trimmingCharacters(in: .whitespaces).isEmpty)
             }
         }

@@ -70,7 +70,7 @@ enum MainMenu {
 
     private static func appMenu(_ app: AppModel) -> NSMenu {
         let menu = NSMenu(title: "Kaizu")
-        menu.addItem(withTitle: "About Kaizu", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+        menu.addItem(ActionMenuItem("About Kaizu") { UtilityWindows.showAbout(app: app) })
         menu.addItem(ActionMenuItem("Check for Updates…") { Updates.checkNow(app: app) })
         menu.addItem(.separator())
         menu.addItem(ActionMenuItem("Settings…", key: ",") { UtilityWindows.showSettings(app: app) })

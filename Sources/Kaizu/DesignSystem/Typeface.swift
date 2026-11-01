@@ -32,6 +32,16 @@ enum Typeface {
         NSFont(name: roman, size: size) ?? .systemFont(ofSize: size)
     }
 
+    /// IM Fell for web pages Kaizu writes itself (Reader, the error page):
+    /// they run in another process, which can't see the app's fonts. Embedded,
+    /// because Reader's security policy lets nothing else load.
+    static let webFontFaces: String = [("normal", "IMFell-Roman"), ("italic", "IMFell-Italic")].compactMap { style, name in
+        guard let url = BundledResource.url(named: name, extension: "ttf", in: "Fonts"),
+              let data = try? Data(contentsOf: url)
+        else { return nil }
+        return #"@font-face { font-family: "Fell"; font-style: \#(style); src: url(data:font/ttf;base64,\#(data.base64EncodedString())); }"#
+    }.joined(separator: "\n")
+
     /// New York, for AppKit fields.
     static func textField(_ size: CGFloat) -> NSFont {
         let system = NSFont.systemFont(ofSize: size)

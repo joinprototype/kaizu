@@ -30,8 +30,8 @@ struct FindBar: View {
         .padding(.leading, 12)
         .padding(.trailing, 4)
         .frame(height: 40)
-        .background(Surface.elevated(scheme), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Surface.hairline(scheme)))
+        .background(Surface.card(scheme), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay { Neatline(cornerRadius: 12) }
         .shadow(color: .black.opacity(0.15), radius: 12, y: 4)
         .onChange(of: query) { store.updateFind(query) }
         .onChange(of: store.selectedTab?.id) { store.hideFindBar() }
