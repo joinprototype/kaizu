@@ -8,9 +8,19 @@ import UniformTypeIdentifiers
 extension AppModel {
     private static let spotlightDomain = "com.joinprototype.kaizu.pinned"
 
-    /// Re-indexes when the pinned set changed; called after every save.
-    /// Titles are the site's name, never the live page title (a pinned mail
-    /// tab's title can be a message subject).
+    /// Spotlight can wait, and checking means going through every pinned tab.
+    func scheduleSpotlightUpdate() {
+        guard spotlightDelay == nil else { return }
+        spotlightDelay = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(10))
+            self?.spotlightDelay = nil
+            self?.updateSpotlight()
+        }
+    }
+
+    /// Re-indexes when the pinned set changed. Titles are the site's name,
+    /// never the live page title (a pinned mail tab's title can be a message
+    /// subject).
     func updateSpotlight() {
         var seen = Set<UUID>()
         var entries: [(tab: BrowserTab, space: Space, title: String, url: URL?)] = []

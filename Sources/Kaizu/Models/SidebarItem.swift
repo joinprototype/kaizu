@@ -72,11 +72,13 @@ extension [SidebarItem] {
         }
     }
 
-    func tab(id: UUID) -> BrowserTab? {
+    func firstTab(where matches: (BrowserTab) -> Bool) -> BrowserTab? {
         for item in self {
             switch item {
-            case .tab(let tab): if tab.id == id { return tab }
-            case .folder(let folder): if let tab = folder.children.tab(id: id) { return tab }
+            case .tab(let tab):
+                if matches(tab) { return tab }
+            case .folder(let folder):
+                if let tab = folder.children.firstTab(where: matches) { return tab }
             }
         }
         return nil

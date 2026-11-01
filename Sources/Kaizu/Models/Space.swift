@@ -64,9 +64,13 @@ final class Space: Identifiable {
         return split.contains(tab) ? split : [tab]
     }
 
-    /// Selection asks this several times per render, so it doesn't build `allTabs`.
     func tab(id: UUID) -> BrowserTab? {
-        today.first { $0.id == id } ?? profile.favorites.first { $0.id == id } ?? pinned.tab(id: id)
+        firstTab { $0.id == id }
+    }
+
+    /// `allTabs.first`, for what runs on every render: it builds no array.
+    func firstTab(where matches: (BrowserTab) -> Bool) -> BrowserTab? {
+        today.first(where: matches) ?? profile.favorites.first(where: matches) ?? pinned.firstTab(where: matches)
     }
 
     /// Where the space's pinned tabs and favorites live, for not adding them twice.

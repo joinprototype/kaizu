@@ -7,6 +7,9 @@ extension AppModel {
         AppPaths.support.appending(path: "session.json")
     }
 
+    /// One write at a time, in order, so a late one can't undo a newer one.
+    private static let sessionQueue = DispatchQueue(label: "com.joinprototype.kaizu.session", qos: .utility)
+
     /// Saves within a second of the first change. Throttled rather than
     /// debounced, so a page that retitles itself every second (unread
     /// counters, timers) can't keep postponing the save.
@@ -15,18 +18,28 @@ extension AppModel {
         saveTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(1))
             self?.saveTask = nil
-            self?.save()
+            self?.save(inBackground: true)
         }
+        scheduleSpotlightUpdate()
     }
 
-    func save() {
+    /// Pages retitle themselves all the time, so the regular saves leave the
+    /// main thread. Quitting writes in place, after any that's still going.
+    func save(inBackground: Bool = false) {
         let record = SessionRecord(windows: stores.map(\.record), profiles: profiles.map(\.record), spaces: spaces.map(\.record))
-        do {
-            try record.encoded().write(to: Self.sessionURL, options: .atomic)
-        } catch {
-            Log.session.error("Couldn't save the session: \(error.localizedDescription, privacy: .public)")
+        let url = Self.sessionURL
+        let write: @Sendable () -> Void = {
+            do {
+                try record.encoded().write(to: url, options: .atomic)
+            } catch {
+                Log.session.error("Couldn't save the session: \(error.localizedDescription, privacy: .public)")
+            }
         }
-        updateSpotlight()
+        if inBackground {
+            Self.sessionQueue.async(execute: write)
+        } else {
+            Self.sessionQueue.sync(execute: write)
+        }
     }
 
     func restore() {

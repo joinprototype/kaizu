@@ -39,6 +39,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         Log.app.notice("Quitting")
         app.save()
+        app.updateSpotlight()
         app.saveTabStates()
         Updates.installIfReady()
     }

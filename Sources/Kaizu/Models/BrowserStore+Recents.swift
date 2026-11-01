@@ -64,7 +64,7 @@ extension BrowserStore {
     /// mini player. Only loaded tabs play, and the sidebar's `body` asks:
     /// reading the rest would make it depend on every tab there is.
     var backgroundMediaTab: BrowserTab? {
-        activeSpace.allTabs.first { $0.isLoaded && $0.isPlayingMedia && app.store(showing: $0) == nil }
+        activeSpace.firstTab { $0.isLoaded && $0.isPlayingMedia && app.store(showing: $0) == nil }
     }
 }
 

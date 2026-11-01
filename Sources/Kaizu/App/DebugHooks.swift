@@ -4,7 +4,7 @@ import BrowserCore
 import CoreSpotlight
 
 /// Lets screenshots / manual QA jump straight into a UI state:
-///   KAIZU_DEBUG=commandbar|location|space|settings|history|private|peek|switcher|extension|nosidebar|reader|pin|split|splitdrop|capture|quickbar|open|swipe|spotlight|spotlightreset|commands|learn|appearance|hide|hotkeys|tour|bugreport|brokensite|windows|privatewindow|browsingdata|arcimport|arcimport-run .build/debug/Kaizu
+///   KAIZU_DEBUG=commandbar|location|space|settings|history|private|peek|switcher|extension|nosidebar|reader|pin|split|splitdrop|capture|quickbar|open|swipe|spotlight|spotlightreset|commands|learn|appearance|hide|hotkeys|tour|bugreport|brokensite|windows|privatewindow|stress|browsingdata|arcimport|arcimport-run .build/debug/Kaizu
 /// With `commandbar` or `quickbar`, KAIZU_TYPE="gi" types into it key by key (through
 /// the real field editor, so inline completion runs).
 /// `reader` shows Reader for the selected tab, or for KAIZU_URL.
@@ -21,6 +21,8 @@ import CoreSpotlight
 /// `windows` drives several windows, logs each rule as ok or FAILED, saves and
 /// quits; run again on the same KAIZU_SUPPORT to check what came back.
 /// `privatewindow` drives a private window, logs each rule as ok or FAILED and quits.
+/// `stress` adds KAIZU_TABS pinned tabs (2,000 by default) if there are fewer, times
+/// what they cost, then quits; run again on the same KAIZU_SUPPORT to time a launch.
 /// `browsingdata` opens Import Browsing Data; with KAIZU_IMPORT set to a profile
 /// folder, an export file, or "arc", it imports that, logs the result and undoes it.
 /// `arcimport` opens Import from Arc; `arcimport-run` imports without it and logs
@@ -116,6 +118,70 @@ enum DebugHooks {
             await settle()
             check("closing it ends it", app.privateStores.isEmpty && one.isDiscarded && hidden.window == nil)
             check("and the ordinary window is in front again", app.front === store)
+            NSApp.terminate(nil)
+        }
+    }
+
+    private static func qaStress(_ store: BrowserStore) {
+        let app = store.app
+        let count = ProcessInfo.processInfo.environment["KAIZU_TABS"].flatMap(Int.init) ?? 2_000
+        func log(_ text: String) {
+            FileHandle.standardError.write(Data("QA stress: \(text)\n".utf8))
+        }
+        func time(_ label: String, times: Int = 1, _ body: () -> Void) {
+            let start = ContinuousClock.now
+            for _ in 0..<times { body() }
+            let total = (ContinuousClock.now - start) / times
+            log("\(label): \(Double(total.components.attoseconds) / 1e15 + Double(total.components.seconds) * 1000) ms")
+        }
+        var process = kinfo_proc()
+        var size = MemoryLayout<kinfo_proc>.stride
+        var query = [CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid()]
+        sysctl(&query, 4, &process, &size, nil, 0)
+        let started = process.kp_proc.p_starttime
+        let launch = Date().timeIntervalSince1970 - (Double(started.tv_sec) + Double(started.tv_usec) / 1_000_000)
+        log("launch: \(Int(launch * 1000)) ms with \(store.activeSpace.allTabs.count) tabs")
+        Task {
+            let space = store.activeSpace
+            if space.pinned.tabs.count < count {
+                let pages = (0..<count).map { BrowsingData.Bookmark.page(title: "Page \($0) - Example", url: URL(string: "https://example.com/\($0)")!) }
+                let data = BrowsingData(bookmarks: pages)
+                let bookmarks = data.bookmarkFolder(named: "Stress", skipping: [])
+                await app.importBrowsingData([], bookmarks: bookmarks, into: space)
+                log("added \(space.pinned.tabs.count) pinned tabs")
+            }
+            let first = store.openTab(URL(string: "about:blank"))
+            let second = store.openTab(URL(string: "about:blank"))
+            try? await Task.sleep(for: .seconds(1))
+            log("tabs in space: \(space.allTabs.count)")
+            time("selectedTab", times: 1000) { _ = store.selectedTab }
+            time("allTabs", times: 100) { _ = space.allTabs }
+            time("backgroundMediaTab", times: 100) { _ = store.backgroundMediaTab }
+            time("isShowing", times: 1000) { _ = store.isShowing(first) }
+            time("tab switch (model only)", times: 200) { store.select(first); store.select(second) }
+            time("save on the main thread") { app.save(inBackground: true) }
+            time("updateSpotlight unchanged") { app.updateSpotlight() }
+            if let folder = space.pinned.folders.first {
+                time("open folder") {
+                    store.toggle(folder)
+                    store.window?.contentView?.layoutSubtreeIfNeeded()
+                    store.window?.displayIfNeeded()
+                }
+                try? await Task.sleep(for: .seconds(1))
+                time("tab switch, folder open") {
+                    store.select(first)
+                    store.window?.contentView?.layoutSubtreeIfNeeded()
+                    store.window?.displayIfNeeded()
+                }
+                time("close folder") {
+                    store.toggle(folder)
+                    store.window?.contentView?.layoutSubtreeIfNeeded()
+                    store.window?.displayIfNeeded()
+                }
+            }
+            second.title = "Changed"
+            time("saveTabStates") { app.saveTabStates() }
+            try? await Task.sleep(for: .seconds(2))
             NSApp.terminate(nil)
         }
     }
@@ -363,7 +429,7 @@ enum DebugHooks {
             if let url = ProcessInfo.processInfo.environment["KAIZU_URL"].flatMap(URL.init(string:)) {
                 let tab = store.openTab(url)
                 store.togglePin(tab)
-                store.app.save()
+                store.app.updateSpotlight()
                 store.select(store.openTab(nil))
                 store.app.openSpotlightItem(tab.id.uuidString)
                 FileHandle.standardError.write(Data("QA spotlight indexed \(store.app.spotlightIdentifiers.count) selected pinned \(store.selectedTab === tab)\n".utf8))
@@ -372,6 +438,8 @@ enum DebugHooks {
             qaWindows(store)
         case "privatewindow":
             qaPrivateWindow(store)
+        case "stress":
+            qaStress(store)
         case "browsingdata":
             qaBrowsingData(store)
         case "commands":

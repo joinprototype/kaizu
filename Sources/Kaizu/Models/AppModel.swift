@@ -35,6 +35,7 @@ final class AppModel {
     @ObservationIgnored var spotlightSignature: [String]?
     @ObservationIgnored var spotlightIdentifiers: Set<String> = []
     @ObservationIgnored var spotlightUpdate: Task<Void, Never>?
+    @ObservationIgnored var spotlightDelay: Task<Void, Never>?
     @ObservationIgnored var menuCommandCache: (time: Date, commands: [PaletteCommand])?
     /// What the command bar has learned you pick, per profile.
     @ObservationIgnored var choices: [UUID: ChoiceMemory] = [:]

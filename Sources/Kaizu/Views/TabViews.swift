@@ -17,8 +17,11 @@ struct SidebarItemView: View {
         case .folder(let folder):
             FolderRow(folder: folder, depth: depth)
             if folder.isExpanded {
-                ForEach(folder.children) { child in
-                    SidebarItemView(item: child, space: space, depth: depth + 1, parent: folder)
+                // Imported bookmarks can put thousands of tabs in one folder.
+                LazyVStack(alignment: .leading, spacing: 2) {
+                    ForEach(folder.children) { child in
+                        SidebarItemView(item: child, space: space, depth: depth + 1, parent: folder)
+                    }
                 }
             }
         }
