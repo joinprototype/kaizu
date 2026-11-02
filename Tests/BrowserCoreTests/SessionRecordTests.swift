@@ -65,12 +65,40 @@ import Testing
                 id: Self.profileID, name: "Personal", symbol: "star.fill", hue: 0.6, profileID: Self.profileID,
                 selectedTabID: nil, pinned: [.folder(folder)],
                 today: [TabRecord(id: Self.tabID, title: "Apple", url: nil, lastActiveAt: Date(timeIntervalSince1970: 1_790_000_000), customTitle: "Fruit")],
-                split: [Self.tabID, Self.pinnedID], splitWidths: [0.6, 0.4], appearance: "dark"
+                split: [Self.tabID, Self.pinnedID], splitWidths: [0.6, 0.4],
+                splitLayout: SplitNode.pane(Self.tabID).placing(Self.pinnedID, by: Self.tabID, on: .top), appearance: "dark"
             )]
         )
         let (decoded, sourceVersion) = try SessionRecord.decode(try record.encoded())
         #expect(sourceVersion == SessionRecord.currentVersion)
         #expect(decoded == record)
+    }
+
+    /// A session saved before splits could mix rows and columns: same
+    /// version, same panes.
+    @Test func splitFromBeforeTreesLoadsAsARow() throws {
+        var record = Self.session(selectedTabID: Self.tabID)
+        record.spaces[0].split = [Self.tabID, Self.pinnedID]
+        record.spaces[0].splitWidths = [0.6, 0.4]
+        let json = String(decoding: try record.encoded(), as: UTF8.self)
+        #expect(!json.contains("splitLayout"))
+        let (decoded, sourceVersion) = try SessionRecord.decode(Data(json.utf8))
+        #expect(sourceVersion == SessionRecord.currentVersion)
+        let space = decoded.spaces[0]
+        #expect(SplitNode.restored(layout: space.splitLayout, panes: space.split ?? [], widths: space.splitWidths ?? [])
+            == .row([Self.tabID, Self.pinnedID], shares: [0.6, 0.4]))
+    }
+
+    /// An older build's decoder sees the same keys it always did, plus one it skips.
+    @Test func aTreeLeavesTheFlatPaneListInPlace() throws {
+        var record = Self.session(selectedTabID: Self.tabID)
+        let layout = SplitNode.pane(Self.tabID).placing(Self.pinnedID, by: Self.tabID, on: .bottom)
+        record.spaces[0].split = layout.panes
+        record.spaces[0].splitLayout = layout
+        let saved = try JSONSerialization.jsonObject(with: try record.encoded()) as? [String: Any]
+        let space = (saved?["spaces"] as? [[String: Any]])?.first
+        #expect(space?["split"] as? [String] == [Self.tabID.uuidString, Self.pinnedID.uuidString])
+        #expect(space?["splitWidths"] == nil)
     }
 
     @Test func extraWindowsRoundTrip() throws {

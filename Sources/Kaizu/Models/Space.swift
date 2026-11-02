@@ -18,14 +18,13 @@ final class Space: Identifiable {
     var hue: Double
     var pinned: [SidebarItem] = []
     var today: [BrowserTab] = []
-    /// Tabs shown side by side (2–4); see BrowserStore+Split.
-    var split: [UUID] = [] {
-        didSet { if split != oldValue { splitWidths = [] } }
+    /// How the tabs shown together (2–4) sit; see BrowserStore+Split.
+    var splitLayout: SplitNode? {
+        didSet { split = splitLayout?.panes ?? [] }
     }
-    /// Each split pane's share of the width, set by dragging the dividers;
-    /// reset whenever the panes change. Ignored (equal shares) whenever it
-    /// doesn't match the pane count.
-    var splitWidths: [Double] = []
+    /// Those tabs, top left first. Kept, not worked out: sidebar rows ask on
+    /// every render.
+    private(set) var split: [UUID] = []
     /// Light or dark for this space whatever the system uses (Arc does this);
     /// pages follow it too.
     var appearance = Appearance.auto
@@ -64,6 +63,16 @@ final class Space: Identifiable {
         return split.contains(tab) ? split : [tab]
     }
 
+    /// How `panes`, from `panes(with:)`, sit: the split without any tab
+    /// that's gone, or a lone page.
+    func layout(of panes: [BrowserTab]) -> SplitNode {
+        splitLayout?.keeping(Set(panes.map(\.id))) ?? .pane(panes[0].id)
+    }
+
+    func removeFromSplit(_ id: UUID) {
+        splitLayout = splitLayout?.removing(id)
+    }
+
     func tab(id: UUID) -> BrowserTab? {
         firstTab { $0.id == id }
     }
@@ -84,7 +93,7 @@ final class Space: Identifiable {
             id: id, name: name, symbol: symbol, hue: hue, profileID: profile.id,
             selectedTabID: nil, pinned: pinned.map(\.record), today: today.map(\.record),
             split: split.isEmpty ? nil : split,
-            splitWidths: splitWidths.isEmpty ? nil : splitWidths,
+            splitLayout: splitLayout,
             appearance: appearance == .auto ? nil : appearance.rawValue
         )
     }

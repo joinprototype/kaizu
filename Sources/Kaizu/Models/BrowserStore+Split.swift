@@ -1,8 +1,9 @@
 import AppKit
+import BrowserCore
 import SwiftUI
 
-/// Split view: up to four of a space's tabs side by side. The split belongs
-/// to the space and shows whenever one of its tabs is selected.
+/// Split view: up to four of a space's tabs, in rows and columns in any mix.
+/// The split belongs to the space and shows whenever one of its tabs is selected.
 extension BrowserStore {
     static let maxSplitPanes = 4
 
@@ -20,9 +21,9 @@ extension BrowserStore {
         let current = selectedTab
         if space.splitTabs.isEmpty || current.map({ !space.splitTabs.contains($0) }) == true {
             guard let current, current !== tab else { return }
-            space.split = [current.id, tab.id]
+            space.splitLayout = .row([current.id, tab.id])
         } else if !space.split.contains(tab.id), space.splitTabs.count < Self.maxSplitPanes {
-            space.split.append(tab.id)
+            space.splitLayout = space.splitLayout?.appending(tab.id)
         }
         takeOver(tab)
         withAnimation(Motion.glide) {
@@ -56,39 +57,28 @@ extension BrowserStore {
         return panes.contains(tab) || panes.count < Self.maxSplitPanes
     }
 
-    /// A sidebar tab dropped on one half of `target`'s page: starts a split
-    /// with it on that side, or adds it to (or moves it within) the split
-    /// `target` is in.
-    func split(_ target: BrowserTab, with id: UUID, on edge: HorizontalEdge) {
+    /// A sidebar tab dropped on `target`'s page: starts a split with it there,
+    /// or adds it to (or moves it within) the split `target` is in. It takes
+    /// half of `target`'s pane, whichever way that pane's neighbors run, or
+    /// half of the split along its outer edge, which is how a split comes to
+    /// mix rows and columns.
+    func split(_ target: BrowserTab, with id: UUID, at place: SplitPlace) {
         guard canSplit(target, with: id), let tab = tab(TabDrag(id: id)) else { return }
         let space = activeSpace
         takeOver(tab)
-        var panes = space.splitTabs.contains(target) ? space.splitTabs.map(\.id) : [target.id]
-        panes.removeAll { $0 == id }
-        guard let index = panes.firstIndex(of: target.id) else { return }
-        panes.insert(id, at: edge == .leading ? index : index + 1)
         withAnimation(Motion.glide) {
-            space.split = panes
+            space.splitLayout = space.layout(of: space.panes(with: target)).placing(id, at: place)
             select(tab, in: space)
         }
         scheduleSave()
     }
 
-    /// Drop handling for `tab`'s page in the main window.
-    func splitDrop(onto tab: BrowserTab) -> SplitDrop {
-        SplitDrop { [weak self] id in
-            self?.canSplit(tab, with: id) ?? false
-        } perform: { [weak self] id, edge in
-            self?.split(tab, with: id, on: edge)
-        }
-    }
-
     func removeFromSplit(_ tab: BrowserTab) {
         let space = activeSpace
         withAnimation(Motion.glide) {
-            space.split.removeAll { $0 == tab.id }
+            space.removeFromSplit(tab.id)
             if space.splitTabs.isEmpty {
-                space.split = []
+                space.splitLayout = nil
             }
         }
         scheduleSave()
@@ -97,7 +87,7 @@ extension BrowserStore {
     func closeSplit() {
         guard !isSplitElsewhere else { return }
         withAnimation(Motion.glide) {
-            activeSpace.split = []
+            activeSpace.splitLayout = nil
         }
         scheduleSave()
     }

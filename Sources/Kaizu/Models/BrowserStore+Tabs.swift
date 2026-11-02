@@ -131,7 +131,7 @@ extension BrowserStore {
             store.endHidingItems()
         }
         var neighborIndex = 0
-        space.split.removeAll { $0 == tab.id }
+        space.removeFromSplit(tab.id)
         if let index = space.today.firstIndex(of: tab) {
             closedTabs.append(ClosedTab(spaceID: space.id, record: tab.record))
             withAnimation(Motion.snap) {
@@ -285,7 +285,7 @@ extension BrowserStore {
         for store in app.stores where store.selectedTabIDs[source.id] == tab.id {
             store.selectNeighbor(of: index, in: source, excluding: tab)
         }
-        source.split.removeAll { $0 == tab.id }
+        source.removeFromSplit(tab.id)
         if tab.profile === target.profile {
             move(tab, to: .today(before: target.today.first?.id), in: target)
         } else {

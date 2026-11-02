@@ -116,18 +116,22 @@ public struct SpaceRecord: Codable, Equatable, Sendable {
     public var pinned: [SidebarItemRecord]
     /// Unpinned tabs, archived automatically when left alone.
     public var today: [TabRecord]
-    /// Tabs shown side by side (2–4), in order. Optional so files from before
+    /// Tabs shown together (2–4), in order. Optional so files from before
     /// split view still decode without a migration.
     public var split: [UUID]?
-    /// Each split pane's share of the width, when dragged away from equal.
+    /// Each split pane's share of the width, in files from before `splitLayout`.
     public var splitWidths: [Double]?
+    /// How the split's tabs sit. Older files have none, and older builds skip
+    /// it and show the same tabs side by side.
+    public var splitLayout: SplitNode?
     /// "light" or "dark" when the space forces one; nil follows the system.
     public var appearance: String?
 
     public init(
         id: UUID, name: String, symbol: String, hue: Double, profileID: UUID,
         selectedTabID: UUID?, pinned: [SidebarItemRecord], today: [TabRecord],
-        split: [UUID]? = nil, splitWidths: [Double]? = nil, appearance: String? = nil
+        split: [UUID]? = nil, splitWidths: [Double]? = nil, splitLayout: SplitNode? = nil,
+        appearance: String? = nil
     ) {
         self.id = id
         self.name = name
@@ -139,6 +143,7 @@ public struct SpaceRecord: Codable, Equatable, Sendable {
         self.today = today
         self.split = split
         self.splitWidths = splitWidths
+        self.splitLayout = splitLayout
         self.appearance = appearance
     }
 }

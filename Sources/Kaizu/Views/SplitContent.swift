@@ -1,82 +1,103 @@
+import BrowserCore
 import SwiftUI
 
-/// The selected tab's split: panes side by side, the focused one outlined,
-/// with dividers you can drag (double-click one to even them out). With one
-/// pane it's just the page.
+/// The selected tab's split: panes in rows and columns in any mix, the focused
+/// one outlined, with dividers you can drag (double-click one to even out its
+/// row). With one pane it's just the page. Panes are siblings here whatever the
+/// layout's shape, so changing it moves pages and never rebuilds them.
 struct SplitContent: View {
     @Environment(BrowserStore.self) private var store
+    @Environment(\.colorScheme) private var scheme
     let space: Space
     let panes: [BrowserTab]
     let focused: BrowserTab
+    /// A sidebar tab being dragged over a pane, and where it would land.
+    @State private var drop: (tab: UUID, place: SplitPlace)?
 
     private static let gap: CGFloat = 8
-    private static let minimumShare = 0.15
 
     var body: some View {
         GeometryReader { geometry in
-            let available = geometry.size.width - Self.gap * CGFloat(panes.count - 1)
-            let shares = shares
-            HStack(spacing: Self.gap) {
-                ForEach(Array(panes.enumerated()), id: \.element.id) { index, pane in
-                    SplitPane(tab: pane, isFocused: pane === focused, isSplit: panes.count > 1, theme: space.theme)
-                        .frame(width: max(available * shares[index], 0))
+            let layout = space.layout(of: panes)
+            let bounds = CGRect(origin: .zero, size: geometry.size)
+            let shape = layout.geometry(in: bounds, gap: Self.gap)
+            ZStack {
+                ForEach(panes, id: \.id) { pane in
+                    if let frame = shape.panes[pane.id] {
+                        SplitPane(tab: pane, isFocused: pane === focused, isSplit: panes.count > 1, theme: space.theme) { point in
+                            shape.place(at: point, on: pane.id)
+                        } onDropHover: { hover in
+                            withAnimation(Motion.snap) { drop = hover }
+                        }
+                        .frame(width: frame.width, height: frame.height)
                         // Panes joining or leaving a split ease in and out;
                         // switching between lone pages stays instant.
                         .transition(panes.count > 1 ? Motion.dissolving(.opacity.combined(with: .scale(scale: 0.98))) : .identity)
-                        .overlay(alignment: .trailing) {
-                            if index < panes.count - 1 {
-                                SplitDivider(shares: shares) { start, distance in
-                                    space.splitWidths = Self.resized(start, at: index, by: available > 0 ? distance / available : 0)
-                                } onEnd: {
-                                    store.scheduleSave()
-                                } onReset: {
-                                    space.splitWidths = []
-                                    store.scheduleSave()
-                                }
-                                .offset(x: Self.gap / 2 + 6)
-                            }
-                        }
+                        .position(x: frame.midX, y: frame.midY)
+                    }
+                }
+                ForEach(shape.dividers) { divider in
+                    SplitDivider(divider: divider, layout: layout) { start, distance in
+                        space.splitLayout = start.resized(divider, by: distance)
+                    } onEnd: {
+                        store.scheduleSave()
+                    } onReset: {
+                        space.splitLayout = layout.evened(divider)
+                        store.scheduleSave()
+                    }
+                    .position(x: divider.frame.midX, y: divider.frame.midY)
+                }
+                if let drop, let frame = layout.placing(drop.tab, at: drop.place).geometry(in: bounds, gap: Self.gap).panes[drop.tab] {
+                    SplitDropPreview(frame: frame.insetBy(dx: 6, dy: 6), accent: space.theme.accent(scheme))
                 }
             }
         }
+        // A drag's end goes unheard if its page leaves first.
+        .onChange(of: panes) { drop = nil }
     }
+}
 
-    private var shares: [Double] {
-        space.splitWidths.count == panes.count
-            ? space.splitWidths
-            : Array(repeating: 1 / Double(panes.count), count: panes.count)
-    }
+/// The room a dragged tab would take.
+private struct SplitDropPreview: View {
+    let frame: CGRect
+    let accent: Color
 
-    /// `start` with the divider after pane `index` moved by `fraction` of the width.
-    private static func resized(_ start: [Double], at index: Int, by fraction: Double) -> [Double] {
-        let pair = start[index] + start[index + 1]
-        let left = min(max(start[index] + fraction, minimumShare), pair - minimumShare)
-        var widths = start
-        widths[index] = left
-        widths[index + 1] = pair - left
-        return widths
+    var body: some View {
+        RoundedRectangle(cornerRadius: 8, style: .continuous)
+            .fill(accent.opacity(0.10))
+            .strokeBorder(accent.opacity(0.55), lineWidth: 1.5)
+            .frame(width: frame.width, height: frame.height)
+            .position(x: frame.midX, y: frame.midY)
+            .animation(Motion.glide, value: frame)
+            .allowsHitTesting(false)
+            .transition(.opacity)
     }
 }
 
 /// The draggable strip in the gap between two panes.
 private struct SplitDivider: View {
-    let shares: [Double]
-    /// The shares when the drag began, and how far it has moved since.
-    let onDrag: (_ start: [Double], _ distance: Double) -> Void
+    let divider: SplitNode.Divider
+    let layout: SplitNode
+    /// The layout when the drag began, and how far it has moved since.
+    let onDrag: (_ start: SplitNode, _ distance: Double) -> Void
     let onEnd: () -> Void
     let onReset: () -> Void
-    @GestureState private var dragStart: [Double]?
+    @GestureState private var dragStart: SplitNode?
+
+    private var isStacked: Bool { divider.direction == .stacked }
 
     var body: some View {
         Color.clear
-            .frame(width: 12)
+            .frame(width: isStacked ? divider.frame.width : 12, height: isStacked ? 12 : divider.frame.height)
             .contentShape(Rectangle())
-            .pointerStyle(.columnResize)
+            .pointerStyle(isStacked ? .rowResize : .columnResize)
             .gesture(
                 // GestureState resets itself, even when the drag is cancelled.
                 DragGesture(minimumDistance: 1, coordinateSpace: .global)
-                    .updating($dragStart) { _, start, _ in start = start ?? shares }
-                    .onChanged { value in onDrag(dragStart ?? shares, value.translation.width) }
+                    .updating($dragStart) { _, start, _ in start = start ?? layout }
+                    .onChanged { value in
+                        onDrag(dragStart ?? layout, isStacked ? value.translation.height : value.translation.width)
+                    }
                     .onEnded { _ in onEnd() }
             )
             .onTapGesture(count: 2) { withAnimation(Motion.snap) { onReset() } }
@@ -90,10 +111,21 @@ private struct SplitPane: View {
     let isFocused: Bool
     let isSplit: Bool
     let theme: Theme
+    let place: (CGPoint) -> SplitPlace
+    let onDropHover: ((tab: UUID, place: SplitPlace)?) -> Void
     @State private var isHovering = false
 
+    private var drop: SplitDrop {
+        SplitDrop(
+            accepts: { [weak store] id in store?.canSplit(tab, with: id) ?? false },
+            place: place,
+            perform: { [weak store] id, place in store?.split(tab, with: id, at: place) },
+            hover: onDropHover
+        )
+    }
+
     var body: some View {
-        PageView(tab: tab, accent: theme.accent(scheme), splitDrop: store.splitDrop(onto: tab))
+        PageView(tab: tab, accent: theme.accent(scheme), splitDrop: drop)
             .overlay {
                 if let reader = store.reader, reader.tabID == tab.id {
                     ReaderView(article: reader)
