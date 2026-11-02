@@ -18,14 +18,14 @@ struct SplitContent: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let layout = space.layout(with: focused)
+            let layout = space.layout(of: panes)
             let bounds = CGRect(origin: .zero, size: geometry.size)
             let shape = layout.geometry(in: bounds, gap: Self.gap)
             ZStack {
                 ForEach(panes, id: \.id) { pane in
                     if let frame = shape.panes[pane.id] {
                         SplitPane(tab: pane, isFocused: pane === focused, isSplit: panes.count > 1, theme: space.theme) { point in
-                            layout.place(at: CGPoint(x: frame.minX + point.x, y: frame.minY + point.y), over: pane.id, in: bounds, gap: Self.gap)
+                            shape.place(at: point, on: pane.id)
                         } onDropHover: { hover in
                             withAnimation(Motion.snap) { drop = hover }
                         }
@@ -115,8 +115,17 @@ private struct SplitPane: View {
     let onDropHover: ((tab: UUID, place: SplitPlace)?) -> Void
     @State private var isHovering = false
 
+    private var drop: SplitDrop {
+        SplitDrop(
+            accepts: { [weak store] id in store?.canSplit(tab, with: id) ?? false },
+            place: place,
+            perform: { [weak store] id, place in store?.split(tab, with: id, at: place) },
+            hover: onDropHover
+        )
+    }
+
     var body: some View {
-        PageView(tab: tab, accent: theme.accent(scheme), splitDrop: store.splitDrop(onto: tab, place: place, hover: onDropHover))
+        PageView(tab: tab, accent: theme.accent(scheme), splitDrop: drop)
             .overlay {
                 if let reader = store.reader, reader.tabID == tab.id {
                     ReaderView(article: reader)

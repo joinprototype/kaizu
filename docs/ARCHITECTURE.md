@@ -103,10 +103,10 @@ WindowModel (one per window; today's `BrowserStore`)
   edits, frames, dividers, the session form. `SplitContent` only draws them: all
   panes are siblings keyed by tab, so changing the layout moves pages and never
   rebuilds them.
-  Sessions stay v2. A row saves as it always did (`split`, `splitWidths`); anything
-  else adds `splitLayout` beside the flat `split` list. Older builds skip that key
-  and show the same panes side by side, and their next save drops the shape, never
-  a tab. A tree that disagrees with `split`, or comes from a later build, gives way
+  Sessions stay v2. `splitLayout` sits beside the flat `split` list, which stays
+  for older builds: they skip the tree and show the same panes side by side, and
+  their next save drops the shape, never a tab. Older files' `splitWidths` load as
+  a row. A tree that disagrees with `split`, or comes from a later build, gives way
   to the list, so it can't lose the session.
 - Windows on the same space list the same sidebar and each selects its own tab;
   no two windows keep the same tab selected. This is Arc's model, kept on

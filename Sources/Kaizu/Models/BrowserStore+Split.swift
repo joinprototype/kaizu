@@ -67,25 +67,10 @@ extension BrowserStore {
         let space = activeSpace
         takeOver(tab)
         withAnimation(Motion.glide) {
-            space.splitLayout = space.layout(with: target).placing(id, at: place)
+            space.splitLayout = space.layout(of: space.panes(with: target)).placing(id, at: place)
             select(tab, in: space)
         }
         scheduleSave()
-    }
-
-    /// Drop handling for `tab`'s page in the main window. `place` says where
-    /// a point on the page lands, and `hover` hears where a dragged tab would.
-    func splitDrop(
-        onto tab: BrowserTab,
-        place: @escaping (CGPoint) -> SplitPlace,
-        hover: @escaping ((tab: UUID, place: SplitPlace)?) -> Void
-    ) -> SplitDrop {
-        SplitDrop(
-            accepts: { [weak self] id in self?.canSplit(tab, with: id) ?? false },
-            place: place,
-            perform: { [weak self] id, place in self?.split(tab, with: id, at: place) },
-            hover: hover
-        )
     }
 
     func removeFromSplit(_ tab: BrowserTab) {

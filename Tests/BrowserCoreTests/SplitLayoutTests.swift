@@ -141,8 +141,11 @@ import Testing
 
     // MARK: Where a point lands
 
+    /// `x` and `y` are in the split, the way the eye reads these.
     private func place(_ layout: SplitNode, x: Double, y: Double, over pane: UUID) -> SplitPlace {
-        layout.place(at: CGPoint(x: x, y: y), over: pane, in: bounds, gap: 8)
+        let geometry = layout.geometry(in: bounds, gap: 8)
+        let frame = geometry.panes[pane] ?? bounds
+        return geometry.place(at: CGPoint(x: x - frame.minX, y: y - frame.minY), on: pane)
     }
 
     @Test func nearTheOuterEdgeRunsAlongIt() {
@@ -285,24 +288,9 @@ import Testing
 
     // MARK: In a session
 
-    /// Exactly what every build has written for a row.
-    @Test func aRowSavesAsWidths() {
-        #expect(SplitNode.row([a, b]).saved.widths == nil)
-        #expect(SplitNode.row([a, b]).saved.layout == nil)
-        #expect(SplitNode.row([a, b], shares: [0.6, 0.4]).saved.widths == [0.6, 0.4])
-        #expect(SplitNode.row([a, b], shares: [0.6, 0.4]).saved.layout == nil)
-    }
-
-    @Test func anythingElseSavesAsATree() {
-        #expect(bento.saved.widths == nil)
-        #expect(bento.saved.layout == bento)
-        let stack = SplitNode.pane(a).placing(b, by: a, on: .top)
-        #expect(stack.saved.layout == stack)
-    }
-
     @Test(arguments: [0, 1, 2]) func everyLayoutComesBack(index: Int) {
         let node = [SplitNode.row([a, b], shares: [0.6, 0.4]), SplitNode.row([a, b, c]), bento][index]
-        #expect(SplitNode.restored(layout: node.saved.layout, panes: node.panes, widths: node.saved.widths ?? []) == node)
+        #expect(SplitNode.restored(layout: node, panes: node.panes, widths: []) == node)
     }
 
     @Test func aTreeSurvivesJSON() throws {

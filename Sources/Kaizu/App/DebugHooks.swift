@@ -516,8 +516,8 @@ enum DebugHooks {
                 SplitChild(node: .row([left, right], shares: [0.3, 0.7]), share: 0.4),
             ])
         }
-        func page(showing tab: BrowserTab) -> WebContainerView? {
-            store.window?.contentView.flatMap { pageView(in: $0, showing: tab) }
+        func catcher(of tab: BrowserTab) -> NSView? {
+            (tab.webView.superview as? WebContainerView)?.dropTarget
         }
         func frame(of tab: BrowserTab) -> NSRect {
             tab.webView.convert(tab.webView.bounds, to: nil)
@@ -535,7 +535,7 @@ enum DebugHooks {
         /// it for the split's own edge, shows the preview for a moment, then
         /// drops it.
         func drop(_ tab: BrowserTab, on target: BrowserTab, _ edge: SplitEdge, outer: Bool = false) async {
-            guard let catcher = page(showing: target)?.dropTarget else { return check("the page is showing", false) }
+            guard let catcher = catcher(of: target) else { return check("the page is showing", false) }
             let box = catcher.convert(catcher.bounds, to: nil)
             let across = outer ? 10 : box.width / 4
             let down = outer ? 10 : box.height / 4
@@ -562,9 +562,9 @@ enum DebugHooks {
                 logPageCount(store, "restored")
                 return NSApp.terminate(nil)
             }
-            if space.splitTabs.count > 1 {
-                check("a split from before trees stays a row", space.splitLayout?.saved.layout == nil)
-                FileHandle.standardError.write(Data("QA split kept: \(space.splitTabs.count) panes, widths \(space.splitLayout?.saved.widths ?? [])\n".utf8))
+            if case .group(let direction, let children) = space.splitLayout, space.splitTabs.count > 1 {
+                check("a split from before trees stays a row", direction == .sideBySide)
+                FileHandle.standardError.write(Data("QA split kept: \(children.count) panes, widths \(children.map(\.share))\n".utf8))
                 try? await Task.sleep(for: .seconds(2))
                 return NSApp.terminate(nil)
             }
@@ -604,7 +604,7 @@ enum DebugHooks {
 
             await drop(fourth, on: first, .top)
             check("each column stacks, into a grid", layout() == "[[d / a] | [b / c]]")
-            check("four is the limit", page(showing: third)?.dropTarget.draggingEntered(StandInDrag(fifth.id, at: .zero)) == [])
+            check("four is the limit", catcher(of: third)?.draggingEntered(StandInDrag(fifth.id, at: .zero)) == [])
             store.split(third, with: fifth.id, at: .pane(third.id, .top))
             check("a fifth changes nothing", layout() == "[[d / a] | [b / c]]")
             check("but its panes still move", store.canSplit(third, with: second.id))
@@ -1501,9 +1501,5 @@ enum DebugHooks {
         await send(.leftMouseUp, end ?? start)
     }
 
-    private static func pageView(in view: NSView, showing tab: BrowserTab) -> WebContainerView? {
-        if let page = view as? WebContainerView, tab.isLoaded, tab.webView.superview === page { return page }
-        return view.subviews.lazy.compactMap { pageView(in: $0, showing: tab) }.first
-    }
 }
 #endif

@@ -119,11 +119,10 @@ public struct SpaceRecord: Codable, Equatable, Sendable {
     /// Tabs shown together (2–4), in order. Optional so files from before
     /// split view still decode without a migration.
     public var split: [UUID]?
-    /// Each split pane's share of the width, when they're a row dragged away
-    /// from equal.
+    /// Each split pane's share of the width, in files from before `splitLayout`.
     public var splitWidths: [Double]?
-    /// How the split's tabs sit when they're anything but a row. Older files
-    /// have none, and older builds skip it and show them side by side.
+    /// How the split's tabs sit. Older files have none, and older builds skip
+    /// it and show the same tabs side by side.
     public var splitLayout: SplitNode?
     /// "light" or "dark" when the space forces one; nil follows the system.
     public var appearance: String?

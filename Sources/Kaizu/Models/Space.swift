@@ -19,9 +19,12 @@ final class Space: Identifiable {
     var pinned: [SidebarItem] = []
     var today: [BrowserTab] = []
     /// How the tabs shown together (2–4) sit; see BrowserStore+Split.
-    var splitLayout: SplitNode?
-    /// Those tabs, top left first.
-    var split: [UUID] { splitLayout?.panes ?? [] }
+    var splitLayout: SplitNode? {
+        didSet { split = splitLayout?.panes ?? [] }
+    }
+    /// Those tabs, top left first. Kept, not worked out: sidebar rows ask on
+    /// every render.
+    private(set) var split: [UUID] = []
     /// Light or dark for this space whatever the system uses (Arc does this);
     /// pages follow it too.
     var appearance = Appearance.auto
@@ -60,11 +63,10 @@ final class Space: Identifiable {
         return split.contains(tab) ? split : [tab]
     }
 
-    /// How `panes(with: tab)` sit, without any tab that's gone.
-    func layout(with tab: BrowserTab) -> SplitNode {
-        let split = splitTabs
-        guard split.contains(tab) else { return .pane(tab.id) }
-        return splitLayout?.keeping(Set(split.map(\.id))) ?? .pane(tab.id)
+    /// How `panes`, from `panes(with:)`, sit: the split without any tab
+    /// that's gone, or a lone page.
+    func layout(of panes: [BrowserTab]) -> SplitNode {
+        splitLayout?.keeping(Set(panes.map(\.id))) ?? .pane(panes[0].id)
     }
 
     func removeFromSplit(_ id: UUID) {
@@ -87,13 +89,11 @@ final class Space: Identifiable {
 
     /// Without a selection: each window keeps its own.
     var record: SpaceRecord {
-        let saved = splitLayout?.saved
-        return SpaceRecord(
+        SpaceRecord(
             id: id, name: name, symbol: symbol, hue: hue, profileID: profile.id,
             selectedTabID: nil, pinned: pinned.map(\.record), today: today.map(\.record),
             split: split.isEmpty ? nil : split,
-            splitWidths: saved?.widths,
-            splitLayout: saved?.layout,
+            splitLayout: splitLayout,
             appearance: appearance == .auto ? nil : appearance.rawValue
         )
     }

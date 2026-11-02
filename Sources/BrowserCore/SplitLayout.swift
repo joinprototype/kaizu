@@ -13,7 +13,7 @@ public enum SplitEdge: Sendable {
     /// The side nearest a point on the page, given from its top left as
     /// fractions of its size: the page's diagonals cut it into four, so a
     /// tab dragged in along the middle lands left or right as it always did.
-    public init(x: Double, y: Double) {
+    init(x: Double, y: Double) {
         if abs(x - 0.5) >= abs(y - 0.5) {
             self = x < 0.5 ? .left : .right
         } else {
@@ -21,7 +21,7 @@ public enum SplitEdge: Sendable {
         }
     }
 
-    public var direction: SplitDirection {
+    fileprivate var direction: SplitDirection {
         switch self {
         case .left, .right: .sideBySide
         case .top, .bottom: .stacked
@@ -62,7 +62,7 @@ public struct SplitChild: Equatable, Sendable {
 
 extension SplitNode {
     /// The least of its group a dragged divider leaves a pane.
-    public static let minimumShare = 0.15
+    private static let minimumShare = 0.15
 
     /// `panes` side by side, with `shares` of the width if there's one for each.
     public static func row(_ panes: [UUID], shares: [Double] = []) -> SplitNode {
@@ -87,12 +87,12 @@ extension SplitNode {
 
     /// With `id` taking half of `target`'s place, on `edge`. If it's already
     /// here it moves there, and what it leaves closes up.
-    public func placing(_ id: UUID, by target: UUID, on edge: SplitEdge) -> SplitNode {
+    func placing(_ id: UUID, by target: UUID, on edge: SplitEdge) -> SplitNode {
         (removing(id) ?? self).splitting(target, with: id, on: edge)
     }
 
     /// With `id` taking half of the whole layout, along `edge`.
-    public func placing(_ id: UUID, along edge: SplitEdge) -> SplitNode {
+    func placing(_ id: UUID, along edge: SplitEdge) -> SplitNode {
         let halves = [removing(id) ?? self, .pane(id)].map { SplitChild(node: $0, share: 0.5) }
         return Self.tidied(edge.direction, edge.isBefore ? halves.reversed() : halves) ?? self
     }
@@ -121,9 +121,8 @@ extension SplitNode {
     /// With `id` joining the end, as much of the top group as any other part.
     public func appending(_ id: UUID) -> SplitNode {
         guard case .group(let direction, let children) = self else { return .row(panes + [id]) }
-        let share = 1 / Double(children.count + 1)
-        let kept = children.map { SplitChild(node: $0.node, share: $0.share * (1 - share)) }
-        return .group(direction, kept + [SplitChild(node: .pane(id), share: share)])
+        let joining = SplitChild(node: .pane(id), share: 1 / Double(children.count))
+        return Self.tidied(direction, children + [joining]) ?? self
     }
 
     /// Without `id`, what's left taking up its room; nil if nothing is.
@@ -164,7 +163,7 @@ extension SplitNode {
 
 extension SplitNode {
     /// The strip between two parts of a group.
-    public struct Divider: Equatable, Sendable, Identifiable {
+    public struct Divider: Sendable, Identifiable {
         /// The child to take at each level, from the top, to reach its group.
         public var path: [Int]
         /// It sits after this child.
@@ -178,13 +177,34 @@ extension SplitNode {
         public var id: [Int] { path + [index] }
     }
 
-    public struct Geometry: Equatable, Sendable {
+    public struct Geometry: Sendable {
+        /// How close to the split's outer edge a tab has to be to run along it.
+        private static let outerBand = 36.0
+
+        let bounds: CGRect
         public var panes: [UUID: CGRect] = [:]
         public var dividers: [Divider] = []
+
+        /// Where a tab dragged to `point` on `pane`, from its top left, lands:
+        /// along the split close to its outer edge, or else on the side of the
+        /// pane it's nearest. With one pane there's only that pane's sides.
+        public func place(at point: CGPoint, on pane: UUID) -> SplitPlace {
+            let frame = panes[pane] ?? bounds
+            let x = frame.minX + point.x
+            let y = frame.minY + point.y
+            let distances = [
+                (SplitEdge.left, x - bounds.minX), (.right, bounds.maxX - x),
+                (.top, y - bounds.minY), (.bottom, bounds.maxY - y),
+            ]
+            if !dividers.isEmpty, let nearest = distances.min(by: { $0.1 < $1.1 }), nearest.1 < Self.outerBand {
+                return .split(nearest.0)
+            }
+            return .pane(pane, SplitEdge(x: point.x / frame.width, y: point.y / frame.height))
+        }
     }
 
     public func geometry(in bounds: CGRect, gap: Double) -> Geometry {
-        var geometry = Geometry()
+        var geometry = Geometry(bounds: bounds)
         lay(in: bounds, gap: gap, path: [], into: &geometry)
         return geometry
     }
@@ -212,25 +232,6 @@ extension SplitNode {
                 }
             }
         }
-    }
-
-    /// How close to the split's outer edge a tab has to be to run along it.
-    public static let outerBand = 36.0
-
-    /// Where a tab dragged to `point`, over `pane`, lands: along the split
-    /// close to its outer edge, or else on the side of the pane it's nearest.
-    public func place(at point: CGPoint, over pane: UUID, in bounds: CGRect, gap: Double) -> SplitPlace {
-        if case .group = self {
-            let distances = [
-                (SplitEdge.left, point.x - bounds.minX), (.right, bounds.maxX - point.x),
-                (.top, point.y - bounds.minY), (.bottom, bounds.maxY - point.y),
-            ]
-            if let nearest = distances.min(by: { $0.1 < $1.1 }), nearest.1 < Self.outerBand {
-                return .split(nearest.0)
-            }
-        }
-        let frame = geometry(in: bounds, gap: gap).panes[pane] ?? bounds
-        return .pane(pane, SplitEdge(x: (point.x - frame.minX) / frame.width, y: (point.y - frame.minY) / frame.height))
     }
 
     /// With `divider` moved by `distance`, taken from the parts either side of it.
@@ -270,19 +271,9 @@ extension SplitNode {
 // MARK: - In a session
 
 extension SplitNode {
-    /// How a session keeps this: a row of panes as the widths every build
-    /// knows, anything else as a tree older builds skip, leaving them the
-    /// same panes side by side.
-    public var saved: (widths: [Double]?, layout: SplitNode?) {
-        guard case .group(let direction, let children) = self else { return (nil, nil) }
-        let isRow = direction == .sideBySide && children.allSatisfy { $0.node.panes.count == 1 }
-        guard isRow else { return (nil, self) }
-        let widths = children.map(\.share)
-        return (widths.allSatisfy { abs($0 - 1 / Double(widths.count)) < 1e-9 } ? nil : widths, nil)
-    }
-
     /// The split a session kept. `layout` counts only if it holds just
-    /// `panes`; it wouldn't if a file was changed behind its back.
+    /// `panes`, which it wouldn't if a file was changed behind its back. With
+    /// none, as in files from before trees, `panes` are a row of `widths`.
     public static func restored(layout: SplitNode?, panes: [UUID], widths: [Double]) -> SplitNode? {
         var seen = Set<UUID>()
         let panes = panes.filter { seen.insert($0).inserted }
