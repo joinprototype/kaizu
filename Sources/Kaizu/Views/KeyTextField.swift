@@ -11,6 +11,8 @@ struct KeyTextField: NSViewRepresentable {
     let placeholder: String
     var fontSize: CGFloat = 19
     var font: NSFont?
+    /// The insertion point, in the space's ink rather than the system accent.
+    var caret: Color?
     let onMove: (Int) -> Void
     let onSubmit: () -> Void
     let onCancel: () -> Void
@@ -18,6 +20,7 @@ struct KeyTextField: NSViewRepresentable {
 
     func makeNSView(context: Context) -> FocusingTextField {
         let field = FocusingTextField()
+        field.caret = caret.map(NSColor.init)
         field.isBordered = false
         field.drawsBackground = false
         field.focusRingType = .none
@@ -38,6 +41,7 @@ struct KeyTextField: NSViewRepresentable {
 
     func updateNSView(_ field: FocusingTextField, context: Context) {
         context.coordinator.parent = self
+        field.caret = caret.map(NSColor.init)
         if field.stringValue != text {
             field.stringValue = text
         }
@@ -101,6 +105,16 @@ struct KeyTextField: NSViewRepresentable {
 }
 
 final class FocusingTextField: NSTextField {
+    var caret: NSColor?
+
+    override func becomeFirstResponder() -> Bool {
+        let became = super.becomeFirstResponder()
+        if let caret, let editor = currentEditor() as? NSTextView {
+            editor.insertionPointColor = caret
+        }
+        return became
+    }
+
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         guard let window else { return }

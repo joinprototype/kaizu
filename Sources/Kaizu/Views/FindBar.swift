@@ -13,6 +13,7 @@ struct FindBar: View {
                 text: $query,
                 placeholder: "Find on page",
                 fontSize: 13,
+                caret: store.activeSpace.theme.accent(scheme),
                 onMove: { store.findNext(backwards: $0 < 0) },
                 onSubmit: { store.findNext() },
                 onCancel: { store.hideFindBar() }

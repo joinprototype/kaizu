@@ -172,6 +172,7 @@ struct CommandBar: View {
                     text: $text,
                     placeholder: "",
                     font: Typeface.displayField(25),
+                    caret: palette.accent,
                     onMove: { delta in
                         guard !suggestions.isEmpty else { return }
                         withAnimation(Motion.snap) {

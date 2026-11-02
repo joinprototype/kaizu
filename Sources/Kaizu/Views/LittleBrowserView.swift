@@ -26,6 +26,7 @@ struct LittleBrowserView: View {
                         text: $address,
                         placeholder: "Search or enter address",
                         fontSize: 13,
+                        caret: theme.accent(scheme),
                         onMove: { _ in },
                         onSubmit: submitAddress,
                         onCancel: { isEditingAddress = false }

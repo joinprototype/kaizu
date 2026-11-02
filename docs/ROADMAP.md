@@ -48,7 +48,7 @@ Pulled forward from the phases below, in order:
    - [x] strip tracking parameters (utm_*, fbclid, gclid…) on navigation and Copy Link
    - [ ] evaluate Brave's adblock-rust converter vs ours (coverage, scriptlets)
 7. [x] Find in page, history, Peek, split view **L** total
-8. [ ] Phase 1 motion pass on the core interactions **M**
+8. [x] Phase 1 motion pass on the core interactions **M**
 9. [x] Arc importer from `StorableSidebar.json` with a preview + one-click import (format documented in research/arc-sidebar-format.md; fixture in Tests) **M**
 10. [ ] Developer ID signing + notarization, apply for the passkey entitlement **M** (self-update and the test page at kaizu.joinprototype.com landed Oct 30)
 
@@ -72,30 +72,30 @@ default-browser capable · curated themes · app icon.
 
 | Area | Arc | Kaizu now | Plan | Effort | WebKit notes |
 |---|---|---|---|---|---|
-| Spaces (theme + tabs, bound to a profile) | ✓ | profile = space | P0 split, P1 swipe | M | — |
-| Favorites row (per profile) | ✓ | pinned grid only | P3 | S | — |
-| Pinned folders | ✓ | — | P3 | M | — |
-| Today tabs auto-archive + Archive | ✓ | — | P3 | M | — |
-| Command bar: history, actions, suggestions | ✓ | tabs + URL/search | P2 | M | — |
-| History | ✓ | — | P2 | M | WebKit has no global history; we store it (SQLite+FTS5) |
-| Find in page | ✓ | — | P2 | S | `findString(_:configuration:)` ✓ |
-| Downloads panel | ✓ | silent save | P2 | S | `WKDownload` progress ✓ |
-| Multiple / private windows | ✓ | ✓ | P2 | M | `WKWebsiteDataStore.nonPersistent()` |
-| Back/forward kept across restarts | ✓ | URL only | P2 | S | `interactionState` ✓ |
-| Ad + tracker blocking | via extensions | — | P2 built-in | M | `WKContentRuleList` ✓ (same engine as Safari content blockers) |
-| Split view | ✓ | — | P3 | L | several page views per window |
-| Peek (link preview overlay) | ✓ | — | P3 | M | promote preview to tab without reload |
-| Little Arc (mini window) | ✓ | — | P3 | M | `NSPanel` |
-| ⌃Tab recent-tab switcher | ✓ | cycles list order | P3 | M | `takeSnapshot` ✓ for thumbnails |
-| Media: now playing, mute, auto-PiP | ✓ | now playing, mute | P3 | M | event-driven via isolated-world script; auto-PiP ✓ |
-| Capture / screenshots | ✓ | — | P3 | S | `takeSnapshot`, `createPDF` ✓ |
-| Extensions | Chrome Web Store | — | P4 | L | `WKWebExtension` ✓ (macOS 15.4+) |
-| Password managers | extensions | manual typing | P4 via extensions | L | 1Password/Bitwarden web extensions |
+| Spaces (theme + tabs, bound to a profile) | ✓ | ✓ | — | M | — |
+| Favorites row (per profile) | ✓ | ✓ | — | S | — |
+| Pinned folders | ✓ | ✓ | — | M | — |
+| Today tabs auto-archive + Archive | ✓ | ✓ | — | M | — |
+| Command bar: history, actions, suggestions | ✓ | ✓ | — | M | — |
+| History | ✓ | ✓ | — | M | WebKit has no global history; we store it (SQLite+FTS5) |
+| Find in page | ✓ | ✓ | — | S | `findString(_:configuration:)` ✓ |
+| Downloads panel | ✓ | ✓ | — | S | `WKDownload` progress ✓ |
+| Multiple / private windows | ✓ | ✓ | — | M | `WKWebsiteDataStore.nonPersistent()` |
+| Back/forward kept across restarts | ✓ | ✓ | — | S | `interactionState` ✓ |
+| Ad + tracker blocking | via extensions | ✓ built in | — | M | `WKContentRuleList` ✓ (same engine as Safari content blockers) |
+| Split view | ✓ | ✓ | — | L | several page views per window |
+| Peek (link preview overlay) | ✓ | ✓ | — | M | promote preview to tab without reload |
+| Little Arc (mini window) | ✓ | ✓ | — | M | `NSPanel` |
+| ⌃Tab recent-tab switcher | ✓ | ✓ | — | M | `takeSnapshot` ✓ for thumbnails |
+| Media: now playing, mute, auto-PiP | ✓ | ✓ | — | M | event-driven via isolated-world script; auto-PiP ✓ |
+| Capture / screenshots | ✓ | ✓ | — | S | `takeSnapshot`, `createPDF` ✓ |
+| Extensions | Chrome Web Store | ✓ Chrome Web Store, Firefox Add-ons, Safari | — | L | `WKWebExtension` ✓ (macOS 15.4+) |
+| Password managers | extensions | via extensions, not yet tried by hand | verify | L | 1Password/Bitwarden web extensions |
 | Passkeys | ✓ | blocked | P6 | — | needs Apple's browser passkey entitlement |
-| Import (Arc / Chrome / Safari) | ✓ | ✓ | P4 | M | Arc keeps its sidebar in `StorableSidebar.json`; Chromium browsers share one history and bookmarks format; Safari exports a .zip |
-| Boosts (per-site CSS/JS) | ✓ | — | P5 | M | `WKUserScript` ✓ |
+| Import (Arc / Chrome / Safari) | ✓ | ✓ | — | M | Arc keeps its sidebar in `StorableSidebar.json`; Chromium browsers share one history and bookmarks format; Safari exports a .zip |
+| Boosts (per-site CSS/JS) | ✓ | Hide Distracting Items only | P5, if asked | M | `WKUserScript` ✓ |
 | AI features | Arc Max | — | P5, opt-in | M | side panel with the user's own claude.ai / ChatGPT login |
-| Settings window | ✓ | — | P2 | S | — |
+| Settings window | ✓ | ✓ | — | S | — |
 | Sync across devices | ✓ | — | later | L | CloudKit candidate |
 | Easels, Windows/iOS apps | ✓ | — | not planned | — | — |
 
@@ -146,9 +146,13 @@ peek close/expand, Reader's blank fade, scrims scaling with their cards,
 split open/close, ⌘S from a peek, the space swipe (now 1:1 with the next
 space beside, velocity-carried, backdrop blending), sliding pill and disc,
 row insertion, Clear's teardown. Reduce Motion swaps slides for dissolves
-(Nov 1). Still open: pre-warming a web view per profile so opening a tab
-never builds one mid-animation; measuring whether the sidebar toggle's
-per-frame page resize stutters on heavy pages.
+(Nov 1).
+
+Settled by measuring (Nov 1): a new tab's web view takes about 30 ms, spent
+before the row animation's first frame, so nothing stutters and pre-warming
+stays out (it would also keep a spare web process open). The sidebar toggle
+on heavy pages (New York Times, YouTube) is 0 to 9 late frames, worst 31 ms,
+a little above light pages on the same busy machine: not visible.
 
 Measured (Oct 25, night) with `KAIZU_DEBUG=tour` on a 120 Hz display,
 optimized build: every interaction (command bar, sidebar, space switch and
@@ -156,8 +160,11 @@ swipe, tab switch, split, peek, new/close tab, toasts) runs at 120 fps with
 0 to 2 late frames (worst about 21 ms, so never below 60 fps). Most late
 frames move around between runs (noise); the one that repeats is the frame
 where a space swipe lets go and the new space's page takes over. Next
-candidates: the command bar's first frames (it builds its rows), and
-pre-warming the web view, as above.
+candidate: the command bar's first frames (it builds its rows).
+
+On a busy machine (load 10 or more) a space switch drops 14 to 24 frames in
+bad moments and 0 to 3 in calm ones, in the builds from before and after the
+chart room alike. Compare builds side by side before blaming a change.
 
 Plus, where Kaizu gets its personality:
 - [x] Loading delight: a compass needle in the address pill swings while a page loads and settles on north when done **S**
