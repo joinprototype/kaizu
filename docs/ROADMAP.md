@@ -176,12 +176,17 @@ footprint, what Activity Monitor shows; RSS counts 570 MB of shared system code)
   500 MB each). 3.3% CPU together when left idle. Blocking saves about 170 MB.
 - Hibernating them leaves 183 MB. Before Nov 2 it left 1.3 GB: tabs counted as
   playing if a silent video was autoplaying.
-- Compiling filter lists, on first launch and when an update changes them: 17 s of
-  one core, a peak near 600 MB, about 230 MB held by malloc until the system runs
-  short. The peak is inside WebKit's compile, not ours: a hand-written encoder
-  halved `JSONEncoder`'s own 280 MB but left the app's peak where it was and the
-  leftover at 190 MB, so it isn't in. `malloc_zone_pressure_relief` made no clear
-  difference. The way out is compiling in a short-lived helper process.
+- Compiling filter lists, on first launch and when an update changes them, now
+  happens in a short-lived copy of the app, one per list. A real first launch
+  compiles the bundled lists and then the day's downloads; in it the app's peak
+  went from 644 to 165 MB, what it still holds a minute later from 345 to 50 MB,
+  and its own CPU from 17 s to 0.7 s. A helper peaks at 386 MB and gives it all
+  back by exiting. If one can't run, or takes over two minutes, the app compiles
+  that list itself as it used to. The 165 MB left is a launch transient, not traced.
+- Why a process: malloc kept the memory until the system ran short, and the peak
+  is inside WebKit's compile, not ours. A hand-written encoder halved
+  `JSONEncoder`'s own 280 MB but left the app's peak where it was and the leftover
+  at 190 MB, and `malloc_zone_pressure_relief` made no clear difference.
 
 Plus, where Kaizu gets its personality:
 - [x] Loading delight: a compass needle in the address pill swings while a page loads and settles on north when done **S**

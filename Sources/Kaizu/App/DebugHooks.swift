@@ -1145,6 +1145,56 @@ enum DebugHooks {
         }
     }
 
+    /// Meant for an empty rule list store, so the helper has to build them all.
+    private static func qaRuleLists(_ store: BrowserStore) {
+        var passed = 0, failed = 0
+        func check(_ label: String, _ condition: Bool) {
+            if condition { passed += 1 } else { failed += 1 }
+            FileHandle.standardError.write(Data("QA rulelists \(condition ? "ok" : "FAILED"): \(label)\n".utf8))
+        }
+        func loaded(_ tab: BrowserTab) async {
+            for _ in 0..<100 {
+                try? await Task.sleep(for: .milliseconds(100))
+                if tab.isLoaded, !tab.isLoading, tab.webView.url != nil { break }
+            }
+        }
+        func display(in tab: BrowserTab) async -> String {
+            let script = "const qaAd = document.body.appendChild(document.createElement('div')); qaAd.className = 'ADBox'; qaAd.textContent = 'ad'; getComputedStyle(qaAd).display"
+            return (try? await tab.webView.evaluateJavaScript("{" + script + "}")) as? String ?? "no answer"
+        }
+        Task {
+            let started = ContinuousClock.now
+            let blocker = store.contentBlocker
+            while blocker.state != .ready, started.duration(to: .now) < .seconds(120) {
+                try? await Task.sleep(for: .milliseconds(200))
+            }
+            FileHandle.standardError.write(Data("QA rulelists ready after \(started.duration(to: .now))\n".utf8))
+            check("blocking is ready", blocker.state == .ready)
+            let stored = await WKContentRuleListStore.default()?.availableIdentifiers() ?? []
+            for name in ContentBlocker.listNames {
+                check("\(name) is in the store", stored.filter { $0.hasPrefix("\(name)-") }.count == 1)
+            }
+
+            let site = URL(string: "https://example.com/")!
+            let tab = store.openTab(site)
+            store.select(tab)
+            await loaded(tab)
+            let hidden = await display(in: tab)
+            check("a generic ad rule hides an element (\(hidden))", hidden == "none")
+
+            blocker.togglePause(on: site, temporarily: true)
+            tab.webView.reload()
+            try? await Task.sleep(for: .seconds(1))
+            await loaded(tab)
+            let shown = await display(in: tab)
+            check("and doesn't with blocking paused (\(shown))", shown == "block")
+            blocker.togglePause(on: site, temporarily: true)
+
+            FileHandle.standardError.write(Data("QA rulelists done: \(passed) ok, \(failed) failed\n".utf8))
+            NSApp.terminate(nil)
+        }
+    }
+
     /// Opens KAIZU_SITES (comma separated) in tabs, optionally hibernates them
     /// (KAIZU_HIBERNATE), closes them, KAIZU_ROUNDS times. Waits KAIZU_SETTLE
     /// seconds after each step, so footprints can be read from outside.
@@ -1612,6 +1662,8 @@ enum DebugHooks {
             qaStress(store)
         case "memory":
             qaMemory(store)
+        case "rulelists":
+            qaRuleLists(store)
         case "audible":
             qaAudible(store)
         case "sites":

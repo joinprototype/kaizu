@@ -7,6 +7,9 @@ enum KaizuApp {
     static let delegate = AppDelegate()
 
     static func main() {
+        if let list = RuleListCompiler.requestedList {
+            RuleListCompiler.runAndExit(list: list)
+        }
         let app = NSApplication.shared
         app.setActivationPolicy(.regular)
         app.delegate = delegate

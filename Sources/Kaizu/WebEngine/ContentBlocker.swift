@@ -1,15 +1,13 @@
-import BrowserCore
-import CryptoKit
 import OSLog
 import WebKit
 
 /// Built-in ad, tracker and cookie-banner blocking, YouTube ad removal, and
 /// automatic rejection of cookie consent pop-ups (DuckDuckGo's autoconsent).
 ///
-/// Filter lists are converted to WebKit content rules, compiled once and
-/// cached by WebKit (keyed by list contents and converter version). Each tab
-/// gets its own user content controller so blocking can be paused per site
-/// without recompiling anything.
+/// Filter lists are converted to WebKit content rules, compiled once (see
+/// `RuleListCompiler`) and cached by WebKit. Each tab gets its own user
+/// content controller so blocking can be paused per site without recompiling
+/// anything.
 @MainActor @Observable
 final class ContentBlocker {
     enum State: Equatable {
@@ -237,7 +235,7 @@ final class ContentBlocker {
             log.error("Missing filter list \(name, privacy: .public)")
             return nil
         }
-        let identifier = "\(name)-v\(FilterListConverter.version)-\(Self.fingerprint(text))"
+        let identifier = RuleListCompiler.identifier(for: name, text: text)
         // Earlier versions of this list: removed once the new one is in,
         // and kept blocking if it can't be built.
         let previous = available.filter { $0.hasPrefix("\(name)-") && $0 != identifier }.sorted()
@@ -258,23 +256,19 @@ final class ContentBlocker {
             return await replacingPrevious(with: cached)
         }
 
-        let started = ContinuousClock.now
-        let output = await Task.detached(priority: .utility) {
-            let output = FilterListConverter.convert(text)
-            return (json: try? output.rules.encodedJSON(), count: output.rules.count, skipped: output.skipped)
-        }.value
-        guard let json = output.json else { return await fallingBack() }
-        do {
-            guard let list = try await store.compileContentRuleList(forIdentifier: identifier, encodedContentRuleList: json) else {
-                return await fallingBack()
-            }
-            log.info("Compiled \(name, privacy: .public): \(output.count) rules, \(output.skipped) skipped, \(started.duration(to: .now), privacy: .public)")
-            return await replacingPrevious(with: list)
-        } catch {
-            let reason = (error as NSError).userInfo[NSHelpAnchorErrorKey] as? String ?? error.localizedDescription
-            log.error("Couldn't compile \(name, privacy: .public): \(reason, privacy: .public)")
-            return await fallingBack()
+        var list: WKContentRuleList?
+        if await RuleListCompiler.compileInHelper(name) {
+            list = try? await store.contentRuleList(forIdentifier: identifier)
         }
+        if list == nil {
+            // Blocking matters more than the memory a compile here would keep.
+            log.error("Compiling \(name, privacy: .public) without the helper")
+            list = await RuleListCompiler.compile(name, text: text, into: store)
+        }
+        if let list {
+            return await replacingPrevious(with: list)
+        }
+        return await fallingBack()
     }
 
     private func runReadyHandlers() {
@@ -294,9 +288,5 @@ final class ContentBlocker {
               let source = try? String(contentsOf: url, encoding: .utf8)
         else { return nil }
         return WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: false)
-    }
-
-    private static func fingerprint(_ text: String) -> String {
-        SHA256.hash(data: Data(text.utf8)).prefix(6).map { String(format: "%02x", $0) }.joined()
     }
 }
