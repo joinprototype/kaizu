@@ -91,9 +91,16 @@ final class SiteNotifications: NSObject, WKScriptMessageHandlerWithReply {
             replyHandler(Self.state(answer), nil)
         case "request":
             if let answer { return replyHandler(Self.state(answer), nil) }
-            guard !tab.profile.isPrivate, !isAsking, let window = webView.window else {
-                return replyHandler(Self.state(nil), nil)
+            if tab.profile.isPrivate {
+                // As long as a person takes over the question, or a page
+                // could spot a private window by timing the answer.
+                Task {
+                    try? await Task.sleep(for: .seconds(Double.random(in: 1...3)))
+                    replyHandler(Self.state(nil), nil)
+                }
+                return
             }
+            guard !isAsking, let window = webView.window else { return replyHandler(Self.state(nil), nil) }
             ask(host: host, tab: tab, window: window) { replyHandler(Self.state($0), nil) }
         case "show":
             guard answer == true else { return replyHandler(false, nil) }

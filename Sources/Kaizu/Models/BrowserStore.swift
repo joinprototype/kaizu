@@ -235,15 +235,16 @@ final class BrowserStore {
     func setSelected(_ tab: BrowserTab?, in space: Space) {
         selectedTabIDs[space.id] = tab?.id
         guard let tab else { return }
-        tab.markNotificationsRead()
-        let panes = Set(space.panes(with: tab).map(\.id))
+        let shown = space.panes(with: tab)
+        shown.forEach { $0.markNotificationsRead() }
+        let panes = Set(shown.map(\.id))
         for other in app.stores where other !== self && other.selectedTabIDs.values.contains(where: panes.contains) {
             other.selectedTabIDs = other.selectedTabIDs.filter { !panes.contains($0.value) }
         }
     }
 
     /// The panes on screen.
-    private var shownTabs: [BrowserTab] {
+    var shownTabs: [BrowserTab] {
         selectedTab.map(activeSpace.panes(with:)) ?? []
     }
 

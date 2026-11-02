@@ -77,9 +77,6 @@ extension BrowserStore {
         let space = activeSpace
         withAnimation(Motion.glide) {
             space.removeFromSplit(tab.id)
-            if space.splitTabs.isEmpty {
-                space.splitLayout = nil
-            }
         }
         scheduleSave()
     }

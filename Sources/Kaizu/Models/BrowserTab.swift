@@ -451,7 +451,7 @@ final class BrowserTab: NSObject, Identifiable {
     /// Marks a notification on the tab until you look at it, unless you
     /// already are. When macOS wouldn't take it, the Dock icon asks instead.
     func noteNotification(deliveredByMacOS delivered: Bool) {
-        guard let app, !(NSApp.isActive && app.stores.contains { $0.selectedTab === self }) else { return }
+        guard let app, !(NSApp.isActive && app.store(showing: self) != nil) else { return }
         unreadNotifications += 1
         if !delivered {
             NSApp.requestUserAttention(.informationalRequest)
@@ -492,6 +492,7 @@ final class BrowserTab: NSObject, Identifiable {
     /// Drops the web view but keeps the tab around (used for pinned tabs):
     /// a fresh start at its pinned address.
     func unload() {
+        markNotificationsRead()
         teardown()
         savedState = nil
         if let pinnedURL { url = pinnedURL }
@@ -507,6 +508,7 @@ final class BrowserTab: NSObject, Identifiable {
         webView.uiDelegate = nil
         webView.removeFromSuperview()
         _webView = nil
+        isPopupPage = false
         contentController = nil
         mediaFrames = []
         thumbnail = nil
@@ -560,7 +562,9 @@ final class BrowserTab: NSObject, Identifiable {
 
     private func loadFavicon(from webView: WKWebView) async {
         guard let pageURL = webView.url, let host = pageURL.host() else { return }
-        let href = (try? await webView.evaluateJavaScript(FaviconStore.discoveryScript)) as? String
+        // Not in the page's world, where a script of ours counts as a click:
+        // a page hooking the DOM could spend it on asking for permissions.
+        let href = (try? await webView.evaluateJavaScript(FaviconStore.discoveryScript, contentWorld: .defaultClient)) as? String
         let candidates = [
             href.flatMap { $0.isEmpty ? nil : URL(string: $0, relativeTo: pageURL) },
             URL(string: "/favicon.ico", relativeTo: pageURL),

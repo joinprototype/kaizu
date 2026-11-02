@@ -49,19 +49,20 @@ extension AppModel {
     }
 
     /// Sites you let notify you have no push service behind them, so one tab
-    /// of each has to be running: the one best placed to, which hibernation
-    /// and archiving leave alone.
+    /// of each has to be running, per profile since each has its own login:
+    /// the one best placed to, which hibernation and archiving leave alone.
     var notifyingTabs: Set<BrowserTab> {
         func standing(_ tab: BrowserTab) -> Int {
-            if isOnScreen(tab) { return 4 }
             guard tab.isLoaded else { return tab.pinnedURL == nil ? 0 : 1 }
-            return tab.needsRebuildToNotify ? 2 : 3
+            if tab.needsRebuildToNotify { return 2 }
+            return isOnScreen(tab) ? 4 : 3
         }
         var chosen: [String: BrowserTab] = [:]
         for tab in spaces.flatMap(\.allTabs) {
             guard let host = tab.notifyingHost else { continue }
-            if chosen[host].map({ standing($0) < standing(tab) }) ?? true {
-                chosen[host] = tab
+            let site = "\(tab.profile.id) \(host)"
+            if chosen[site].map({ standing($0) < standing(tab) }) ?? true {
+                chosen[site] = tab
             }
         }
         return Set(chosen.values)
@@ -76,7 +77,7 @@ extension AppModel {
     }
 
     private func isOnScreen(_ tab: BrowserTab) -> Bool {
-        stores.contains { $0.selectedTab === tab || $0.peek === tab || $0.activeSpace.splitTabs.contains(tab) }
+        stores.contains { $0.isShowing(tab) }
     }
 
     // MARK: - Saved tab state

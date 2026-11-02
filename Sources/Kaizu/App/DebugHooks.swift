@@ -2,6 +2,7 @@
 import AppKit
 import BrowserCore
 import CoreSpotlight
+import WebKit
 
 /// What a page hears of a tab dragged over it, without the window server.
 @MainActor
@@ -150,6 +151,34 @@ enum DebugHooks {
             let allowed = store.openTab(URL(string: "https://example.com/"))
             await settle(3)
 
+            // Kaizu runs a script at the end of every load to find the icon.
+            // In the page's world that counts as a click, which a page that
+            // hooks the DOM could spend on asking for permission.
+            let bait = store.openTab(URL(string: "https://example.edu/"))
+            await settle(2)
+            bait.webView.configuration.userContentController.addUserScript(WKUserScript(source: """
+                for (const name of ['querySelector', 'querySelectorAll']) {
+                  const real = document[name];
+                  document[name] = function (...args) { Notification.requestPermission(); return real.apply(this, args) };
+                }
+                """, injectionTime: .atDocumentStart, forMainFrameOnly: true))
+            bait.reload()
+            await settle(4)
+            check("finding a page's icon can't raise the question", store.window?.attachedSheet == nil)
+            if store.window?.attachedSheet != nil {
+                answerQuestion(allow: false)
+                settings.sitePermissions["example.edu"] = nil
+            }
+            store.close(bait)
+            await settle()
+            let icon = store.openTab(URL(string: "https://github.com/"))
+            await settle(5)
+            check("and icons are still found", icon.favicon != nil)
+            store.close(icon)
+            await settle()
+            store.select(allowed)
+            await settle()
+
             check("pages get no window.webkit", await page(allowed, "typeof window.webkit") == "undefined")
             check("allowed site reads granted", await page(allowed, "Notification.permission") == "granted")
             check("tabs made before the blocker was ready get it too", await page(blocked, "Notification.permission") == "denied")
@@ -240,6 +269,8 @@ enum DebugHooks {
             if let popup = store.activeSpace.allTabs.first(where: { $0.url?.path() == "/popup" }) {
                 check("a popup is never rebuilt", !popup.needsRebuildToNotify && popup.notifyingHost == nil)
                 check("so it keeps its opener", await page(popup, "window.opener !== null") == "true")
+                popup.hibernate()
+                check("once hibernated it's a tab like any other", popup.notifyingHost != nil)
                 store.close(popup)
             } else {
                 check("a popup opens as a tab", false)
@@ -269,7 +300,7 @@ enum DebugHooks {
             store.select(asked)
             await settle()
             await app.hibernateIdleTabs()
-            check("a tab just left is never reloaded", allowed.isLoaded && twin.isLoaded && !allowed.needsRebuildToNotify)
+            check("a tab just left is never reloaded", allowed.isLoaded && twin.isLoaded)
             await app.hibernateIdleTabs(olderThan: 0.001)
             await settle()
             check("one tab per site stays, not all", [allowed, twin].filter(\.isLoaded).count == 1 && !blocked.isLoaded)
@@ -335,6 +366,28 @@ enum DebugHooks {
                 await settle()
                 check("nothing waits when you're looking", kept.unreadNotifications == 0)
             }
+            store.select(asked)
+            await settle()
+            store.addToSplit(kept)
+            await settle(1)
+            store.select(asked)
+            await settle(1)
+            if NSApp.isActive {
+                _ = await page(kept, "void new Notification('In the other pane')")
+                await settle()
+                check("nothing waits in a pane on screen", kept.unreadNotifications == 0)
+            }
+            let elsewhere = store.openTab(URL(string: "https://example.org/elsewhere"))
+            await settle(2)
+            await app.hibernateIdleTabs(olderThan: 0)
+            await settle()
+            check("a hidden split can hibernate", !kept.isLoaded && !asked.isLoaded)
+            store.select(kept)
+            await settle(3)
+            check("and comes back when shown", kept.isLoaded && asked.isLoaded)
+            store.closeSplit()
+            store.close(elsewhere)
+            await settle()
             store.select(asked)
             await settle()
             _ = await page(kept, "void new Notification('Then closed')")

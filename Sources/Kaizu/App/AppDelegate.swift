@@ -33,8 +33,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {
-        for store in app.stores {
-            store.selectedTab?.markNotificationsRead()
+        for tab in app.stores.flatMap(\.shownTabs) {
+            tab.markNotificationsRead()
         }
     }
 

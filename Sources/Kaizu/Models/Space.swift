@@ -69,8 +69,12 @@ final class Space: Identifiable {
         splitLayout?.keeping(Set(panes.map(\.id))) ?? .pane(panes[0].id)
     }
 
+    /// A split of one is no split.
     func removeFromSplit(_ id: UUID) {
         splitLayout = splitLayout?.removing(id)
+        if splitTabs.isEmpty {
+            splitLayout = nil
+        }
     }
 
     func tab(id: UUID) -> BrowserTab? {

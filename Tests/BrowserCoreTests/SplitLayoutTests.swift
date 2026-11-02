@@ -28,7 +28,7 @@ import Testing
 
     /// One pane across the top, two below.
     private var bento: SplitNode {
-        SplitNode.pane(a).placing(b, by: a, on: .bottom).placing(c, by: b, on: .right)
+        SplitNode.pane(a).placing(b, at: .pane(a, .bottom)).placing(c, at: .pane(b, .right))
     }
 
     // MARK: Where a drop lands
@@ -53,10 +53,10 @@ import Testing
     // MARK: Building a layout
 
     @Test func aLonePageSplitsAnyWay() {
-        #expect(shape(SplitNode.pane(a).placing(b, by: a, on: .left)) == "[b | a]")
-        #expect(shape(SplitNode.pane(a).placing(b, by: a, on: .right)) == "[a | b]")
-        #expect(shape(SplitNode.pane(a).placing(b, by: a, on: .top)) == "[b / a]")
-        #expect(shape(SplitNode.pane(a).placing(b, by: a, on: .bottom)) == "[a / b]")
+        #expect(shape(SplitNode.pane(a).placing(b, at: .pane(a, .left))) == "[b | a]")
+        #expect(shape(SplitNode.pane(a).placing(b, at: .pane(a, .right))) == "[a | b]")
+        #expect(shape(SplitNode.pane(a).placing(b, at: .pane(a, .top))) == "[b / a]")
+        #expect(shape(SplitNode.pane(a).placing(b, at: .pane(a, .bottom))) == "[a / b]")
     }
 
     @Test func aPaneOnTopWithTwoBelow() {
@@ -65,32 +65,32 @@ import Testing
     }
 
     @Test func twoColumnsOfTwo() {
-        let grid = SplitNode.row([a, b]).placing(c, by: a, on: .bottom).placing(d, by: b, on: .bottom)
+        let grid = SplitNode.row([a, b]).placing(c, at: .pane(a, .bottom)).placing(d, at: .pane(b, .bottom))
         #expect(shape(grid) == "[[a / c] | [b / d]]")
     }
 
     /// A drop halves its pane and leaves the rest as they were.
     @Test func aDropTakesHalfOfItsPane() {
-        let row = SplitNode.row([a, b]).placing(c, by: b, on: .right)
+        let row = SplitNode.row([a, b]).placing(c, at: .pane(b, .right))
         #expect(shape(row) == "[a | b | c]")
         #expect(shares(row) == [0.5, 0.25, 0.25])
-        #expect(shares(row.placing(d, by: a, on: .left)) == [0.25, 0.25, 0.25, 0.25])
+        #expect(shares(row.placing(d, at: .pane(a, .left))) == [0.25, 0.25, 0.25, 0.25])
     }
 
     @Test func goingTheOtherWayNestsJustThatPane() {
-        let nested = SplitNode.row([a, b]).placing(c, by: b, on: .bottom)
+        let nested = SplitNode.row([a, b]).placing(c, at: .pane(b, .bottom))
         #expect(shape(nested) == "[a | [b / c]]")
         #expect(shares(nested) == [0.5, 0.5])
     }
 
     @Test func aPaneInTheLayoutMoves() {
-        #expect(shape(bento.placing(c, by: a, on: .right)) == "[[a | c] / b]")
-        #expect(shape(bento.placing(a, by: c, on: .bottom)) == "[b | [c / a]]")
-        #expect(shape(SplitNode.row([a, b]).placing(b, by: a, on: .top)) == "[b / a]")
+        #expect(shape(bento.placing(c, at: .pane(a, .right))) == "[[a | c] / b]")
+        #expect(shape(bento.placing(a, at: .pane(c, .bottom))) == "[b | [c / a]]")
+        #expect(shape(SplitNode.row([a, b]).placing(b, at: .pane(a, .top))) == "[b / a]")
     }
 
     @Test func aTargetThatIsntThereChangesNothing() {
-        #expect(SplitNode.row([a, b]).placing(c, by: d, on: .left) == SplitNode.row([a, b]))
+        #expect(SplitNode.row([a, b]).placing(c, at: .pane(d, .left)) == SplitNode.row([a, b]))
     }
 
     @Test func appendingJoinsTheTopGroup() {
@@ -103,39 +103,33 @@ import Testing
     // MARK: Along the whole split
 
     @Test func aRowGainsARowAcrossIt() {
-        let below = SplitNode.row([a, b]).placing(c, along: .bottom)
+        let below = SplitNode.row([a, b]).placing(c, at: .split(.bottom))
         #expect(shape(below) == "[[a | b] / c]")
         #expect(shares(below) == [0.5, 0.5])
-        #expect(shape(SplitNode.row([a, b]).placing(c, along: .top)) == "[c / [a | b]]")
+        #expect(shape(SplitNode.row([a, b]).placing(c, at: .split(.top))) == "[c / [a | b]]")
     }
 
     @Test func aStackGainsAColumnBesideIt() {
-        let stack = SplitNode.pane(a).placing(b, by: a, on: .bottom)
-        #expect(shape(stack.placing(c, along: .left)) == "[c | [a / b]]")
-        #expect(shape(stack.placing(c, along: .right)) == "[[a / b] | c]")
+        let stack = SplitNode.pane(a).placing(b, at: .pane(a, .bottom))
+        #expect(shape(stack.placing(c, at: .split(.left))) == "[c | [a / b]]")
+        #expect(shape(stack.placing(c, at: .split(.right))) == "[[a / b] | c]")
     }
 
     /// Along the way it already runs: the same group, not a group in a group.
     @Test func goingTheGroupsWayJoinsIt() {
-        let stack = SplitNode.pane(a).placing(b, by: a, on: .bottom).placing(c, along: .bottom)
+        let stack = SplitNode.pane(a).placing(b, at: .pane(a, .bottom)).placing(c, at: .split(.bottom))
         #expect(shape(stack) == "[a / b / c]")
         #expect(shares(stack) == [0.25, 0.25, 0.5])
     }
 
     @Test func aPaneInTheLayoutMovesToTheEdge() {
-        #expect(shape(bento.placing(a, along: .bottom)) == "[[b | c] / a]")
-        #expect(shape(bento.placing(c, along: .right)) == "[[a / b] | c]")
-        #expect(shape(SplitNode.row([a, b]).placing(a, along: .top)) == "[a / b]")
-    }
-
-    @Test func aPlaceSaysWhichWayItLands() {
-        let row = SplitNode.row([a, b])
-        #expect(row.placing(c, at: .pane(b, .bottom)) == row.placing(c, by: b, on: .bottom))
-        #expect(row.placing(c, at: .split(.bottom)) == row.placing(c, along: .bottom))
+        #expect(shape(bento.placing(a, at: .split(.bottom))) == "[[b | c] / a]")
+        #expect(shape(bento.placing(c, at: .split(.right))) == "[[a / b] | c]")
+        #expect(shape(SplitNode.row([a, b]).placing(a, at: .split(.top))) == "[a / b]")
     }
 
     @Test func aRowAcrossSpansEveryPane() {
-        let geometry = SplitNode.row([a, b]).placing(c, along: .bottom).geometry(in: bounds, gap: 8)
+        let geometry = SplitNode.row([a, b]).placing(c, at: .split(.bottom)).geometry(in: bounds, gap: 8)
         #expect(isClose(geometry.panes[c], CGRect(x: 0, y: 408, width: 1008, height: 400)))
     }
 
@@ -200,7 +194,7 @@ import Testing
 
     /// Lifted up a level, a row inside a row is just a longer row.
     @Test func aPartRunningItsGroupsWayJoinsIt() {
-        let wide = SplitNode.row([a, d]).placing(b, by: a, on: .bottom).placing(c, by: b, on: .right)
+        let wide = SplitNode.row([a, d]).placing(b, at: .pane(a, .bottom)).placing(c, at: .pane(b, .right))
         #expect(shape(wide) == "[[a / [b | c]] | d]")
         let merged = wide.removing(a)
         #expect(shape(merged) == "[b | c | d]")
@@ -262,16 +256,16 @@ import Testing
     @Test func noPaneDragsDownToNothing() throws {
         let divider = try #require(SplitNode.row([a, b]).geometry(in: bounds, gap: 8).dividers.first)
         let row = SplitNode.row([a, b])
-        #expect(shares(row.resized(divider, by: 5000)) == [0.85, 0.15000000000000002])
-        #expect(shares(row.resized(divider, by: -5000)) == [0.15, 0.85])
+        #expect(abs(shares(row.resized(divider, by: 5000))[1] - 0.15) < 1e-9)
+        #expect(abs(shares(row.resized(divider, by: -5000))[0] - 0.15) < 1e-9)
     }
 
-    @Test func halvedPanesStaySmallerThanTheMinimumAllows() throws {
+    @Test func halvedPanesKeepADividerThatMoves() throws {
         let row = SplitNode.row([a, b, c, d], shares: [0.7, 0.1, 0.1, 0.1])
         let divider = try #require(row.geometry(in: bounds, gap: 8).dividers.last)
         let after = shares(row.resized(divider, by: -500))
-        #expect(abs(after[2] - 0.1) < 1e-9)
-        #expect(abs(after[3] - 0.1) < 1e-9)
+        #expect(abs(after[2] - 0.05) < 1e-9)
+        #expect(abs(after[3] - 0.15) < 1e-9)
     }
 
     @Test func evenedActsOnItsOwnGroup() throws {
@@ -337,6 +331,10 @@ import Testing
         let unknown = #"{ "direction": "diagonal", "children": [{ "spiral": 3 }] }"#
         let decoded = try JSONCoding.decoder.decode(SplitNode.self, from: Data(unknown.utf8))
         #expect(SplitNode.restored(layout: decoded, panes: [a, b], widths: []) == .row([a, b]))
+        for value in ["[]", "7", #""nope""#, "null"] {
+            let odd = try JSONCoding.decoder.decode(SplitNode.self, from: Data(value.utf8))
+            #expect(SplitNode.restored(layout: odd, panes: [a, b], widths: []) == .row([a, b]))
+        }
         let garbled = #"{ "children": "nope" }"#
         let other = try JSONCoding.decoder.decode(SplitNode.self, from: Data(garbled.utf8))
         #expect(SplitNode.restored(layout: other, panes: [a, b], widths: []) == .row([a, b]))

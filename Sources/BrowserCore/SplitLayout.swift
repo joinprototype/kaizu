@@ -42,7 +42,7 @@ public enum SplitPlace: Equatable, Sendable {
 /// How a split's panes sit: a pane, or a group of these side by side or
 /// stacked. Any pane can split again the other way, so panes can make any
 /// bento: one across the top with two below is a stack of a pane and a row.
-public indirect enum SplitNode: Equatable, Sendable {
+public enum SplitNode: Equatable, Sendable {
     case pane(UUID)
     case group(SplitDirection, [SplitChild])
 }
@@ -78,23 +78,17 @@ extension SplitNode {
         }
     }
 
+    /// With `id` taking half of a pane's place or of the whole layout. If it's
+    /// already here it moves there, and what it leaves closes up.
     public func placing(_ id: UUID, at place: SplitPlace) -> SplitNode {
+        let rest = removing(id) ?? self
         switch place {
-        case .pane(let target, let edge): placing(id, by: target, on: edge)
-        case .split(let edge): placing(id, along: edge)
+        case .pane(let target, let edge):
+            return rest.splitting(target, with: id, on: edge)
+        case .split(let edge):
+            let halves = [rest, .pane(id)].map { SplitChild(node: $0, share: 0.5) }
+            return Self.tidied(edge.direction, edge.isBefore ? halves.reversed() : halves) ?? self
         }
-    }
-
-    /// With `id` taking half of `target`'s place, on `edge`. If it's already
-    /// here it moves there, and what it leaves closes up.
-    func placing(_ id: UUID, by target: UUID, on edge: SplitEdge) -> SplitNode {
-        (removing(id) ?? self).splitting(target, with: id, on: edge)
-    }
-
-    /// With `id` taking half of the whole layout, along `edge`.
-    func placing(_ id: UUID, along edge: SplitEdge) -> SplitNode {
-        let halves = [removing(id) ?? self, .pane(id)].map { SplitChild(node: $0, share: 0.5) }
-        return Self.tidied(edge.direction, edge.isBefore ? halves.reversed() : halves) ?? self
     }
 
     private func splitting(_ target: UUID, with id: UUID, on edge: SplitEdge) -> SplitNode {
@@ -240,7 +234,8 @@ extension SplitNode {
             let index = divider.index
             guard index + 1 < children.count, divider.length > 0 else { return }
             let pair = children[index].share + children[index + 1].share
-            let least = min(Self.minimumShare, pair / 2)
+            // Halved panes can start below the minimum: their divider still moves.
+            let least = min(Self.minimumShare, pair / 4)
             let first = min(max(children[index].share + distance / divider.length, least), pair - least)
             children[index].share = first
             children[index + 1].share = pair - first
@@ -291,10 +286,13 @@ extension SplitNode: Codable {
         case pane, direction, children
     }
 
-    /// Never fails on what's inside, so a layout from a later build can't lose
-    /// the whole session: `restored` falls back on the panes.
+    /// Never fails, so a layout from a later build can't lose the whole
+    /// session: `restored` falls back on the panes.
     public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
+        guard let container = try? decoder.container(keyedBy: CodingKeys.self) else {
+            self = .group(.sideBySide, [])
+            return
+        }
         if let pane = try? container.decode(UUID.self, forKey: .pane) {
             self = .pane(pane)
         } else {

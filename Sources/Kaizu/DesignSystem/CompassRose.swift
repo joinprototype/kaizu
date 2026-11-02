@@ -148,7 +148,7 @@ struct RhumbWeb: View {
 
     /// Drawn in steps and stretched to fit: dragging the sidebar's edge goes
     /// through every size, and these lines are too faint to show the stretch.
-    private static let step: CGFloat = 64
+    private static let step: CGFloat = 32
 
     var body: some View {
         let plate = CGSize(
