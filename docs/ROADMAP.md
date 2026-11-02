@@ -41,7 +41,7 @@ Pulled forward from the phases below, in order:
    - [x] cookie-banner hiding (EasyList Cookie List)
    - [x] Global Privacy Control (macOS 27+), HTTPS-first navigation
    - [x] cookie pop-ups auto-rejected v1 (DuckDuckGo's autoconsent standalone, MPL-2.0; page world, all frames)
-   - [ ] autoconsent v2: isolated content world + native rule filtering (DDG-style), smaller per-frame cost. Measure first: the 600 KB script is parsed in every frame; moving to an isolated world needs a native bridge for the rules that `eval` page state (DDG evaluates those in the page world), and must be checked on real CMPs before it replaces v1
+   - [ ] autoconsent v2: isolated content world + native rule filtering (DDG-style), smaller per-frame cost. Measured Nov 2: on ten heavy sites the 600 KB script costs about 100 MB of 2.4 GB, inside the noise between runs, so memory is no reason to do this. Moving to an isolated world needs a native bridge for the rules that `eval` page state (DDG evaluates those in the page world), and must be checked on real CMPs before it replaces v1
    - [x] filter list auto-updates (daily; newer of downloaded vs bundled wins)
    - [x] per-site "pause blocking" (shield in address pill, per-tab controllers, no recompiles)
    - [x] broken-site reporting (site popover, Help menu, the toast after pausing): a Mail draft with the site's name, never the page unless asked; records whether turning blocking off fixed it
@@ -167,6 +167,22 @@ On a busy machine (load 10 or more) a space switch drops 14 to 24 frames in
 bad moments and 0 to 3 in calm ones, in the builds from before and after the
 chart room alike. Compare builds side by side before blaming a change.
 
+Memory, measured Nov 2 with `KAIZU_DEBUG=memory` on an optimized build (phys
+footprint, what Activity Monitor shows; RSS counts 570 MB of shared system code):
+- Kaizu itself: about 42 MB at launch, no CPU and no wakeups when idle, 80 MB with
+  ten tabs, 65 MB after closing them. Two rounds of opening and closing end level,
+  and no tab or web view outlives closing. A warm launch takes about 250 ms.
+- Ten heavy sites: 2.4 GB, 90% of it WebKit's page processes (the biggest about
+  500 MB each). 3.3% CPU together when left idle. Blocking saves about 170 MB.
+- Hibernating them leaves 183 MB. Before Nov 2 it left 1.3 GB: tabs counted as
+  playing if a silent video was autoplaying.
+- Compiling filter lists, on first launch and when an update changes them: 17 s of
+  one core, a peak near 600 MB, about 230 MB held by malloc until the system runs
+  short. The peak is inside WebKit's compile, not ours: a hand-written encoder
+  halved `JSONEncoder`'s own 280 MB but left the app's peak where it was and the
+  leftover at 190 MB, so it isn't in. `malloc_zone_pressure_relief` made no clear
+  difference. The way out is compiling in a short-lived helper process.
+
 Plus, where Kaizu gets its personality:
 - [x] Loading delight: a compass needle in the address pill swings while a page loads and settles on north when done **S**
 - [x] A chart-paper empty state: a sea chart's rhumb-line web, drawn outward once, in the chart-maker's three inks **S**
@@ -195,7 +211,7 @@ What makes someone keep it as their default browser.
 - [x] Private window (⇧⌘P): a full window with tabs, split and Reader on its own in-memory profile; no history/favicon cache/session, no extensions, gone when it closes **M**
 - [x] Multiple full browser windows (⌘N, Move to New Window): windows on a space share its sidebar and each shows its own tab; a tab's page is in one window at a time, so picking it elsewhere brings that window forward; all reopen on launch **M**
 - [x] Restore back/forward history per tab (WebKit interaction state, saved on quit and every 5 min) **S**
-- [x] Tab hibernation: background tabs idle 30 min (not playing media / using camera) and all of them on memory pressure **S**
+- [x] Tab hibernation: background tabs idle 30 min (not playing sound / using camera) and all of them on memory pressure **S**
 - [x] Camera and microphone permissions remembered per site (forget in Settings → Privacy) **S**
 - [x] Per-site zoom, remembered like Safari (⌘0 forgets it) **S**
 - [x] Reader (⇧⌘R): Mozilla Readability in an isolated world, set in a serif on vellum, scripts off **M**

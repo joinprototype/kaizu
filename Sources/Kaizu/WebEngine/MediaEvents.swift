@@ -1,8 +1,8 @@
 import WebKit
 
-/// Tells a tab when any audio or video in it (iframes included) plays or
-/// stops, so the sidebar's speaker and mini player stay current without
-/// polling every tab, and mutes media for the tab's mute button (only
+/// Tells a tab when any audio or video in it (iframes included) plays, stops
+/// or changes volume, so the sidebar's speaker and mini player stay current
+/// without polling every tab, and mutes media for the tab's mute button (only
 /// elements it muted itself are unmuted again). Runs in an isolated world,
 /// invisible to pages. The script is one of the content blocker's standard
 /// scripts; each tab adds its own message handler.
@@ -18,7 +18,7 @@ final class MediaEvents: NSObject, WKScriptMessageHandler {
             if (muted && !media.muted) { media.muted = true; ours.add(media); }
           };
           const post = () => window.webkit?.messageHandlers?.\(name)?.postMessage(0);
-          for (const type of ['play', 'pause', 'ended', 'emptied']) {
+          for (const type of ['play', 'pause', 'ended', 'emptied', 'volumechange']) {
             document.addEventListener(type, (event) => {
               if (type === 'play') mute(event.target);
               post();

@@ -22,6 +22,7 @@ final class BrowserTab: NSObject, Identifiable {
     var canGoForward = false
     /// Last captured picture of the page, for the ⌃Tab switcher.
     var thumbnail: NSImage?
+    /// Making sound, or would be if you hadn't muted it: see `isPlayingSound`.
     var isPlayingMedia = false
     /// Muted from the sidebar's speaker; WebKit has no public mute, so
     /// `MediaEvents` mutes the page's media elements, frame by frame.
@@ -404,8 +405,15 @@ final class BrowserTab: NSObject, Identifiable {
 
     func refreshMediaState() async {
         guard let _webView else { return }
-        let playing = await _webView.requestMediaPlaybackState() == .playing
+        let playing = await isPlayingSound(in: _webView)
         if playing != isPlayingMedia { isPlayingMedia = playing }
+    }
+
+    /// Sound, or what would be if you hadn't muted the tab. WebKit calls a
+    /// silent video playing too, and pages autoplay those: NYT, YouTube and
+    /// Amazon's home pages kept half of ten tabs' memory from hibernating.
+    private func isPlayingSound(in webView: WKWebView) async -> Bool {
+        await webView.requestMediaPlaybackState() == .playing && (isMuted || webView.isAudible)
     }
 
     func pauseMedia() {
@@ -482,13 +490,13 @@ final class BrowserTab: NSObject, Identifiable {
         activate()
     }
 
-    /// Whether the page is playing media or using the camera/microphone,
+    /// Whether the page is playing sound or using the camera/microphone,
     /// so it must not be hibernated.
     var isBusy: Bool {
         get async {
             guard let _webView else { return false }
             if _webView.cameraCaptureState != .none || _webView.microphoneCaptureState != .none { return true }
-            return await _webView.requestMediaPlaybackState() == .playing
+            return await isPlayingSound(in: _webView)
         }
     }
 
@@ -777,5 +785,14 @@ extension BrowserTab: WKNavigationDelegate {
     /// A page's host for the log (hashed there), never a private window's.
     private func logHost(_ url: URL?) -> String {
         profile.isPrivate ? "private window" : url?.host() ?? "no host"
+    }
+}
+
+private extension WKWebView {
+    /// WebKit's own answer to whether the page can be heard. It has no public
+    /// name, so without it a tab goes by the playback state alone.
+    var isAudible: Bool {
+        let key = "_isPlayingAudio"
+        return responds(to: NSSelectorFromString(key)) ? value(forKey: key) as? Bool ?? true : true
     }
 }
