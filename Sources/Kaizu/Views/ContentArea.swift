@@ -1,9 +1,10 @@
+import BrowserCore
 import SwiftUI
 import WebKit
 
 /// The selected tab's page as a rounded card, or its split, plus the peek
 /// and find overlays. A lone page is a split of one, so opening or closing
-/// a split keeps the page where it is and only its width moves.
+/// a split keeps the page where it is and only its size moves.
 struct ContentArea: View {
     @Environment(BrowserStore.self) private var store
     @Environment(\.colorScheme) private var scheme
@@ -50,56 +51,27 @@ struct PageView: View {
     let accent: Color
     /// Set where a sidebar tab dropped on the page should split with it.
     var splitDrop: SplitDrop?
-    /// The half of the page a sidebar tab is being dragged over.
-    @State private var dropEdge: HorizontalEdge?
 
     var body: some View {
         ZStack(alignment: .top) {
             // A closed tab fading out with its card keeps its place, empty,
             // rather than being given a new page.
             if !tab.isDiscarded {
-                WebContainer(webView: tab.webView, tabDrop: splitDrop.map { drop in
-                    WebContainerView.TabDrop(accepts: drop.accepts, perform: drop.perform) { edge in
-                        withAnimation(Motion.snap) { dropEdge = edge }
-                    }
-                })
+                WebContainer(webView: tab.webView, tabDrop: splitDrop)
             }
             LoadingBar(isLoading: tab.isLoading, progress: tab.progress, color: accent)
                 .id(tab.id)
         }
-        .overlay {
-            if let dropEdge {
-                SplitDropPreview(edge: dropEdge, accent: accent)
-            }
-        }
     }
 }
 
-/// Lets a page take a tab dragged from the sidebar: dropped on one half,
-/// it opens in split view on that side.
+/// Lets a page take a tab dragged from the sidebar: dropped on one side, it
+/// opens in split view there.
 struct SplitDrop {
     var accepts: (UUID) -> Bool
-    var perform: (UUID, HorizontalEdge) -> Void
-}
-
-/// The half of the page a dragged tab will take.
-private struct SplitDropPreview: View {
-    let edge: HorizontalEdge
-    let accent: Color
-
-    var body: some View {
-        GeometryReader { geometry in
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(accent.opacity(0.10))
-                .strokeBorder(accent.opacity(0.55), lineWidth: 1.5)
-                .frame(width: geometry.size.width / 2)
-                .frame(maxWidth: .infinity, alignment: edge == .leading ? .leading : .trailing)
-                .animation(Motion.snap, value: edge)
-        }
-        .padding(6)
-        .allowsHitTesting(false)
-        .transition(.opacity)
-    }
+    var perform: (UUID, SplitEdge) -> Void
+    /// Where the tab would land; nil once it leaves or drops.
+    var hover: ((tab: UUID, edge: SplitEdge)?) -> Void
 }
 
 extension View {
@@ -115,7 +87,7 @@ extension View {
 /// so each page keeps its state while in the background.
 struct WebContainer: NSViewRepresentable {
     let webView: WKWebView
-    var tabDrop: WebContainerView.TabDrop?
+    var tabDrop: SplitDrop?
 
     func makeNSView(context: Context) -> WebContainerView {
         let view = WebContainerView()
@@ -162,20 +134,18 @@ final class WebContainerView: NSView {
 
     // MARK: - Tabs dropped on the page
 
-    struct TabDrop {
-        var accepts: (UUID) -> Bool
-        var perform: (UUID, HorizontalEdge) -> Void
-        /// The half of the page the tab is over; nil once it leaves or drops.
-        var hover: (HorizontalEdge?) -> Void
-    }
-
     /// Set where a dropped sidebar tab should split the page.
-    var tabDrop: TabDrop? {
+    var tabDrop: SplitDrop? {
         get { dropCatcher.tabDrop }
         set { dropCatcher.tabDrop = newValue }
     }
 
     private let dropCatcher = TabDropCatcher()
+
+    #if DEBUG
+    /// What takes drags here, for QA to hand one.
+    var dropTarget: NSView { dropCatcher }
+    #endif
 
     /// The page it was last told to show. Told again, it does nothing: on
     /// its way out it hears once more, after another window has taken the page.
@@ -201,9 +171,9 @@ final class WebContainerView: NSView {
 /// windows) it still takes tab drags, and refuses them, so the page never
 /// receives one.
 private final class TabDropCatcher: NSView {
-    var tabDrop: WebContainerView.TabDrop?
+    var tabDrop: SplitDrop?
     private var draggedTab: UUID?
-    private var dropEdge: HorizontalEdge?
+    private var dropEdge: SplitEdge?
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -224,7 +194,8 @@ private final class TabDropCatcher: NSView {
 
     override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
         guard draggedTab != nil else { return [] }
-        setDropEdge(convert(sender.draggingLocation, from: nil).x < bounds.midX ? .leading : .trailing)
+        let point = convert(sender.draggingLocation, from: nil)
+        setDropEdge(SplitEdge(x: point.x / bounds.width, y: 1 - point.y / bounds.height))
         return .move
     }
 
@@ -244,10 +215,10 @@ private final class TabDropCatcher: NSView {
         draggedTab = nil
     }
 
-    private func setDropEdge(_ edge: HorizontalEdge?) {
+    private func setDropEdge(_ edge: SplitEdge?) {
         guard edge != dropEdge else { return }
         dropEdge = edge
-        tabDrop?.hover(edge)
+        tabDrop?.hover(edge.flatMap { edge in draggedTab.map { ($0, edge) } })
     }
 }
 

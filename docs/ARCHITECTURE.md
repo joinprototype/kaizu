@@ -93,6 +93,20 @@ WindowModel (one per window; today's `BrowserStore`)
   `BrowserTab`.
 - A `WKWebView` can only be in one view hierarchy, so a tab is shown in at most
   one window/pane at a time; selecting it elsewhere moves focus to it.
+- **A split is a tree of panes.** `Space.splitLayout` is a `SplitNode`: a pane,
+  or a row or column of nodes with shares, so any pane can split again the other
+  way. Arc 1.171 saves less (flat `childrenIds`, one `layoutOrientation` and one
+  `itemWidthFactors` per split); Kaizu goes further so one pane can sit above
+  two. A drop takes half the pane it lands on, and its preview shows that room.
+  `BrowserCore/SplitLayout.swift` holds what can be tested without a window: tree
+  edits, frames, dividers, the session form. `SplitContent` only draws them: all
+  panes are siblings keyed by tab, so changing the layout moves pages and never
+  rebuilds them.
+  Sessions stay v2. A row saves as it always did (`split`, `splitWidths`); anything
+  else adds `splitLayout` beside the flat `split` list. Older builds skip that key
+  and show the same panes side by side, and their next save drops the shape, never
+  a tab. A tree that disagrees with `split`, or comes from a later build, gives way
+  to the list, so it can't lose the session.
 - Windows on the same space list the same sidebar and each selects its own tab;
   no two windows keep the same tab selected. This is Arc's model, kept on
   purpose: Arc tried separate Today tabs per window and went back in 1.5.

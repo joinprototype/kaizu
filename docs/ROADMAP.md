@@ -210,7 +210,8 @@ What makes someone keep it as their default browser.
 - [x] Today tabs auto-archive + searchable Archive (12 h fixed; setting later) **M**
 - [x] Split view (2–4 panes; context menu "Open in Split View", click to focus, saved per space) **L**
 - [x] Split view: resizable dividers (double-click to even out), widths remembered across launches **S**
-- [x] Split view: drag a sidebar tab onto a half of the page to split there **M**
+- [x] Split view: drag a sidebar tab onto a side of the page to split there **M**
+- [x] Split view: bento layouts: a pane splits again the other way, so rows and columns mix (one pane above two, a 2×2 grid), up to 4 panes **L**
 - [x] Peek: links from favorites/pinned tabs to other sites open in a preview card; Esc/⌘W closes, "Open as Tab" keeps it without reloading **M**
 - [x] Little window (⌥⌘N, and for links from other apps) **M**
 - [x] ⌃Tab most-recent switcher with page thumbnails (⌥⌘↑/↓ keep sidebar order) **M**

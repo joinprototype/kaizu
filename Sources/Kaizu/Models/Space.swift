@@ -18,14 +18,10 @@ final class Space: Identifiable {
     var hue: Double
     var pinned: [SidebarItem] = []
     var today: [BrowserTab] = []
-    /// Tabs shown side by side (2–4); see BrowserStore+Split.
-    var split: [UUID] = [] {
-        didSet { if split != oldValue { splitWidths = [] } }
-    }
-    /// Each split pane's share of the width, set by dragging the dividers;
-    /// reset whenever the panes change. Ignored (equal shares) whenever it
-    /// doesn't match the pane count.
-    var splitWidths: [Double] = []
+    /// How the tabs shown together (2–4) sit; see BrowserStore+Split.
+    var splitLayout: SplitNode?
+    /// Those tabs, top left first.
+    var split: [UUID] { splitLayout?.panes ?? [] }
     /// Light or dark for this space whatever the system uses (Arc does this);
     /// pages follow it too.
     var appearance = Appearance.auto
@@ -64,6 +60,17 @@ final class Space: Identifiable {
         return split.contains(tab) ? split : [tab]
     }
 
+    /// How `panes(with: tab)` sit, without any tab that's gone.
+    func layout(with tab: BrowserTab) -> SplitNode {
+        let split = splitTabs
+        guard split.contains(tab) else { return .pane(tab.id) }
+        return splitLayout?.keeping(Set(split.map(\.id))) ?? .pane(tab.id)
+    }
+
+    func removeFromSplit(_ id: UUID) {
+        splitLayout = splitLayout?.removing(id)
+    }
+
     func tab(id: UUID) -> BrowserTab? {
         firstTab { $0.id == id }
     }
@@ -80,11 +87,13 @@ final class Space: Identifiable {
 
     /// Without a selection: each window keeps its own.
     var record: SpaceRecord {
-        SpaceRecord(
+        let saved = splitLayout?.saved
+        return SpaceRecord(
             id: id, name: name, symbol: symbol, hue: hue, profileID: profile.id,
             selectedTabID: nil, pinned: pinned.map(\.record), today: today.map(\.record),
             split: split.isEmpty ? nil : split,
-            splitWidths: splitWidths.isEmpty ? nil : splitWidths,
+            splitWidths: saved?.widths,
+            splitLayout: saved?.layout,
             appearance: appearance == .auto ? nil : appearance.rawValue
         )
     }
