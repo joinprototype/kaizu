@@ -240,7 +240,7 @@ struct CommandBar: View {
                 KeyHint(keys: "↑↓", label: "select")
                 KeyHint(keys: "esc", label: "close")
                 Spacer()
-                Text("Try 20+20, 100 usd to eur, yt lofi")
+                Text("Try 20+20, 100 usd to eur, time in tokyo")
                     .font(Typeface.water(14))
                     .foregroundStyle(.tertiary)
             }

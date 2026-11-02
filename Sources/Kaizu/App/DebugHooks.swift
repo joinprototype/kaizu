@@ -664,6 +664,10 @@ enum DebugHooks {
         case "commandbar":
             store.showCommandBar(.newTab)
             typeIntoKeyWindow()
+            Task {
+                try? await Task.sleep(for: .seconds(6))
+                saveShot(of: store.window)
+            }
         case "currency":
             // KAIZU_TYPE answered through the real feed and its cache.
             let query = ProcessInfo.processInfo.environment["KAIZU_TYPE"] ?? "100 usd to kzt"

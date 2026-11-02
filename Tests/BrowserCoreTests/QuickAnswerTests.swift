@@ -126,3 +126,62 @@ import Testing
         #expect(CurrencyRates(frankfurterJSON: Data("[]".utf8)) == nil)
     }
 }
+
+@Suite struct TimeZoneAnswerTests {
+    // Monday 2 Nov 2026, 5 pm in Almaty.
+    let now = ISO8601DateFormatter().date(from: "2026-11-02T12:00:00Z")!
+    let here = TimeZone(identifier: "Asia/Almaty")!
+    let american = Locale(identifier: "en_US")
+
+    func answer(_ text: String, locale: Locale? = nil) -> QuickAnswer? {
+        QuickAnswer.evaluate(text, now: now, here: here, locale: locale ?? american)
+    }
+
+    @Test(arguments: [
+        ("time in tokyo", "9:00 PM", "Time in Tokyo · 4 hours ahead"),
+        ("Tokyo time", "9:00 PM", "Time in Tokyo · 4 hours ahead"),
+        ("new york time", "7:00 AM", "Time in New York · 10 hours behind"),
+        ("what time is it in the uk?", "12:00 PM", "Time in UK · 5 hours behind"),
+        ("what's the time in san francisco", "4:00 AM", "Time in San Francisco · 13 hours behind"),
+        ("time in mumbai", "5:30 PM", "Time in Mumbai · 0.5 hours ahead"),
+        ("time in astana", "5:00 PM", "Time in Astana · same as here"),
+        ("time in auckland", "Tue 1:00 AM", "Time in Auckland · 8 hours ahead"),
+    ])
+    func tellsTheTimeThere(input: String, time: String, question: String) {
+        #expect(answer(input)?.answer == time)
+        #expect(answer(input)?.question == question)
+    }
+
+    @Test(arguments: [
+        ("3pm pst in tokyo", "Tue 8:00 AM", "3:00 PM PST in Tokyo"),
+        ("3 pm PST to Tokyo", "Tue 8:00 AM", "3:00 PM PST in Tokyo"),
+        ("15:30 to london", "10:30 AM", "3:30 PM your time in London"),
+        ("3pm in new york", "5:00 AM", "3:00 PM your time in New York"),
+        ("noon est", "10:00 PM", "12:00 PM EST in your time"),
+        ("midnight in new york", "Sun 2:00 PM", "12:00 AM your time in New York"),
+        ("9am sf to nyc", "12:00 PM", "9:00 AM SF in NYC"),
+        ("9am london time to tokyo time", "6:00 PM", "9:00 AM London in Tokyo"),
+    ])
+    func convertsAClockReading(input: String, time: String, question: String) {
+        #expect(answer(input)?.answer == time)
+        #expect(answer(input)?.question == question)
+    }
+
+    @Test func followsTheLocaleClock() {
+        #expect(answer("time in tokyo", locale: Locale(identifier: "en_GB"))?.answer == "21:00")
+    }
+
+    @Test(arguments: [
+        "3 in tokyo", "25:00 to london", "13pm in tokyo", "3:75pm in tokyo", "3pm", "3pm in atlantis", "3pm nowhere to tokyo",
+        "time in atlantis", "christmas time", "easter time", "wake time", "cat time", "bed time", "part time", "time",
+    ])
+    func ignoresEverythingElse(input: String) {
+        #expect(answer(input) == nil)
+    }
+
+    @Test func nicknamesPointAtRealZones() {
+        for identifier in Array(TimeZoneAnswer.knownAs.keys) + Array(TimeZoneAnswer.shorthand.values) {
+            #expect(TimeZone(identifier: identifier) != nil, "\(identifier)")
+        }
+    }
+}

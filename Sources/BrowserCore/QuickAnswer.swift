@@ -1,23 +1,28 @@
 import Foundation
 
-/// An instant answer for the command bar: arithmetic, a unit conversion or
-/// a currency conversion, like Spotlight and Raycast. Computed locally; the
-/// only network use is fetching public exchange rates.
+/// An instant answer for the command bar: arithmetic, a unit conversion, the
+/// time elsewhere or a currency conversion, like Spotlight and Raycast.
+/// Computed locally; the only network use is fetching public exchange rates.
 public struct QuickAnswer: Equatable, Sendable {
     /// What was understood, e.g. "20 + 20" or "10 km in miles".
     public var question: String
     /// The result, ready to copy, e.g. "40" or "6.21 mi".
     public var answer: String
 
-    /// Tries the calculator, then units, then currencies (when rates are known).
-    public static func evaluate(_ text: String, rates: CurrencyRates? = nil) -> QuickAnswer? {
+    /// Tries the calculator, then units, time zones, then currencies (when
+    /// rates are known).
+    public static func evaluate(
+        _ text: String, rates: CurrencyRates? = nil, now: Date = Date(), here: TimeZone = .current, locale: Locale = .current
+    ) -> QuickAnswer? {
         let input = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !input.isEmpty else { return nil }
         if let answer = deepThought(input) { return answer }
         if let value = Calculator.evaluate(input) {
             return QuickAnswer(question: input, answer: format(value))
         }
-        return UnitConversion.convert(input) ?? rates.flatMap { CurrencyConversion.convert(input, rates: $0) }
+        return UnitConversion.convert(input)
+            ?? TimeZoneAnswer.answer(input, now: now, here: here, locale: locale)
+            ?? rates.flatMap { CurrencyConversion.convert(input, rates: $0) }
     }
 
     /// Seven and a half million years of computation, cached.
