@@ -201,6 +201,8 @@ What makes someone keep it as their default browser.
 - [x] Reader (⇧⌘R): Mozilla Readability in an isolated world, set in a serif on vellum, scripts off **M**
 - [x] Location permission, remembered per site (macOS 27+; WebKit's own prompt before) **S**
 - [x] Print (⌘P) **S**
+- [x] Page right-click menu: links open in a new tab, Split View, a new window or a private window; search uses your engine; Share on the page **S**
+- [x] Spell checking on by default, with the standard Spelling and Grammar menu **S**
 - [x] Site notifications: ask on a click, Ask/Allow/Block in the site popover; one tab of each allowed site stays loaded and keeps running in the background; a dot on the tab and a count on the Dock, with macOS banners once Kaizu has a Developer ID **M**
 
 ## Phase 3: Arc signature features

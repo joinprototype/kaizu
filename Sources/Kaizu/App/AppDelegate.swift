@@ -10,6 +10,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Kaizu's windows are spaces and tabs, never system tabs of each other.
         NSWindow.allowsAutomaticWindowTabbing = false
         Typeface.register()
+        // Web views leave this off, unlike Safari. Registered, so turning it
+        // off in the Edit menu sticks.
+        UserDefaults.standard.register(defaults: ["WebContinuousSpellCheckingEnabled": true])
         // Before launch finishes: a click can be what launched Kaizu.
         SiteNotifications.center?.delegate = notificationClicks
     }

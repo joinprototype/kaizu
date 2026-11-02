@@ -23,6 +23,7 @@ Found a bug? Choose Help → Report a Bug in Kaizu, or write to
 - **Extensions**: "Add to Kaizu" on Chrome Web Store and Firefox Add-ons pages, or from a folder, a `.zip` or a Safari extension app
 - **Capture** (⇧⌘2): drag over part of the page to copy it as an image
 - **Hide Distracting Items**: click away banners and clutter; the site remembers
+- **Right-click**: open links in a new tab, Split View, a new window or a private window, search with your own engine, share a page
 - **Reading**: Reader (⇧⌘R), picture in picture when you leave a playing video, per-tab mute
 - **Site notifications**: sites you allow can reach you from the background, with a dot on the tab and a count on the Dock
 - **Remembers per site**: camera, microphone and location answers, zoom; all of it (plus blocking and clearing the site's data) in a popover from the address pill's lock

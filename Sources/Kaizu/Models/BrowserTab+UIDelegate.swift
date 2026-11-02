@@ -10,6 +10,13 @@ extension BrowserTab: WKUIDelegate {
         windowFeatures: WKWindowFeatures
     ) -> WKWebView? {
         guard let store else { return nil }
+        if let destination = linkDestination {
+            linkDestination = nil
+            if let url = navigationAction.request.url {
+                store.open(url, at: destination, from: self)
+            }
+            return nil
+        }
         let tab = store.openTab(navigationAction.request.url, after: self, configuration: configuration)
         return tab.webView
     }

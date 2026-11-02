@@ -99,6 +99,8 @@ final class BrowserTab: NSObject, Identifiable {
         return url?.displayHost ?? "New Tab"
     }
 
+    /// Where the page's menu just sent a link, for WebKit to ask about.
+    @ObservationIgnored var linkDestination: LinkDestination?
     /// Made from WebKit's configuration for `window.open`. It's left alone:
     /// rebuilding it would cut it off from the page that opened it.
     private var isPopupPage = false
@@ -147,7 +149,8 @@ final class BrowserTab: NSObject, Identifiable {
             configuration.preferences.inactiveSchedulingPolicy = .throttle
         }
 
-        let webView = WKWebView(frame: .zero, configuration: configuration)
+        let webView = PageWebView(frame: .zero, configuration: configuration)
+        webView.tab = self
         webView.navigationDelegate = self
         webView.uiDelegate = self
         webView.allowsBackForwardNavigationGestures = true
@@ -596,6 +599,10 @@ final class BrowserTab: NSObject, Identifiable {
 // MARK: - WKNavigationDelegate
 
 extension BrowserTab: WKNavigationDelegate {
+    /// WebKit gives buttons as bit flags, not the usual numbers: 2 here is
+    /// the right button, as with any link opened from the page's menu.
+    private static let middleButton = 4
+
     func webView(
         _ webView: WKWebView,
         decidePolicyFor navigationAction: WKNavigationAction,
@@ -644,7 +651,7 @@ extension BrowserTab: WKNavigationDelegate {
             // Favorites and pinned tabs peek links to other sites instead of leaving.
             // (⌘-click and middle-click still mean "background tab", handled below.)
             // Shift-click peeks any link, from any tab.
-            let opensElsewhere = navigationAction.modifierFlags.contains(.command) || navigationAction.buttonNumber == 2
+            let opensElsewhere = navigationAction.modifierFlags.contains(.command) || navigationAction.buttonNumber == Self.middleButton
             let wantsPeek = navigationAction.modifierFlags.contains(.shift)
             if navigationAction.navigationType == .linkActivated, !opensElsewhere, let store, store.peek !== self,
                wantsPeek || (store.peeksLinks(from: self) && target.siteKey != webView.url?.siteKey) {
@@ -669,7 +676,7 @@ extension BrowserTab: WKNavigationDelegate {
         // ⌘-click / middle-click opens in a background tab.
         let flags = navigationAction.modifierFlags
         if navigationAction.navigationType == .linkActivated,
-           flags.contains(.command) || navigationAction.buttonNumber == 2 {
+           flags.contains(.command) || navigationAction.buttonNumber == Self.middleButton {
             store?.openTab(TrackingParameters.stripped(target) ?? target, after: self, select: flags.contains(.shift))
             return decisionHandler(.cancel)
         }
