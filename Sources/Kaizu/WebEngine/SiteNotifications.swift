@@ -9,8 +9,10 @@ import WebKit
 /// in our own content world over DOM events, because a message handler in
 /// the page's world would add `window.webkit`, which Safari pages don't have
 /// and sign-in pages look for. There's no push service behind this, so a
-/// site can only notify while its page runs: allowed sites stay loaded and
-/// aren't suspended in the background. Private windows don't get any of it.
+/// site can only notify while a page of it runs: one tab of each allowed
+/// site stays loaded and isn't paused in the background. Private windows get
+/// the same script, or pages could spot one, but nothing is read or kept:
+/// every site there is one that hasn't been asked.
 ///
 /// macOS refuses this to apps without a developer signature, which until
 /// Developer ID means every build of Kaizu. So a notification also waits on
@@ -32,14 +34,14 @@ final class SiteNotifications: NSObject, WKScriptMessageHandlerWithReply {
     private weak var tab: BrowserTab?
     private var isAsking = false
 
-    /// Main frames only, as in Safari.
+    /// Main frames only, as in Safari. Part of the content blocker's
+    /// standard scripts, which it puts back whenever it replaces them.
     static let scripts = [
         WKUserScript(source: relayScript, injectionTime: .atDocumentStart, forMainFrameOnly: true, in: world),
         WKUserScript(source: pageScript, injectionTime: .atDocumentStart, forMainFrameOnly: true, in: .page),
     ]
 
     static func install(on controller: WKUserContentController, for tab: BrowserTab) {
-        guard !tab.profile.isPrivate else { return }
         let handler = SiteNotifications()
         handler.tab = tab
         controller.addScriptMessageHandler(handler, contentWorld: world, name: handlerName)
@@ -82,14 +84,16 @@ final class SiteNotifications: NSObject, WKScriptMessageHandlerWithReply {
               let body = message.body as? [String: Any], let kind = body["kind"] as? String
         else { return replyHandler(nil, nil) }
         let host = origin.host
-        let answer = settings.sitePermissions[host]?[Self.permission]
+        let answer = tab.profile.isPrivate ? nil : settings.sitePermissions[host]?[Self.permission]
 
         switch kind {
         case "permission":
             replyHandler(Self.state(answer), nil)
         case "request":
             if let answer { return replyHandler(Self.state(answer), nil) }
-            guard !isAsking, let window = webView.window else { return replyHandler(Self.state(nil), nil) }
+            guard !tab.profile.isPrivate, !isAsking, let window = webView.window else {
+                return replyHandler(Self.state(nil), nil)
+            }
             ask(host: host, tab: tab, window: window) { replyHandler(Self.state($0), nil) }
         case "show":
             guard answer == true else { return replyHandler(false, nil) }
@@ -98,6 +102,7 @@ final class SiteNotifications: NSObject, WKScriptMessageHandlerWithReply {
                 replyHandler(true, nil)
             }
         case "close":
+            guard answer == true else { return replyHandler(false, nil) }
             Self.center?.removeDeliveredNotifications(withIdentifiers: [Self.identifier(body, host: host, tab: tab)])
             replyHandler(true, nil)
         default:
@@ -124,11 +129,14 @@ final class SiteNotifications: NSObject, WKScriptMessageHandlerWithReply {
         alert.informativeText = "They arrive while the site is open in Kaizu, so it stays loaded in the background. Change this from the lock in the address bar."
         alert.addButton(withTitle: "Allow")
         alert.addButton(withTitle: "Don’t Allow")
+        // The page may be why you're pressing Return: it shouldn't answer this.
+        alert.buttons[0].keyEquivalent = ""
+        alert.buttons[1].keyEquivalent = "\r"
         alert.beginSheetModal(for: window) { [weak self] response in
             self?.isAsking = false
             guard response == .alertFirstButtonReturn || response == .alertSecondButtonReturn else { return completion(nil) }
             let allowed = response == .alertFirstButtonReturn
-            tab.setNotifications(allowed)
+            tab.setNotifications(allowed, for: host)
             completion(allowed)
         }
     }
@@ -179,7 +187,11 @@ final class SiteNotifications: NSObject, WKScriptMessageHandlerWithReply {
       window.addEventListener("kaizu-notification-ask", async (event) => {
         let message;
         try { message = JSON.parse(event.detail); } catch { return; }
-        const reply = await handler.postMessage(message).catch(() => null);
+        // Only from a click or a key press, as in Safari: a question a page
+        // puts to everyone on arrival is one people learn to refuse. Checked
+        // here, where the page can't forge this event's sender or `navigator`.
+        const refused = message.kind === "request" && navigator.userActivation?.isActive !== true;
+        const reply = refused ? null : await handler.postMessage(message).catch(() => null);
         const detail = JSON.stringify({ ref: message.ref, reply });
         window.dispatchEvent(new CustomEvent("kaizu-notification-reply", { detail }));
       });
@@ -219,7 +231,8 @@ final class SiteNotifications: NSObject, WKScriptMessageHandlerWithReply {
       const ready = ask({ kind: "permission" }).then((state) => { permission = state ?? "default"; });
 
       class Notification extends EventTarget {
-        #id = String(++nextID);
+        // Unique across reloads, or a click could reach the wrong page's.
+        #id = Date.now().toString(36) + "-" + ++nextID;
         constructor(title, options = {}) {
           if (arguments.length === 0) throw new TypeError("Notification needs a title");
           super();
@@ -248,11 +261,8 @@ final class SiteNotifications: NSObject, WKScriptMessageHandlerWithReply {
         }
         static get permission() { return permission; }
         static get maxActions() { return 0; }
-        // Only from a click or a key press, as in Safari: a question a page
-        // puts to everyone on arrival is one people learn to refuse.
         static requestPermission(callback) {
-          const answer = navigator.userActivation?.isActive === false ? Promise.resolve(permission) : ask({ kind: "request" });
-          return answer.then((state) => {
+          return ask({ kind: "request" }).then((state) => {
             permission = state ?? permission;
             callback?.(permission);
             return permission;

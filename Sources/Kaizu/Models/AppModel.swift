@@ -45,7 +45,7 @@ final class AppModel {
     private weak var lastRegularStore: BrowserStore?
 
     init() {
-        contentBlocker.standardScripts = [MediaEvents.script]
+        contentBlocker.standardScripts = [MediaEvents.script] + SiteNotifications.scripts
         contentBlocker.start()
         extensions.app = self
         Task {
@@ -199,7 +199,6 @@ final class AppModel {
     func discard(_ tabs: [BrowserTab]) {
         for tab in tabs {
             extensions.didClose(tab)
-            tab.markNotificationsRead()
             tab.discard()
         }
     }

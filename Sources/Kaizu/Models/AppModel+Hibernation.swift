@@ -17,6 +17,7 @@ extension AppModel {
             while let self {
                 try? await Task.sleep(for: Self.hibernationSweep)
                 await self.hibernateIdleTabs()
+                self.wakeTabsThatNotify()
                 self.saveTabStates(inBackground: true)
             }
         }
@@ -30,26 +31,34 @@ extension AppModel {
 
     /// Hibernates loaded tabs that aren't on screen, haven't been used for
     /// `interval`, and aren't playing media or using the camera/microphone.
+    /// One tab of each site allowed to notify is spared, and rebuilt if it
+    /// would otherwise be paused, except on a memory warning (no `interval`).
     func hibernateIdleTabs(olderThan interval: TimeInterval = hibernateAfter) async {
         let now = Date()
         let cutoff = now.addingTimeInterval(-interval)
-        for tab in Set(spaces.flatMap(\.allTabs)) where tab.isLoaded && !isOnScreen(tab) {
-            if tab.needsRebuildToNotify, await !tab.isInUse, !isOnScreen(tab) {
-                tab.hibernate()
-                tab.activate()
-            }
+        let tabs = Set(spaces.flatMap(\.allTabs))
+        var listening = Set(tabs.filter { $0.canKeepRunning && isOnScreen($0) }.compactMap { $0.url?.host() })
+        // Ones already running first, so none is rebuilt for nothing.
+        for tab in tabs.sorted(by: { !$0.needsRebuildToNotify && $1.needsRebuildToNotify })
+        where tab.isLoaded && !isOnScreen(tab) {
+            let listens = interval > 0 && tab.canKeepRunning && tab.url?.host().map { listening.insert($0).inserted } == true
             // Re-checked after the await: the user may have switched to it meanwhile.
             guard (tab.lastActiveAt ?? now) <= cutoff, await !tab.isBusy, !isOnScreen(tab) else { continue }
-            tab.hibernate()
+            if !listens {
+                tab.hibernate()
+            } else if tab.needsRebuildToNotify {
+                tab.rebuildToNotify()
+            }
         }
     }
 
     /// Sites you let notify you have no push service behind them: one tab of
-    /// each has to be running. They'd otherwise wait to be clicked after a
-    /// relaunch, like every other tab.
+    /// each has to be running. Otherwise it would wait to be clicked after a
+    /// relaunch or a memory warning, or if its page process died.
     func wakeTabsThatNotify() {
-        var awake = Set(spaces.flatMap(\.allTabs).filter(\.isLoaded).compactMap { $0.url?.host() })
-        for tab in spaces.flatMap(\.allTabs) where tab.mayNotify {
+        let tabs = spaces.flatMap(\.allTabs).filter(\.canKeepRunning)
+        var awake = Set(tabs.filter(\.isLoaded).compactMap { $0.url?.host() })
+        for tab in tabs {
             if let host = tab.url?.host(), awake.insert(host).inserted {
                 tab.activate()
             }

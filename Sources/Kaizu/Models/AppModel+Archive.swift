@@ -25,12 +25,16 @@ extension AppModel {
         let now = Date()
         let cutoff = now.addingTimeInterval(-interval)
         var archived: [ArchivedTabRecord] = []
+        // A site you let notify you stays reachable through one tab.
+        let kept = spaces.flatMap { $0.pinned.tabs + $0.profile.favorites }.filter(\.canKeepRunning)
+        var listening = Set(kept.compactMap { $0.url?.host() })
         for space in spaces {
             // Anything on screen or audible stays, however long it's been.
             let selected = Set(stores.compactMap { $0.selectedTabIDs[space.id] })
             let stale = space.today.filter { tab in
                 !selected.contains(tab.id) && !space.split.contains(tab.id) && !tab.isPlayingMedia
                     && (tab.lastActiveAt ?? now) < cutoff
+                    && !(tab.canKeepRunning && tab.url?.host().map { listening.insert($0).inserted } == true)
             }
             guard !stale.isEmpty else { continue }
             archived += stale.map { ArchivedTabRecord(tab: $0.record, spaceID: space.id, archivedAt: now) }

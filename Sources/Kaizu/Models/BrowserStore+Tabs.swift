@@ -211,6 +211,7 @@ extension BrowserStore {
         for tab in cleared {
             closedTabs.append(ClosedTab(spaceID: space.id, record: tab.record))
             extensions.didClose(tab)
+            tab.markNotificationsRead()
         }
         withAnimation(Motion.snap, completionCriteria: .removed) {
             space.today = []

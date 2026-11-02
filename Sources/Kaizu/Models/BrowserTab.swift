@@ -100,6 +100,9 @@ final class BrowserTab: NSObject, Identifiable {
     }
 
     private var keepsRunningInBackground = false
+    /// Made from WebKit's configuration for `window.open`. It's left alone:
+    /// rebuilding it would cut it off from the page that opened it.
+    private var isPopupPage = false
 
     /// Notifications from this page you haven't looked at. Not saved.
     private(set) var unreadNotifications = 0
@@ -121,9 +124,7 @@ final class BrowserTab: NSObject, Identifiable {
             configuration = extensionConfiguration
             contentController = nil
         } else {
-            let controller = app?.contentBlocker.makeUserContentController(
-                tabScripts: profile.isPrivate ? [] : SiteNotifications.scripts
-            )
+            let controller = app?.contentBlocker.makeUserContentController()
             configuration = pendingConfiguration ?? Self.makeConfiguration(for: profile)
             // Like other browsers, extensions stay out of private windows.
             configuration.webExtensionController = profile.isPrivate ? nil : app?.extensions.controller
@@ -141,7 +142,8 @@ final class BrowserTab: NSObject, Identifiable {
         // A web view out of a window is paused otherwise, which is every tab
         // but the one on screen: hidden, a chat site's socket stalled for
         // 46 s, against 0.8 s throttled (Nov 1).
-        keepsRunningInBackground = mayNotify && !isPopup
+        isPopupPage = isPopup
+        keepsRunningInBackground = canKeepRunning
         if keepsRunningInBackground {
             configuration.preferences.inactiveSchedulingPolicy = .throttle
         }
@@ -278,6 +280,7 @@ final class BrowserTab: NSObject, Identifiable {
     /// a view still fading out with it (which would load the page again).
     func discard() {
         isDiscarded = true
+        markNotificationsRead()
         teardown()
     }
 
@@ -409,27 +412,38 @@ final class BrowserTab: NSObject, Identifiable {
     }
 
     /// Whether this page's site may notify you. It can only do that while
-    /// the page runs, so such a tab stays loaded and awake in the background.
+    /// a page of it runs, so one tab of each such site stays loaded and awake.
     var mayNotify: Bool {
         // The web view knows a new page before `url` catches up.
         guard !profile.isPrivate, let host = (_webView?.url ?? url)?.host() else { return false }
         return app?.settings.sitePermissions[host]?[SiteNotifications.permission] == true
     }
 
+    var canKeepRunning: Bool { mayNotify && !isPopupPage }
+
     /// A site's answer about notifications, from the page's question or the
     /// site popover. macOS is asked too, the first time one is allowed.
-    func setNotifications(_ allowed: Bool?) {
-        guard let host = url?.host(), let settings = app?.settings else { return }
+    func setNotifications(_ allowed: Bool?, for host: String) {
+        guard let settings = app?.settings else { return }
         settings.sitePermissions[host, default: [:]][SiteNotifications.permission] = allowed
         if settings.sitePermissions[host]?.isEmpty == true {
             settings.sitePermissions[host] = nil
         }
         guard allowed == true else { return }
         Task {
-            switch await SiteNotifications.requestDelivery() {
-            case false?: store?.showToast("Turn on notifications for Kaizu in System Settings", symbol: "bell.slash")
-            case nil: store?.showToast("They’ll show on this tab and in the Dock", symbol: "bell")
-            default: break
+            let macOS = await SiteNotifications.requestDelivery()
+            if macOS == false {
+                store?.showToast("Turn on notifications for Kaizu in System Settings", symbol: "bell.slash")
+            } else if needsRebuildToNotify {
+                store?.showToast(
+                    "Reload so this site can reach you from the background",
+                    symbol: "bell",
+                    undo: { self.rebuildToNotify() },
+                    actionTitle: "Reload",
+                    lasts: .seconds(8)
+                )
+            } else if macOS == nil {
+                store?.showToast("They’ll show on this tab and in the Dock", symbol: "bell")
             }
         }
     }
@@ -451,24 +465,25 @@ final class BrowserTab: NSObject, Identifiable {
         app?.updateDockBadge()
     }
 
-    /// Allowed since its web view was made, so it would still be paused in
-    /// the background: WebKit only reads that setting at creation.
-    var needsRebuildToNotify: Bool { isLoaded && mayNotify && !keepsRunningInBackground }
+    /// Allowed since its web view was made, or arrived here by a link, so
+    /// it would still be paused in the background: WebKit only reads that
+    /// setting at creation.
+    var needsRebuildToNotify: Bool { isLoaded && canKeepRunning && !keepsRunningInBackground }
 
-    /// Whether the page is playing media or using the camera/microphone.
-    var isInUse: Bool {
+    /// Reloads the page in a web view that keeps running, back/forward intact.
+    func rebuildToNotify() {
+        hibernate()
+        webViewRevision += 1
+        activate()
+    }
+
+    /// Whether the page is playing media or using the camera/microphone,
+    /// so it must not be hibernated.
+    var isBusy: Bool {
         get async {
             guard let _webView else { return false }
             if _webView.cameraCaptureState != .none || _webView.microphoneCaptureState != .none { return true }
             return await _webView.requestMediaPlaybackState() == .playing
-        }
-    }
-
-    /// In use or waiting to notify you, so it must not be hibernated.
-    var isBusy: Bool {
-        get async {
-            if mayNotify, isLoaded { return true }
-            return await isInUse
         }
     }
 

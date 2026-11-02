@@ -57,7 +57,7 @@ struct SiteSettingsView: View {
                         permissionRow("Microphone", device: "microphone", host: host)
                         permissionRow("Location", device: "location", host: host)
                         permissionRow("Notifications", device: SiteNotifications.permission, host: host) { allowed in
-                            tab.setNotifications(allowed)
+                            tab.setNotifications(allowed, for: host)
                         }
                     }
                 }
