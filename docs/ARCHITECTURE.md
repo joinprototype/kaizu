@@ -188,7 +188,7 @@ struct Command: Identifiable {
 | Reader | `BrowserStore+Reader.swift` (Readability in an isolated world), `Views/ReaderView.swift` |
 | Arc import | `BrowserCore/ArcSidebar.swift` (reads the file), `ArcImport.swift` (plans what to add, adds only), `Models/BrowserStore+ArcImport.swift`, `Views/ArcImportView.swift` |
 | Browsing data import | `BrowserCore/BrowsingData.swift`, `ChromiumProfile.swift` (reads a copy of `History`, plus `Bookmarks`), `SafariExport.swift` (streams only history and bookmarks out of the .zip, nothing unpacked; it also holds passwords), `Models/AppModel+DataImport.swift`, `Views/BrowsingDataImportView.swift` |
-| Network fetches we make | filter lists (daily), favicons (http/https, 1 MB cap), ECB rates (on first currency query), search suggestions (opt-in) |
+| Network fetches we make | filter lists (daily), favicons (http/https, 1 MB cap), Frankfurter exchange rates (on first currency query), search suggestions (opt-in) |
 | Bundled page scripts | `Resources/Scripts/` (see its README for sources and licenses) |
 
 Page scripts we write run in WebKit's isolated `.defaultClient` world where

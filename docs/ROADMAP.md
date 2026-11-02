@@ -177,7 +177,7 @@ What makes someone keep it as their default browser.
 - [x] History store (SQLite, per profile, frecency) + history in the command bar; Clear History **M**
 - [x] History window (⌘Y): by day, search, open, copy, delete entries **S**
 - [x] Command bar 2.0: instant answers (calculator, unit conversion), search shortcuts (yt, gh, w…), commands by name, key hints **M**
-- [x] Command bar: inline domain autocomplete, currency conversion (ECB rates, fetched on first use) **M**
+- [x] Command bar: inline domain autocomplete, currency conversion (Frankfurter rates, fetched on first use) **M**
 - [x] Command bar: opt-in search suggestions (Google, DuckDuckGo, Kagi, Bing; never for addresses) **S**
 - [x] Command bar: editable search shortcuts (Settings → General) **S**
 - [x] Built-in ad/tracker blocking with `WKContentRuleList` (see note below) **M**

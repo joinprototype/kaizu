@@ -1,11 +1,12 @@
 import Foundation
 
-/// Euro reference rates from the European Central Bank's daily feed
-/// (https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml).
+/// Rates against the euro from Frankfurter (https://frankfurter.dev), which
+/// gathers what central banks publish. The ECB alone covers about 30 currencies.
 public struct CurrencyRates: Equatable, Sendable {
     /// Units of each currency per euro, including EUR itself.
     public var perEuro: [String: Double]
-    /// The day the rates are for, as published ("2026-10-23").
+    /// The newest day among the rates, as published ("2026-10-23"). Banks
+    /// publish on different days, so some rates can be a few days older.
     public var date: String?
 
     public init(perEuro: [String: Double], date: String? = nil) {
@@ -13,17 +14,18 @@ public struct CurrencyRates: Equatable, Sendable {
         self.date = date
     }
 
-    /// Parses the ECB XML; nil for anything else (an error page, a portal).
-    public init?(ecbXML data: Data) {
-        guard let xml = String(data: data, encoding: .utf8) else { return nil }
-        var rates: [String: Double] = [:]
-        for match in xml.matches(of: /currency=['"]([A-Z]{3})['"]\s+rate=['"]([\d.]+)['"]/) {
-            if let rate = Double(match.2), rate > 0 {
-                rates[String(match.1)] = rate
-            }
+    /// Parses Frankfurter's list of rates; nil for anything else (an error
+    /// page, a portal).
+    public init?(frankfurterJSON data: Data) {
+        struct Row: Decodable {
+            let date: String
+            let quote: String
+            let rate: Double
         }
+        guard let rows = try? JSONDecoder().decode([Row].self, from: data) else { return nil }
+        let rates = Dictionary(rows.filter { $0.rate > 0 }.map { ($0.quote, $0.rate) }) { current, _ in current }
         guard rates["USD"] != nil else { return nil }
-        self.init(perEuro: rates, date: xml.firstMatch(of: /time=['"](\d{4}-\d{2}-\d{2})['"]/).map { String($0.1) })
+        self.init(perEuro: rates, date: rows.map(\.date).max())
     }
 
     public func convert(_ amount: Double, from: String, to: String) -> Double? {
@@ -40,16 +42,13 @@ public enum CurrencyConversion {
         public var to: String
     }
 
-    /// Currencies the ECB publishes, plus the euro.
-    static let codes: Set<String> = [
-        "EUR", "USD", "JPY", "BGN", "CZK", "DKK", "GBP", "HUF", "PLN", "RON", "SEK", "CHF", "ISK", "NOK",
-        "TRY", "AUD", "BRL", "CAD", "CNY", "HKD", "IDR", "ILS", "INR", "KRW", "MXN", "MYR", "NZD", "PHP",
-        "SGD", "THB", "ZAR",
-    ]
+    /// Any ISO currency, so a conversion is recognised before rates arrive.
+    /// One the rates turn out not to cover gets no answer.
+    static let codes = Set(Locale.commonISOCurrencyCodes)
     static let aliases: [String: String] = [
         "$": "USD", "dollar": "USD", "dollars": "USD", "€": "EUR", "euro": "EUR", "euros": "EUR",
         "£": "GBP", "pound": "GBP", "pounds": "GBP", "¥": "JPY", "yen": "JPY", "₹": "INR", "₩": "KRW",
-        "fr": "CHF", "francs": "CHF", "yuan": "CNY", "rmb": "CNY",
+        "fr": "CHF", "francs": "CHF", "yuan": "CNY", "rmb": "CNY", "₸": "KZT", "tenge": "KZT",
     ]
 
     /// Recognises a conversion without needing rates, so callers can fetch
@@ -69,7 +68,7 @@ public enum CurrencyConversion {
         guard let request = parse(text),
               let value = rates.convert(request.amount, from: request.from, to: request.to)
         else { return nil }
-        let source = rates.date.map { " · ECB \($0)" } ?? ""
+        let source = rates.date.map { " · Frankfurter \($0)" } ?? ""
         return QuickAnswer(
             question: "\(QuickAnswer.format(request.amount)) \(request.from) in \(request.to)\(source)",
             answer: "\(QuickAnswer.format((value * 100).rounded() / 100)) \(request.to)"

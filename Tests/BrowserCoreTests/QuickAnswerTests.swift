@@ -75,7 +75,7 @@ import Testing
 }
 
 @Suite struct CurrencyConversionTests {
-    let rates = CurrencyRates(perEuro: ["USD": 1.25, "GBP": 0.8, "JPY": 160], date: "2026-10-23")
+    let rates = CurrencyRates(perEuro: ["USD": 1.25, "GBP": 0.8, "JPY": 160, "KZT": 500], date: "2026-10-23")
 
     @Test(arguments: [
         ("100 usd to eur", "80 EUR"),
@@ -84,13 +84,16 @@ import Testing
         ("1,000 GBP to usd", "1562.5 USD"),
         ("1,5 eur to usd", "1.88 USD"),
         ("1.000,50 eur to usd", "1250.63 USD"),
+        ("100 usd to kzt", "40000 KZT"),
+        ("₸5000 in usd", "12.5 USD"),
+        ("100 euros in tenge", "50000 KZT"),
     ])
     func converts(input: String, answer: String) {
         #expect(QuickAnswer.evaluate(input, rates: rates)?.answer == answer)
     }
 
     @Test func citesTheRateDate() {
-        #expect(QuickAnswer.evaluate("100 usd to eur", rates: rates)?.question == "100 USD in EUR · ECB 2026-10-23")
+        #expect(QuickAnswer.evaluate("100 usd to eur", rates: rates)?.question == "100 USD in EUR · Frankfurter 2026-10-23")
     }
 
     @Test(arguments: ["100 usd to usd", "$20 usd in eur", "usd to eur", "100 abc to eur", "100 usd"])
@@ -103,16 +106,23 @@ import Testing
         #expect(QuickAnswer.evaluate("100 usd to eur") == nil)
     }
 
-    @Test func parsesECBFeed() throws {
-        let xml = """
-        <gesmes:Envelope><Cube><Cube time='2026-10-23'>
-        <Cube currency='USD' rate='1.0823'/><Cube currency='JPY' rate='163.47'/>
-        </Cube></Cube></gesmes:Envelope>
+    @Test func staysQuietWithoutARate() {
+        #expect(CurrencyConversion.parse("100 usd to pen") != nil)
+        #expect(QuickAnswer.evaluate("100 usd to pen", rates: rates) == nil)
+    }
+
+    @Test func parsesFrankfurterRates() throws {
+        let json = """
+        [{"date":"2026-10-23","base":"EUR","quote":"KZT","rate":506.98},
+         {"date":"2026-10-24","base":"EUR","quote":"USD","rate":1.1177},
+         {"date":"2026-10-22","base":"EUR","quote":"XXX","rate":0}]
         """
-        let parsed = try #require(CurrencyRates(ecbXML: Data(xml.utf8)))
-        #expect(parsed.perEuro["USD"] == 1.0823)
+        let parsed = try #require(CurrencyRates(frankfurterJSON: Data(json.utf8)))
+        #expect(parsed.perEuro["KZT"] == 506.98)
         #expect(parsed.perEuro["EUR"] == 1)
-        #expect(parsed.date == "2026-10-23")
-        #expect(CurrencyRates(ecbXML: Data("<html>Sign in to Wi-Fi</html>".utf8)) == nil)
+        #expect(parsed.perEuro["XXX"] == nil)
+        #expect(parsed.date == "2026-10-24")
+        #expect(CurrencyRates(frankfurterJSON: Data("<html>Sign in to Wi-Fi</html>".utf8)) == nil)
+        #expect(CurrencyRates(frankfurterJSON: Data("[]".utf8)) == nil)
     }
 }

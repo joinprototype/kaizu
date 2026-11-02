@@ -4,7 +4,7 @@ import BrowserCore
 import CoreSpotlight
 
 /// Lets screenshots / manual QA jump straight into a UI state:
-///   KAIZU_DEBUG=commandbar|location|space|settings|history|private|peek|switcher|extension|nosidebar|reader|pin|split|splitdrop|capture|quickbar|open|swipe|spotlight|spotlightreset|commands|learn|appearance|hide|hotkeys|tour|bugreport|brokensite|windows|privatewindow|tabmoves|stress|sites|showcase|browsingdata|arcimport|arcimport-run .build/debug/Kaizu
+///   KAIZU_DEBUG=commandbar|currency|location|space|settings|history|private|peek|switcher|extension|nosidebar|reader|pin|split|splitdrop|capture|quickbar|open|swipe|spotlight|spotlightreset|commands|learn|appearance|hide|hotkeys|tour|bugreport|brokensite|windows|privatewindow|tabmoves|stress|sites|showcase|browsingdata|arcimport|arcimport-run .build/debug/Kaizu
 /// With `commandbar` or `quickbar`, KAIZU_TYPE="gi" types into it key by key (through
 /// the real field editor, so inline completion runs).
 /// `reader` shows Reader for the selected tab, or for KAIZU_URL.
@@ -664,6 +664,16 @@ enum DebugHooks {
         case "commandbar":
             store.showCommandBar(.newTab)
             typeIntoKeyWindow()
+        case "currency":
+            // KAIZU_TYPE answered through the real feed and its cache.
+            let query = ProcessInfo.processInfo.environment["KAIZU_TYPE"] ?? "100 usd to kzt"
+            CurrencyFeed.shared.requestIfNeeded()
+            Task {
+                try? await Task.sleep(for: .seconds(4))
+                let answer = QuickAnswer.evaluate(query, rates: CurrencyFeed.shared.rates)
+                FileHandle.standardError.write(Data("QA currency \(query): \(answer?.answer ?? "no answer") (\(answer?.question ?? "-"))\n".utf8))
+                NSApp.terminate(nil)
+            }
         case "reader":
             // KAIZU_URL opens a throwaway tab for it, closed again after 12 s.
             let tab = ProcessInfo.processInfo.environment["KAIZU_URL"].flatMap(URL.init(string:)).map { store.openTab($0) }
