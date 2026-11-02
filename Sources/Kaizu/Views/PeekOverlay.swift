@@ -32,14 +32,7 @@ struct PeekOverlay: View {
                 .pageCard(cornerRadius: isExpanding ? 10 : 8, shadow: false)
                 .padding([.horizontal, .bottom], isExpanding ? 0 : 6)
         }
-        .background(
-            Surface.card(scheme).opacity(isExpanding ? 0 : 1),
-            in: RoundedRectangle(cornerRadius: isExpanding ? 10 : 14, style: .continuous)
-        )
-        .overlay {
-            Neatline(cornerRadius: isExpanding ? 10 : 14)
-                .opacity(isExpanding ? 0 : 1)
-        }
+        .paperCard(cornerRadius: isExpanding ? 10 : 14, fill: isExpanding ? 0 : 1)
         .shadow(color: .black.opacity(isExpanding ? 0 : 0.3), radius: 30, y: 12)
         .padding(.horizontal, isExpanding ? 0 : 44)
         .padding(.vertical, isExpanding ? 0 : 24)

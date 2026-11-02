@@ -12,7 +12,7 @@ struct FindBar: View {
             KeyTextField(
                 text: $query,
                 placeholder: "Find on page",
-                fontSize: 13,
+                font: Typeface.textField(13),
                 caret: store.activeSpace.theme.accent(scheme),
                 onMove: { store.findNext(backwards: $0 < 0) },
                 onSubmit: { store.findNext() },
@@ -31,8 +31,7 @@ struct FindBar: View {
         .padding(.leading, 12)
         .padding(.trailing, 4)
         .frame(height: 40)
-        .background(Surface.card(scheme), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay { Neatline(cornerRadius: 12) }
+        .paperCard(cornerRadius: 12)
         .shadow(color: .black.opacity(0.15), radius: 12, y: 4)
         .onChange(of: query) { store.updateFind(query) }
         .onChange(of: store.selectedTab?.id) { store.hideFindBar() }

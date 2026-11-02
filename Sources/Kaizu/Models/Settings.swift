@@ -155,6 +155,14 @@ extension Settings {
         Self.siteKey(for: url).flatMap { siteZoom[$0] } ?? 1
     }
 
+    /// An answer about one of a site's permissions; nil forgets it.
+    func setPermission(_ device: String, to allowed: Bool?, on host: String) {
+        sitePermissions[host, default: [:]][device] = allowed
+        if sitePermissions[host]?.isEmpty == true {
+            sitePermissions[host] = nil
+        }
+    }
+
     func setZoom(_ zoom: Double, for url: URL?) {
         guard let key = Self.siteKey(for: url) else { return }
         siteZoom[key] = abs(zoom - 1) < 0.01 ? nil : zoom

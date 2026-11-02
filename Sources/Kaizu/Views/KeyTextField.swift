@@ -9,10 +9,9 @@ import SwiftUI
 struct KeyTextField: NSViewRepresentable {
     @Binding var text: String
     let placeholder: String
-    var fontSize: CGFloat = 19
-    var font: NSFont?
+    let font: NSFont
     /// The insertion point, in the space's ink rather than the system accent.
-    var caret: Color?
+    let caret: Color
     let onMove: (Int) -> Void
     let onSubmit: () -> Void
     let onCancel: () -> Void
@@ -20,11 +19,9 @@ struct KeyTextField: NSViewRepresentable {
 
     func makeNSView(context: Context) -> FocusingTextField {
         let field = FocusingTextField()
-        field.caret = caret.map(NSColor.init)
         field.isBordered = false
         field.drawsBackground = false
         field.focusRingType = .none
-        let font = font ?? Typeface.textField(fontSize)
         field.font = font
         field.textColor = .labelColor
         field.placeholderAttributedString = NSAttributedString(
@@ -41,7 +38,7 @@ struct KeyTextField: NSViewRepresentable {
 
     func updateNSView(_ field: FocusingTextField, context: Context) {
         context.coordinator.parent = self
-        field.caret = caret.map(NSColor.init)
+        field.caret = NSColor(caret)
         if field.stringValue != text {
             field.stringValue = text
         }

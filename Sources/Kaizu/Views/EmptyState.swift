@@ -43,15 +43,7 @@ struct EmptyState: View {
                 }
             }
         }
-        .overlay {
-            ZStack {
-                Neatline(cornerRadius: 6)
-                Graticule()
-                    .stroke(Ink.iron(scheme).opacity(0.3), lineWidth: 0.5)
-                    .padding(3)
-            }
-            .padding(12)
-        }
+        .overlay { ChartFrame(cornerRadius: 6, inset: 12) }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .contentShape(Rectangle())
         .onTapGesture { store.showCommandBar(.newTab) }

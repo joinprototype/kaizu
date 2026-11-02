@@ -84,24 +84,23 @@ enum TimeZoneAnswer {
         "art", "cat", "center", "christmas", "cot", "easter", "eat", "midway", "pet", "reunion", "wake", "wat", "wet", "wit",
     ]
 
-    private static let places: [String: Place] = {
-        var places: [String: Place] = [:]
+    /// What people call places, for the zone each one follows. Identifiers,
+    /// not zones: this is built on the first thing typed in the command bar.
+    private static let places: [String: (name: String, identifier: String)] = {
+        var places: [String: (name: String, identifier: String)] = [:]
         for identifier in TimeZone.knownTimeZoneIdentifiers {
             let path = identifier.split(separator: "/")
-            guard path.count > 1, !["Antarctica", "Arctic"].contains(path[0]), let zone = TimeZone(identifier: identifier)
-            else { continue }
+            guard path.count > 1, !["Antarctica", "Arctic"].contains(path[0]) else { continue }
             let city = path[path.count - 1].replacingOccurrences(of: "_", with: " ")
-            places[city.lowercased()] = Place(name: city, zone: zone)
+            places[city.lowercased()] = (city, identifier)
         }
         for (identifier, names) in knownAs {
-            guard let zone = TimeZone(identifier: identifier) else { continue }
             for name in names {
-                places[name] = Place(name: name.count < 4 ? name.uppercased() : name.capitalized, zone: zone)
+                places[name] = (name.count < 4 ? name.uppercased() : name.capitalized, identifier)
             }
         }
         for (name, identifier) in TimeZone.abbreviationDictionary.merging(shorthand, uniquingKeysWith: { _, ours in ours }) {
-            guard let zone = TimeZone(identifier: identifier) else { continue }
-            places[name.lowercased()] = Place(name: name, zone: zone)
+            places[name.lowercased()] = (name, identifier)
         }
         return places.filter { !otherMeanings.contains($0.key) }
     }()
@@ -130,22 +129,12 @@ enum TimeZoneAnswer {
               let (hour, minute) = clock(match.1, hour: match.2, minute: match.3, meridiem: match.4)
         else { return nil }
 
-        var fromWords: String? = rest
-        var toWords: String?
-        if let split = rest.wholeMatch(of: /(?:(.+?)\s+)?(?:in|to)\s+(.+)/) {
-            fromWords = split.1.map(String.init)
-            toWords = String(split.2)
-        }
-        var from: Place?
-        var to: Place?
-        if let fromWords {
-            from = place(fromWords)
-            guard from != nil else { return nil }
-        }
-        if let toWords {
-            to = place(toWords)
-            guard to != nil else { return nil }
-        }
+        let split = rest.wholeMatch(of: /(?:(.+?)\s+)?(?:in|to)\s+(.+)/)
+        let fromWords = split == nil ? rest : split?.1.map(String.init)
+        let toWords = split.map { String($0.2) }
+        let from = fromWords.flatMap(place), to = toWords.flatMap(place)
+        // Words that were given have to mean somewhere.
+        guard (from == nil) == (fromWords == nil), (to == nil) == (toWords == nil) else { return nil }
 
         let source = from?.zone ?? here
         var calendar = Calendar(identifier: .gregorian)
@@ -173,7 +162,10 @@ enum TimeZoneAnswer {
     }
 
     private static func place(_ words: String) -> Place? {
-        places[words.hasSuffix(" time") ? String(words.dropLast(5)) : words]
+        guard let found = places[words.hasSuffix(" time") ? String(words.dropLast(5)) : words],
+              let zone = TimeZone(identifier: found.identifier)
+        else { return nil }
+        return Place(name: found.name, zone: zone)
     }
 
     private static func difference(of zone: TimeZone, from here: TimeZone, at date: Date) -> String {

@@ -48,7 +48,7 @@ final class SiteNotifications: NSObject, WKScriptMessageHandlerWithReply {
     }
 
     /// Nil without a bundle, as in development, where asking for it crashes.
-    private static var center: UNUserNotificationCenter? {
+    static var center: UNUserNotificationCenter? {
         Bundle.main.bundleIdentifier == nil ? nil : .current()
     }
 
@@ -58,12 +58,12 @@ final class SiteNotifications: NSObject, WKScriptMessageHandlerWithReply {
         try? await center?.requestAuthorization(options: [.alert, .sound])
     }
 
-    /// Fires a notification's event in the page that showed it.
-    static func tell(_ tab: BrowserTab, notification id: String, happened type: String) {
-        guard tab.isLoaded, let detail = try? JSONEncoder().encode(["id": id, "type": type]) else { return }
+    /// Tells the page that showed a notification it was clicked.
+    static func fireClick(on tab: BrowserTab, notification id: String) {
+        guard tab.isLoaded else { return }
         tab.webView.callAsyncJavaScript(
-            "window.dispatchEvent(new CustomEvent('kaizu-notification-event', { detail }))",
-            arguments: ["detail": String(decoding: detail, as: UTF8.self)],
+            "window.dispatchEvent(new CustomEvent('kaizu-notification-click', { detail }))",
+            arguments: ["detail": id],
             in: nil,
             in: world,
             completionHandler: nil
@@ -79,12 +79,12 @@ final class SiteNotifications: NSObject, WKScriptMessageHandlerWithReply {
         replyHandler: @escaping @MainActor @Sendable (Any?, String?) -> Void
     ) {
         let origin = message.frameInfo.securityOrigin
-        guard let tab, let settings = tab.app?.settings, let webView = message.webView, message.frameInfo.isMainFrame,
+        guard let tab, let webView = message.webView, message.frameInfo.isMainFrame,
               origin.protocol == "https", !origin.host.isEmpty,
               let body = message.body as? [String: Any], let kind = body["kind"] as? String
         else { return replyHandler(nil, nil) }
         let host = origin.host
-        let answer = tab.profile.isPrivate ? nil : settings.sitePermissions[host]?[Self.permission]
+        let answer = tab.notificationAnswer(for: host)
 
         switch kind {
         case "permission":
@@ -224,10 +224,7 @@ final class SiteNotifications: NSObject, WKScriptMessageHandlerWithReply {
         waiting.get(ref)?.resolve(reply);
         waiting.delete(ref);
       });
-      window.addEventListener("kaizu-notification-event", (event) => {
-        const { id, type } = JSON.parse(event.detail);
-        shown.get(id)?.(type);
-      });
+      window.addEventListener("kaizu-notification-click", (event) => shown.get(event.detail)?.("click"));
       const ready = ask({ kind: "permission" }).then((state) => { permission = state ?? "default"; });
 
       class Notification extends EventTarget {
@@ -293,6 +290,15 @@ final class SiteNotifications: NSObject, WKScriptMessageHandlerWithReply {
 }
 
 extension AppModel {
+    /// A click on a notification: its tab if it's still around, else its page.
+    func openNotification(tab id: UUID?, page: String, url: URL?) {
+        if let tab = id.flatMap(reveal(tabWithID:)) {
+            SiteNotifications.fireClick(on: tab, notification: page)
+        } else if let url {
+            regularFront.openTab(url)
+        }
+    }
+
     /// The Dock's count of notifications you haven't looked at yet.
     func updateDockBadge() {
         let waiting = Set(spaces.flatMap(\.allTabs)).reduce(0) { $0 + $1.unreadNotifications }
@@ -302,10 +308,10 @@ extension AppModel {
 
 /// Answers macOS when a notification is about to show or was clicked.
 final class NotificationClicks: NSObject, UNUserNotificationCenterDelegate {
-    private let open: @MainActor @Sendable (_ tab: UUID?, _ page: String, _ url: URL?) -> Void
+    private let app: AppModel
 
-    init(open: @escaping @MainActor @Sendable (UUID?, String, URL?) -> Void) {
-        self.open = open
+    init(app: AppModel) {
+        self.app = app
     }
 
     /// By default macOS keeps quiet while the app is in front.
@@ -321,6 +327,6 @@ final class NotificationClicks: NSObject, UNUserNotificationCenterDelegate {
         let tab = (info["tab"] as? String).flatMap(UUID.init(uuidString:))
         let page = info["page"] as? String ?? ""
         let url = (info["url"] as? String).flatMap(URL.init(string:))
-        await open(tab, page, url)
+        await app.openNotification(tab: tab, page: page, url: url)
     }
 }

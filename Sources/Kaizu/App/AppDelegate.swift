@@ -1,32 +1,17 @@
 import AppKit
 import CoreSpotlight
-import UserNotifications
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let app = AppModel()
-    private var notificationClicks: NotificationClicks?
+    private lazy var notificationClicks = NotificationClicks(app: app)
 
     func applicationWillFinishLaunching(_ notification: Notification) {
         // Kaizu's windows are spaces and tabs, never system tabs of each other.
         NSWindow.allowsAutomaticWindowTabbing = false
         Typeface.register()
-        listenForNotificationClicks()
-    }
-
-    /// Set before launch finishes: a click can be what launched Kaizu. Runs
-    /// without a bundle during development, where macOS refuses the center.
-    private func listenForNotificationClicks() {
-        guard Bundle.main.bundleIdentifier != nil else { return }
-        let clicks = NotificationClicks { [app] tab, page, url in
-            if let shown = tab.flatMap(app.reveal(tabWithID:)) {
-                SiteNotifications.tell(shown, notification: page, happened: "click")
-            } else if let url {
-                app.regularFront.openTab(url)
-            }
-        }
-        notificationClicks = clicks
-        UNUserNotificationCenter.current().delegate = clicks
+        // Before launch finishes: a click can be what launched Kaizu.
+        SiteNotifications.center?.delegate = notificationClicks
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {

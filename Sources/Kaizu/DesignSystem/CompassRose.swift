@@ -17,7 +17,7 @@ private enum Engraving {
         let renderer = ImageRenderer(content: drawing().frame(width: size.width, height: size.height).environment(\.colorScheme, scheme))
         renderer.scale = scale
         guard let image = renderer.cgImage else { return nil }
-        // Dragging the sidebar's edge asks for a new size at every step.
+        // Windows pass through many sizes over a session.
         if plates.count > 24 {
             plates.removeAll()
         }
@@ -145,25 +145,36 @@ struct RhumbWeb: View {
     @Environment(\.colorScheme) private var scheme
     let size: CGSize
     let center: CGPoint
-    var strength = 1.0
+
+    /// Drawn in steps and stretched to fit: dragging the sidebar's edge goes
+    /// through every size, and these lines are too faint to show the stretch.
+    private static let step: CGFloat = 64
 
     var body: some View {
-        Engraving.plate("rhumbs \(center) \(strength)", size: size, scheme: scheme) {
-            RhumbDrawing(center: center, strength: strength)
-        }
-        .allowsHitTesting(false)
+        let plate = CGSize(
+            width: (size.width / Self.step).rounded(.up) * Self.step,
+            height: (size.height / Self.step).rounded(.up) * Self.step
+        )
+        let origin = CGPoint(
+            x: (center.x * plate.width / size.width / 8).rounded() * 8,
+            y: (center.y * plate.height / size.height / 8).rounded() * 8
+        )
+        Engraving.plate("rhumbs \(origin)", size: plate, scheme: scheme) { RhumbDrawing(center: origin) }?
+            .interpolation(.high)
+            .resizable()
+            .frame(width: size.width, height: size.height)
+            .allowsHitTesting(false)
     }
 }
 
 private struct RhumbDrawing: View {
     @Environment(\.colorScheme) private var scheme
     let center: CGPoint
-    let strength: Double
 
     var body: some View {
-        let dark = Ink.iron(scheme).opacity(0.13 * strength)
-        let green = Ink.verdigris(scheme).opacity(0.16 * strength)
-        let red = Ink.claret(scheme).opacity(0.13 * strength)
+        let dark = Ink.iron(scheme).opacity(0.07)
+        let green = Ink.verdigris(scheme).opacity(0.09)
+        let red = Ink.claret(scheme).opacity(0.07)
         Canvas { context, size in
             let reach = hypot(size.width, size.height) * 1.2
             var lines = [Path(), Path(), Path()]
@@ -197,10 +208,48 @@ struct Neatline: View {
     }
 }
 
+/// Paper with a chart's border: what the floating cards are made of. A
+/// `fill` below 1 fades both, as when a card opens into a page.
+private struct PaperCard: ViewModifier {
+    @Environment(\.colorScheme) private var scheme
+    let cornerRadius: CGFloat
+    let fill: Double
+
+    func body(content: Content) -> some View {
+        content
+            .background(Surface.card(scheme).opacity(fill), in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .overlay { Neatline(cornerRadius: cornerRadius).opacity(fill) }
+    }
+}
+
+extension View {
+    func paperCard(cornerRadius: CGFloat = 16, fill: Double = 1) -> some View {
+        modifier(PaperCard(cornerRadius: cornerRadius, fill: fill))
+    }
+}
+
+/// A full chart's edge, inset from what it surrounds: the neatline with the
+/// graticule running inside it.
+struct ChartFrame: View {
+    @Environment(\.colorScheme) private var scheme
+    let cornerRadius: CGFloat
+    let inset: CGFloat
+
+    var body: some View {
+        ZStack {
+            Neatline(cornerRadius: cornerRadius)
+            Graticule()
+                .stroke(Ink.iron(scheme).opacity(0.3), lineWidth: 0.5)
+                .padding(3)
+        }
+        .padding(inset)
+    }
+}
+
 /// The ticks along a chart's edge that mark degrees and minutes: every
 /// tenth one long.
-struct Graticule: Shape {
-    var spacing: CGFloat = 12
+private struct Graticule: Shape {
+    private let spacing: CGFloat = 12
 
     func path(in rect: CGRect) -> Path {
         var path = Path()

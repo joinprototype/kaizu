@@ -181,7 +181,7 @@ struct Command: Identifiable {
 |---|---|
 | Shared state | `Models/AppModel.swift` + `AppModel+Persistence/Archive/Hibernation/Choices/Spotlight/QuickBar/DataImport.swift` |
 | A window's state and actions | `Models/BrowserStore.swift` + `BrowserStore+Tabs/Spaces/Split/Recents/Find/Peek/Reader/External/Privacy/Commands.swift`, `App/BrowserWindowController.swift` |
-| A tab and its web view | `Models/BrowserTab.swift` (navigation and UI delegates, permissions, mute, picture in picture, `MediaEvents`) |
+| A tab and its web view | `Models/BrowserTab.swift` (navigation delegate, mute, picture in picture), `BrowserTab+UIDelegate.swift` (dialogs, popups, permissions), `WebEngine/MediaEvents.swift` |
 | Command bar | `Views/CommandBar.swift`, `Views/KeyTextField.swift` (inline completion); answers in `BrowserCore/QuickAnswer.swift`, `CurrencyConversion.swift`, `TimeZoneAnswer.swift`, `SearchShortcut.swift`, `InlineCompletion.swift`; command registry in `BrowserStore+Commands.swift` |
 | Privacy | `WebEngine/ContentBlocker.swift` (rule lists, page scripts, per-site pause), `FilterListUpdater.swift`, `BrowserCore/ContentBlocking/`, `TrackingParameters.swift` |
 | Extensions | `WebEngine/ExtensionHost.swift`, `ExtensionAdapters.swift`, `Views/ExtensionViews.swift` |

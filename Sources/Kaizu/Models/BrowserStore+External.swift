@@ -1,7 +1,6 @@
 import AppKit
 import BrowserCore
 import SwiftUI
-import WebKit
 
 /// Links from other apps (with Kaizu as the default browser) and the
 /// little windows they open in.
@@ -33,12 +32,11 @@ extension BrowserStore {
         }
     }
 
-    /// `configuration` is for popups, which WebKit loads itself. A private
-    /// window's profile doesn't leave it, so there it's a tab instead.
+    /// A private window's profile doesn't leave it, so there it's a tab instead.
     @discardableResult
-    func openLittleWindow(_ url: URL? = nil, configuration: WKWebViewConfiguration? = nil) -> BrowserTab {
-        guard !isPrivate else { return openTab(url, configuration: configuration) }
-        let tab = BrowserTab(profile: activeSpace.profile, app: app, url: url, configuration: configuration)
+    func openLittleWindow(_ url: URL? = nil) -> BrowserTab {
+        guard !isPrivate else { return openTab(url) }
+        let tab = BrowserTab(profile: activeSpace.profile, app: app, url: url)
         let controller = LittleWindowController(tab: tab, app: app)
         app.littleWindows.append(controller)
         controller.showWindow(nil)

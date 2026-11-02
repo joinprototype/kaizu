@@ -62,8 +62,7 @@ struct ToastView: View {
         .foregroundStyle(Ink.iron(scheme))
         .padding(.horizontal, 18)
         .padding(.vertical, 10)
-        .background(Surface.card(scheme), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
-        .overlay { Neatline(cornerRadius: 11) }
+        .paperCard(cornerRadius: 11)
         .shadow(color: .black.opacity(0.18), radius: 14, y: 5)
     }
 }

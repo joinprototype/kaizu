@@ -239,7 +239,14 @@ extension BrowserStore {
     func reopenClosedTab() {
         guard let closed = closedTabs.popLast() else { return }
         let space = spaces.first { $0.id == closed.spaceID } ?? activeSpace
-        openTab(closed.record.url, in: space).title = closed.record.title
+        reopen(closed.record, in: space)
+    }
+
+    /// Opens a closed or archived tab again, under the name it had.
+    func reopen(_ record: TabRecord, in space: Space) {
+        let tab = openTab(record.url, in: space)
+        tab.title = record.title
+        tab.customTitle = record.customTitle
     }
 
     // MARK: - Moving

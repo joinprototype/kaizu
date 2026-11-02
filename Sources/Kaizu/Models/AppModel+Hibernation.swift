@@ -31,20 +31,16 @@ extension AppModel {
 
     /// Hibernates loaded tabs that aren't on screen, haven't been used for
     /// `interval`, and aren't playing media or using the camera/microphone.
-    /// One tab of each site allowed to notify is spared, and rebuilt if it
-    /// would otherwise be paused, except on a memory warning (no `interval`).
+    /// `notifyingTabs` are spared, and rebuilt if they'd otherwise be paused,
+    /// except on a memory warning (no `interval`).
     func hibernateIdleTabs(olderThan interval: TimeInterval = hibernateAfter) async {
         let now = Date()
         let cutoff = now.addingTimeInterval(-interval)
-        let tabs = Set(spaces.flatMap(\.allTabs))
-        var listening = Set(tabs.filter { $0.canKeepRunning && isOnScreen($0) }.compactMap { $0.url?.host() })
-        // Ones already running first, so none is rebuilt for nothing.
-        for tab in tabs.sorted(by: { !$0.needsRebuildToNotify && $1.needsRebuildToNotify })
-        where tab.isLoaded && !isOnScreen(tab) {
-            let listens = interval > 0 && tab.canKeepRunning && tab.url?.host().map { listening.insert($0).inserted } == true
+        let spared = interval > 0 ? notifyingTabs : []
+        for tab in Set(spaces.flatMap(\.allTabs)) where tab.isLoaded && !isOnScreen(tab) {
             // Re-checked after the await: the user may have switched to it meanwhile.
             guard (tab.lastActiveAt ?? now) <= cutoff, await !tab.isBusy, !isOnScreen(tab) else { continue }
-            if !listens {
+            if !spared.contains(tab) {
                 tab.hibernate()
             } else if tab.needsRebuildToNotify {
                 tab.rebuildToNotify()
@@ -52,16 +48,30 @@ extension AppModel {
         }
     }
 
-    /// Sites you let notify you have no push service behind them: one tab of
-    /// each has to be running. Otherwise it would wait to be clicked after a
-    /// relaunch or a memory warning, or if its page process died.
-    func wakeTabsThatNotify() {
-        let tabs = spaces.flatMap(\.allTabs).filter(\.canKeepRunning)
-        var awake = Set(tabs.filter(\.isLoaded).compactMap { $0.url?.host() })
-        for tab in tabs {
-            if let host = tab.url?.host(), awake.insert(host).inserted {
-                tab.activate()
+    /// Sites you let notify you have no push service behind them, so one tab
+    /// of each has to be running: the one best placed to, which hibernation
+    /// and archiving leave alone.
+    var notifyingTabs: Set<BrowserTab> {
+        func standing(_ tab: BrowserTab) -> Int {
+            if isOnScreen(tab) { return 4 }
+            guard tab.isLoaded else { return tab.pinnedURL == nil ? 0 : 1 }
+            return tab.needsRebuildToNotify ? 2 : 3
+        }
+        var chosen: [String: BrowserTab] = [:]
+        for tab in spaces.flatMap(\.allTabs) {
+            guard let host = tab.notifyingHost else { continue }
+            if chosen[host].map({ standing($0) < standing(tab) }) ?? true {
+                chosen[host] = tab
             }
+        }
+        return Set(chosen.values)
+    }
+
+    /// One of them would otherwise wait to be clicked after a relaunch or a
+    /// memory warning, or if its page process died.
+    func wakeTabsThatNotify() {
+        for tab in notifyingTabs where !tab.isLoaded {
+            tab.activate()
         }
     }
 

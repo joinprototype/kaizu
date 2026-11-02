@@ -198,7 +198,7 @@ enum DebugHooks {
             await click(allowed)
             await settle(3)
             if let popup = store.activeSpace.allTabs.first(where: { $0.url?.path() == "/popup" }) {
-                check("a popup is never rebuilt", !popup.needsRebuildToNotify && !popup.canKeepRunning)
+                check("a popup is never rebuilt", !popup.needsRebuildToNotify && popup.notifyingHost == nil)
                 check("so it keeps its opener", await page(popup, "window.opener !== null") == "true")
                 store.close(popup)
             } else {
@@ -276,7 +276,7 @@ enum DebugHooks {
             delivered = []
             check("private windows look like any other", await page(inPrivate, "Notification.toString().includes('native code')") == "false")
             check("but read no saved answers", await page(inPrivate, "Notification.permission") == "default")
-            check("and aren't kept awake", !inPrivate.mayNotify)
+            check("and aren't kept awake", inPrivate.notifyingHost == nil)
             _ = await page(inPrivate, "void new Notification('Private')")
             await settle()
             check("and deliver nothing", delivered.isEmpty)
@@ -459,6 +459,12 @@ enum DebugHooks {
             check("with its name", reopened?.displayTitle == "My page")
             check("nothing selected where it left", store.selectedTab == nil)
             store.switchTo(home)
+            let named = store.openTab(URL(string: "https://example.org/named"))
+            store.rename(named, to: "Named")
+            store.close(named)
+            store.reopenClosedTab()
+            try? await Task.sleep(for: .milliseconds(500))
+            check("⇧⌘T keeps a tab's name", store.selectedTab?.customTitle == "Named")
             try? await Task.sleep(for: .seconds(1))
             NSApp.terminate(nil)
         }

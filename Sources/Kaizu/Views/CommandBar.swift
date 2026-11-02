@@ -112,7 +112,8 @@ struct CommandBar: View {
     /// Applies late-arriving results without moving the highlight off the
     /// row it's on (new rows can land above it), easing the rows apart.
     private func keepingSelection(_ update: () -> Void) {
-        let selected = suggestions.indices.contains(selection) ? suggestions[selection].id : nil
+        let current = suggestions
+        let selected = current.indices.contains(selection) ? current[selection].id : nil
         withAnimation(Motion.snap) {
             update()
             selection = suggestions.firstIndex { $0.id == selected } ?? 0
@@ -251,8 +252,7 @@ struct CommandBar: View {
             .frame(height: 32)
         }
         .frame(width: 620)
-        .background(Surface.card(scheme), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay { Neatline() }
+        .paperCard()
         .shadow(color: .black.opacity(0.3), radius: 40, y: 16)
     }
 

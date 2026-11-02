@@ -36,15 +36,7 @@ struct AboutView: View {
             }
             .padding(.horizontal, 44)
         }
-        .overlay {
-            ZStack {
-                Neatline(cornerRadius: 5)
-                Graticule()
-                    .stroke(Ink.iron(scheme).opacity(0.3), lineWidth: 0.5)
-                    .padding(3)
-            }
-            .padding(10)
-        }
+        .overlay { ChartFrame(cornerRadius: 5, inset: 10) }
         .frame(width: 380, height: 470)
     }
 }

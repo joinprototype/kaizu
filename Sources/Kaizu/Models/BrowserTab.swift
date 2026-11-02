@@ -99,13 +99,14 @@ final class BrowserTab: NSObject, Identifiable {
         return url?.displayHost ?? "New Tab"
     }
 
-    private var keepsRunningInBackground = false
     /// Made from WebKit's configuration for `window.open`. It's left alone:
     /// rebuilding it would cut it off from the page that opened it.
     private var isPopupPage = false
 
     /// Notifications from this page you haven't looked at. Not saved.
-    private(set) var unreadNotifications = 0
+    private(set) var unreadNotifications = 0 {
+        didSet { app?.updateDockBadge() }
+    }
 
     var isLoaded: Bool { _webView != nil }
 
@@ -115,9 +116,9 @@ final class BrowserTab: NSObject, Identifiable {
 
         // A configuration handed to us by WebKit (window.open / target=_blank)
         // must be used as-is, and WebKit performs the load itself.
-        let isPopup = pendingConfiguration != nil
+        isPopupPage = pendingConfiguration != nil
         // Extension pages (options, onboarding) need their extension's own configuration.
-        let extensionContext = isPopup || profile.isPrivate ? nil : url.flatMap { app?.extensions.controller.extensionContext(for: $0) }
+        let extensionContext = isPopupPage || profile.isPrivate ? nil : url.flatMap { app?.extensions.controller.extensionContext(for: $0) }
         extensionBaseURL = extensionContext?.baseURL
         let configuration: WKWebViewConfiguration
         if let extensionConfiguration = extensionContext?.webViewConfiguration {
@@ -142,9 +143,7 @@ final class BrowserTab: NSObject, Identifiable {
         // A web view out of a window is paused otherwise, which is every tab
         // but the one on screen: hidden, a chat site's socket stalled for
         // 46 s, against 0.8 s throttled (Nov 1).
-        isPopupPage = isPopup
-        keepsRunningInBackground = canKeepRunning
-        if keepsRunningInBackground {
+        if notifyingHost != nil {
             configuration.preferences.inactiveSchedulingPolicy = .throttle
         }
 
@@ -164,7 +163,7 @@ final class BrowserTab: NSObject, Identifiable {
         ]
         _webView = webView
 
-        if !isPopup {
+        if !isPopupPage {
             let state = savedState
             savedState = nil
             // Hold the first load until content blocking is in place, unless
@@ -411,24 +410,25 @@ final class BrowserTab: NSObject, Identifiable {
         isPlayingMedia = false
     }
 
-    /// Whether this page's site may notify you. It can only do that while
-    /// a page of it runs, so one tab of each such site stays loaded and awake.
-    var mayNotify: Bool {
-        // The web view knows a new page before `url` catches up.
-        guard !profile.isPrivate, let host = (_webView?.url ?? url)?.host() else { return false }
-        return app?.settings.sitePermissions[host]?[SiteNotifications.permission] == true
+    /// Your answer about a site's notifications. Private windows don't read
+    /// any: every site there is one that hasn't been asked.
+    func notificationAnswer(for host: String) -> Bool? {
+        profile.isPrivate ? nil : app?.settings.sitePermissions[host]?[SiteNotifications.permission]
     }
 
-    var canKeepRunning: Bool { mayNotify && !isPopupPage }
+    /// The site this tab could hear from in the background, if it's allowed
+    /// to notify you. See `AppModel.notifyingTabs`.
+    var notifyingHost: String? {
+        // The web view knows a new page before `url` catches up.
+        guard !isPopupPage, let host = (_webView?.url ?? url)?.host(), notificationAnswer(for: host) == true
+        else { return nil }
+        return host
+    }
 
     /// A site's answer about notifications, from the page's question or the
     /// site popover. macOS is asked too, the first time one is allowed.
     func setNotifications(_ allowed: Bool?, for host: String) {
-        guard let settings = app?.settings else { return }
-        settings.sitePermissions[host, default: [:]][SiteNotifications.permission] = allowed
-        if settings.sitePermissions[host]?.isEmpty == true {
-            settings.sitePermissions[host] = nil
-        }
+        app?.settings.setPermission(SiteNotifications.permission, to: allowed, on: host)
         guard allowed == true else { return }
         Task {
             let macOS = await SiteNotifications.requestDelivery()
@@ -453,22 +453,24 @@ final class BrowserTab: NSObject, Identifiable {
     func noteNotification(deliveredByMacOS delivered: Bool) {
         guard let app, !(NSApp.isActive && app.stores.contains { $0.selectedTab === self }) else { return }
         unreadNotifications += 1
-        app.updateDockBadge()
         if !delivered {
             NSApp.requestUserAttention(.informationalRequest)
         }
     }
 
     func markNotificationsRead() {
-        guard unreadNotifications > 0 else { return }
-        unreadNotifications = 0
-        app?.updateDockBadge()
+        if unreadNotifications > 0 {
+            unreadNotifications = 0
+        }
     }
 
     /// Allowed since its web view was made, or arrived here by a link, so
     /// it would still be paused in the background: WebKit only reads that
     /// setting at creation.
-    var needsRebuildToNotify: Bool { isLoaded && canKeepRunning && !keepsRunningInBackground }
+    var needsRebuildToNotify: Bool {
+        guard let _webView, notifyingHost != nil else { return false }
+        return _webView.configuration.preferences.inactiveSchedulingPolicy != .throttle
+    }
 
     /// Reloads the page in a web view that keeps running, back/forward intact.
     func rebuildToNotify() {
@@ -764,223 +766,5 @@ extension BrowserTab: WKNavigationDelegate {
     /// A page's host for the log (hashed there), never a private window's.
     private func logHost(_ url: URL?) -> String {
         profile.isPrivate ? "private window" : url?.host() ?? "no host"
-    }
-}
-
-// MARK: - WKUIDelegate
-
-extension BrowserTab: WKUIDelegate {
-    func webView(
-        _ webView: WKWebView,
-        createWebViewWith configuration: WKWebViewConfiguration,
-        for navigationAction: WKNavigationAction,
-        windowFeatures: WKWindowFeatures
-    ) -> WKWebView? {
-        guard let store else { return nil }
-        let tab = store.openTab(navigationAction.request.url, after: self, configuration: configuration)
-        return tab.webView
-    }
-
-    func webViewDidClose(_ webView: WKWebView) {
-        store?.close(self)
-    }
-
-    func webView(
-        _ webView: WKWebView,
-        runJavaScriptAlertPanelWithMessage message: String,
-        initiatedByFrame frame: WKFrameInfo,
-        completionHandler: @escaping @MainActor @Sendable () -> Void
-    ) {
-        let alert = NSAlert()
-        alert.messageText = frame.securityOrigin.host
-        alert.informativeText = message
-        alert.addButton(withTitle: "OK")
-        present(alert) { _ in completionHandler() }
-    }
-
-    func webView(
-        _ webView: WKWebView,
-        runJavaScriptConfirmPanelWithMessage message: String,
-        initiatedByFrame frame: WKFrameInfo,
-        completionHandler: @escaping @MainActor @Sendable (Bool) -> Void
-    ) {
-        let alert = NSAlert()
-        alert.messageText = frame.securityOrigin.host
-        alert.informativeText = message
-        alert.addButton(withTitle: "OK")
-        alert.addButton(withTitle: "Cancel")
-        present(alert) { completionHandler($0 == .alertFirstButtonReturn) }
-    }
-
-    func webView(
-        _ webView: WKWebView,
-        runJavaScriptTextInputPanelWithPrompt prompt: String,
-        defaultText: String?,
-        initiatedByFrame frame: WKFrameInfo,
-        completionHandler: @escaping @MainActor @Sendable (String?) -> Void
-    ) {
-        let alert = NSAlert()
-        alert.messageText = frame.securityOrigin.host
-        alert.informativeText = prompt
-        alert.addButton(withTitle: "OK")
-        alert.addButton(withTitle: "Cancel")
-        let field = NSTextField(string: defaultText ?? "")
-        field.frame = NSRect(x: 0, y: 0, width: 260, height: 24)
-        alert.accessoryView = field
-        present(alert) { completionHandler($0 == .alertFirstButtonReturn ? field.stringValue : nil) }
-    }
-
-    func webView(
-        _ webView: WKWebView,
-        runOpenPanelWith parameters: WKOpenPanelParameters,
-        initiatedByFrame frame: WKFrameInfo,
-        completionHandler: @escaping @MainActor @Sendable ([URL]?) -> Void
-    ) {
-        let panel = NSOpenPanel()
-        panel.allowsMultipleSelection = parameters.allowsMultipleSelection
-        panel.canChooseDirectories = parameters.allowsDirectories
-        panel.canChooseFiles = true
-        guard let window = webView.window else { return completionHandler(nil) }
-        panel.beginSheetModal(for: window) { response in
-            completionHandler(response == .OK ? panel.urls : nil)
-        }
-    }
-
-    /// Camera and microphone: ask once per site and remember the answer
-    /// (except in private windows), instead of WebKit asking on every visit.
-    func webView(
-        _ webView: WKWebView,
-        requestMediaCapturePermissionFor origin: WKSecurityOrigin,
-        initiatedByFrame frame: WKFrameInfo,
-        type: WKMediaCaptureType,
-        decisionHandler: @escaping @MainActor @Sendable (WKPermissionDecision) -> Void
-    ) {
-        let devices = switch type {
-        case .camera: ["camera"]
-        case .microphone: ["microphone"]
-        default: ["camera", "microphone"]
-        }
-        decidePermission(for: origin.host, devices: devices, decisionHandler: decisionHandler)
-    }
-
-    @available(macOS 27.0, *)
-    func webView(
-        _ webView: WKWebView,
-        requestGeolocationPermissionFor origin: WKSecurityOrigin,
-        initiatedByFrame frame: WKFrameInfo,
-        decisionHandler: @escaping @MainActor @Sendable (WKPermissionDecision) -> Void
-    ) {
-        decidePermission(for: origin.host, devices: ["location"], decisionHandler: decisionHandler)
-    }
-
-    /// Uses a remembered answer, or asks with "Remember for this site".
-    /// Answers are shared by every profile, like Safari's website settings;
-    /// private windows always ask and never remember.
-    private func decidePermission(
-        for host: String,
-        devices: [String],
-        decisionHandler: @escaping @MainActor @Sendable (WKPermissionDecision) -> Void
-    ) {
-        guard let settings = app?.settings else { return decisionHandler(.prompt) }
-        let remembers = !profile.isPrivate
-        if remembers {
-            let remembered = devices.map { settings.sitePermissions[host]?[$0] }
-            if remembered.allSatisfy({ $0 == true }) { return decisionHandler(.grant) }
-            if remembered.contains(false) { return decisionHandler(.deny) }
-        }
-
-        let alert = NSAlert()
-        alert.messageText = "Allow “\(host)” to use your \(devices.joined(separator: " and "))?"
-        alert.addButton(withTitle: "Allow")
-        alert.addButton(withTitle: "Don’t Allow")
-        if remembers {
-            alert.showsSuppressionButton = true
-            alert.suppressionButton?.title = "Remember for this site"
-            alert.suppressionButton?.state = .on
-        }
-        present(alert) { response in
-            let allowed = response == .alertFirstButtonReturn
-            if remembers, response != .abort, alert.suppressionButton?.state == .on {
-                for device in devices {
-                    settings.sitePermissions[host, default: [:]][device] = allowed
-                }
-            }
-            decisionHandler(allowed ? .grant : .deny)
-        }
-    }
-
-    private func confirmOpeningApp(for target: URL) {
-        guard let app = NSWorkspace.shared.urlForApplication(toOpen: target) else { return }
-        let alert = NSAlert()
-        alert.messageText = "Open “\(FileManager.default.displayName(atPath: app.path))”?"
-        alert.informativeText = "\(url?.displayHost ?? "This page") wants to open this application."
-        alert.addButton(withTitle: "Open")
-        alert.addButton(withTitle: "Cancel")
-        present(alert) { response in
-            if response == .alertFirstButtonReturn {
-                NSWorkspace.shared.open(target)
-            }
-        }
-    }
-
-    /// Shows the alert as a sheet on the tab's window. Pages in the
-    /// background get `.abort` instead: an app-modal dialog from a tab you
-    /// can't see would freeze the whole browser.
-    private func present(_ alert: NSAlert, completion: @escaping (NSApplication.ModalResponse) -> Void) {
-        guard let window = _webView?.window else { return completion(.abort) }
-        alert.beginSheetModal(for: window, completionHandler: completion)
-    }
-}
-
-// MARK: - Media events
-
-/// Tells a tab when any audio or video in it (iframes included) plays or
-/// stops, so the sidebar's speaker and mini player stay current without
-/// polling every tab, and mutes media for the tab's mute button (only
-/// elements it muted itself are unmuted again). Runs in an isolated world,
-/// invisible to pages. The script is one of the content blocker's standard
-/// scripts; each tab adds its own message handler.
-@MainActor
-final class MediaEvents: NSObject, WKScriptMessageHandler {
-    private static let name = "kaizuMedia"
-    static let script = WKUserScript(
-        source: """
-        (() => {
-          let muted = false;
-          const ours = new WeakSet();
-          const mute = (media) => {
-            if (muted && !media.muted) { media.muted = true; ours.add(media); }
-          };
-          const post = () => window.webkit?.messageHandlers?.\(name)?.postMessage(0);
-          for (const type of ['play', 'pause', 'ended', 'emptied']) {
-            document.addEventListener(type, (event) => {
-              if (type === 'play') mute(event.target);
-              post();
-            }, true);
-          }
-          window.kaizuSetMuted = (value) => {
-            muted = value;
-            for (const media of document.querySelectorAll('video, audio')) {
-              if (value) mute(media);
-              else if (ours.has(media)) { media.muted = false; ours.delete(media); }
-            }
-          };
-        })();
-        """,
-        injectionTime: .atDocumentStart,
-        forMainFrameOnly: false,
-        in: .defaultClient
-    )
-
-    private weak var tab: BrowserTab?
-
-    static func install(on controller: WKUserContentController, for tab: BrowserTab) {
-        let events = MediaEvents()
-        events.tab = tab
-        controller.add(events, contentWorld: .defaultClient, name: name)
-    }
-
-    func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
-        tab?.mediaDidChange(in: message.frameInfo)
     }
 }

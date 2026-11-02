@@ -25,16 +25,14 @@ extension AppModel {
         let now = Date()
         let cutoff = now.addingTimeInterval(-interval)
         var archived: [ArchivedTabRecord] = []
-        // A site you let notify you stays reachable through one tab.
-        let kept = spaces.flatMap { $0.pinned.tabs + $0.profile.favorites }.filter(\.canKeepRunning)
-        var listening = Set(kept.compactMap { $0.url?.host() })
+        let notifying = notifyingTabs
         for space in spaces {
-            // Anything on screen or audible stays, however long it's been.
+            // Anything on screen, audible or notifying stays, however long it's been.
             let selected = Set(stores.compactMap { $0.selectedTabIDs[space.id] })
             let stale = space.today.filter { tab in
                 !selected.contains(tab.id) && !space.split.contains(tab.id) && !tab.isPlayingMedia
                     && (tab.lastActiveAt ?? now) < cutoff
-                    && !(tab.canKeepRunning && tab.url?.host().map { listening.insert($0).inserted } == true)
+                    && !notifying.contains(tab)
             }
             guard !stale.isEmpty else { continue }
             archived += stale.map { ArchivedTabRecord(tab: $0.record, spaceID: space.id, archivedAt: now) }
@@ -67,7 +65,7 @@ extension BrowserStore {
     func reopen(_ archived: ArchivedTabRecord) {
         app.archive.removeAll { $0.id == archived.id }
         let space = spaces.first { $0.id == archived.spaceID } ?? activeSpace
-        openTab(archived.tab.url, in: space).title = archived.tab.title
+        reopen(archived.tab, in: space)
         app.saveArchive()
     }
 }
