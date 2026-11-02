@@ -57,27 +57,33 @@ extension BrowserStore {
         return panes.contains(tab) || panes.count < Self.maxSplitPanes
     }
 
-    /// A sidebar tab dropped on one side of `target`'s page: starts a split
-    /// with it there, or adds it to (or moves it within) the split `target`
-    /// is in. It takes half of `target`'s pane, whichever way that pane's
-    /// neighbors run, which is how a split comes to mix rows and columns.
-    func split(_ target: BrowserTab, with id: UUID, on edge: SplitEdge) {
+    /// A sidebar tab dropped on `target`'s page: starts a split with it there,
+    /// or adds it to (or moves it within) the split `target` is in. It takes
+    /// half of `target`'s pane, whichever way that pane's neighbors run, or
+    /// half of the split along its outer edge, which is how a split comes to
+    /// mix rows and columns.
+    func split(_ target: BrowserTab, with id: UUID, at place: SplitPlace) {
         guard canSplit(target, with: id), let tab = tab(TabDrag(id: id)) else { return }
         let space = activeSpace
         takeOver(tab)
         withAnimation(Motion.glide) {
-            space.splitLayout = space.layout(with: target).placing(id, by: target.id, on: edge)
+            space.splitLayout = space.layout(with: target).placing(id, at: place)
             select(tab, in: space)
         }
         scheduleSave()
     }
 
-    /// Drop handling for `tab`'s page in the main window. `hover` hears where
-    /// a dragged tab would land.
-    func splitDrop(onto tab: BrowserTab, hover: @escaping ((tab: UUID, edge: SplitEdge)?) -> Void) -> SplitDrop {
+    /// Drop handling for `tab`'s page in the main window. `place` says where
+    /// a point on the page lands, and `hover` hears where a dragged tab would.
+    func splitDrop(
+        onto tab: BrowserTab,
+        place: @escaping (CGPoint) -> SplitPlace,
+        hover: @escaping ((tab: UUID, place: SplitPlace)?) -> Void
+    ) -> SplitDrop {
         SplitDrop(
             accepts: { [weak self] id in self?.canSplit(tab, with: id) ?? false },
-            perform: { [weak self] id, edge in self?.split(tab, with: id, on: edge) },
+            place: place,
+            perform: { [weak self] id, place in self?.split(tab, with: id, at: place) },
             hover: hover
         )
     }

@@ -97,7 +97,8 @@ WindowModel (one per window; today's `BrowserStore`)
   or a row or column of nodes with shares, so any pane can split again the other
   way. Arc 1.171 saves less (flat `childrenIds`, one `layoutOrientation` and one
   `itemWidthFactors` per split); Kaizu goes further so one pane can sit above
-  two. A drop takes half the pane it lands on, and its preview shows that room.
+  two. A drop takes half the pane it lands on, or half the split within 36 pt of
+  its outer edge (a row across all of it), and its preview shows that room.
   `BrowserCore/SplitLayout.swift` holds what can be tested without a window: tree
   edits, frames, dividers, the session form. `SplitContent` only draws them: all
   panes are siblings keyed by tab, so changing the layout moves pages and never

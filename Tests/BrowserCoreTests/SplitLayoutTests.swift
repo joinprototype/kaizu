@@ -100,6 +100,86 @@ import Testing
         #expect(shape(bento.appending(d)) == "[a / [b | c] / d]")
     }
 
+    // MARK: Along the whole split
+
+    @Test func aRowGainsARowAcrossIt() {
+        let below = SplitNode.row([a, b]).placing(c, along: .bottom)
+        #expect(shape(below) == "[[a | b] / c]")
+        #expect(shares(below) == [0.5, 0.5])
+        #expect(shape(SplitNode.row([a, b]).placing(c, along: .top)) == "[c / [a | b]]")
+    }
+
+    @Test func aStackGainsAColumnBesideIt() {
+        let stack = SplitNode.pane(a).placing(b, by: a, on: .bottom)
+        #expect(shape(stack.placing(c, along: .left)) == "[c | [a / b]]")
+        #expect(shape(stack.placing(c, along: .right)) == "[[a / b] | c]")
+    }
+
+    /// Along the way it already runs: the same group, not a group in a group.
+    @Test func goingTheGroupsWayJoinsIt() {
+        let stack = SplitNode.pane(a).placing(b, by: a, on: .bottom).placing(c, along: .bottom)
+        #expect(shape(stack) == "[a / b / c]")
+        #expect(shares(stack) == [0.25, 0.25, 0.5])
+    }
+
+    @Test func aPaneInTheLayoutMovesToTheEdge() {
+        #expect(shape(bento.placing(a, along: .bottom)) == "[[b | c] / a]")
+        #expect(shape(bento.placing(c, along: .right)) == "[[a / b] | c]")
+        #expect(shape(SplitNode.row([a, b]).placing(a, along: .top)) == "[a / b]")
+    }
+
+    @Test func aPlaceSaysWhichWayItLands() {
+        let row = SplitNode.row([a, b])
+        #expect(row.placing(c, at: .pane(b, .bottom)) == row.placing(c, by: b, on: .bottom))
+        #expect(row.placing(c, at: .split(.bottom)) == row.placing(c, along: .bottom))
+    }
+
+    @Test func aRowAcrossSpansEveryPane() {
+        let geometry = SplitNode.row([a, b]).placing(c, along: .bottom).geometry(in: bounds, gap: 8)
+        #expect(isClose(geometry.panes[c], CGRect(x: 0, y: 408, width: 1008, height: 400)))
+    }
+
+    // MARK: Where a point lands
+
+    private func place(_ layout: SplitNode, x: Double, y: Double, over pane: UUID) -> SplitPlace {
+        layout.place(at: CGPoint(x: x, y: y), over: pane, in: bounds, gap: 8)
+    }
+
+    @Test func nearTheOuterEdgeRunsAlongIt() {
+        let row = SplitNode.row([a, b])
+        #expect(place(row, x: 800, y: 790, over: b) == .split(.bottom))
+        #expect(place(row, x: 200, y: 790, over: a) == .split(.bottom))
+        #expect(place(row, x: 800, y: 10, over: b) == .split(.top))
+        #expect(place(row, x: 10, y: 400, over: a) == .split(.left))
+        #expect(place(row, x: 1000, y: 400, over: b) == .split(.right))
+    }
+
+    @Test func theCornerGoesToTheNearerEdge() {
+        #expect(place(.row([a, b]), x: 1000, y: 780, over: b) == .split(.right))
+        #expect(place(.row([a, b]), x: 980, y: 800, over: b) == .split(.bottom))
+    }
+
+    @Test func insideItStaysOnThePane() {
+        let row = SplitNode.row([a, b])
+        #expect(place(row, x: 754, y: 760, over: b) == .pane(b, .bottom))
+        #expect(place(row, x: 754, y: 60, over: b) == .pane(b, .top))
+        // The side of a pane that's inside the split isn't an outer edge.
+        #expect(place(row, x: 510, y: 400, over: b) == .pane(b, .left))
+        #expect(place(row, x: 498, y: 400, over: a) == .pane(a, .right))
+    }
+
+    @Test func nestedPanesMeasureFromTheirOwnFrame() {
+        #expect(place(bento, x: 760, y: 500, over: c) == .pane(c, .top))
+        #expect(place(bento, x: 260, y: 700, over: b) == .pane(b, .bottom))
+        #expect(place(bento, x: 760, y: 400, over: a) == .pane(a, .bottom))
+    }
+
+    /// With one pane the edge of the page is the edge of the split.
+    @Test func aLonePageHasOnlyItsSides() {
+        #expect(place(.pane(a), x: 500, y: 800, over: a) == .pane(a, .bottom))
+        #expect(place(.pane(a), x: 2, y: 400, over: a) == .pane(a, .left))
+    }
+
     // MARK: Taking panes out
 
     @Test func whatsLeftTakesUpTheRoom() {

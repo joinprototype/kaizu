@@ -11,8 +11,8 @@ struct SplitContent: View {
     let space: Space
     let panes: [BrowserTab]
     let focused: BrowserTab
-    /// A sidebar tab being dragged over a pane, and the side it's nearest.
-    @State private var drop: DropHover?
+    /// A sidebar tab being dragged over a pane, and where it would land.
+    @State private var drop: (tab: UUID, place: SplitPlace)?
 
     private static let gap: CGFloat = 8
 
@@ -24,10 +24,10 @@ struct SplitContent: View {
             ZStack {
                 ForEach(panes, id: \.id) { pane in
                     if let frame = shape.panes[pane.id] {
-                        SplitPane(tab: pane, isFocused: pane === focused, isSplit: panes.count > 1, theme: space.theme) { hover in
-                            withAnimation(Motion.snap) {
-                                drop = hover.map { DropHover(tab: $0.tab, target: pane.id, edge: $0.edge) }
-                            }
+                        SplitPane(tab: pane, isFocused: pane === focused, isSplit: panes.count > 1, theme: space.theme) { point in
+                            layout.place(at: CGPoint(x: frame.minX + point.x, y: frame.minY + point.y), over: pane.id, in: bounds, gap: Self.gap)
+                        } onDropHover: { hover in
+                            withAnimation(Motion.snap) { drop = hover }
                         }
                         .frame(width: frame.width, height: frame.height)
                         // Panes joining or leaving a split ease in and out;
@@ -47,24 +47,13 @@ struct SplitContent: View {
                     }
                     .position(x: divider.frame.midX, y: divider.frame.midY)
                 }
-                if let drop, let frame = drop.landing(in: layout, bounds: bounds, gap: Self.gap) {
+                if let drop, let frame = layout.placing(drop.tab, at: drop.place).geometry(in: bounds, gap: Self.gap).panes[drop.tab] {
                     SplitDropPreview(frame: frame.insetBy(dx: 6, dy: 6), accent: space.theme.accent(scheme))
                 }
             }
         }
         // A drag's end goes unheard if its page leaves first.
         .onChange(of: panes) { drop = nil }
-    }
-}
-
-private struct DropHover {
-    let tab: UUID
-    let target: UUID
-    let edge: SplitEdge
-
-    /// Where the tab would end up.
-    func landing(in layout: SplitNode, bounds: CGRect, gap: CGFloat) -> CGRect? {
-        layout.placing(tab, by: target, on: edge).geometry(in: bounds, gap: gap).panes[tab]
     }
 }
 
@@ -122,11 +111,12 @@ private struct SplitPane: View {
     let isFocused: Bool
     let isSplit: Bool
     let theme: Theme
-    let onDropHover: ((tab: UUID, edge: SplitEdge)?) -> Void
+    let place: (CGPoint) -> SplitPlace
+    let onDropHover: ((tab: UUID, place: SplitPlace)?) -> Void
     @State private var isHovering = false
 
     var body: some View {
-        PageView(tab: tab, accent: theme.accent(scheme), splitDrop: store.splitDrop(onto: tab, hover: onDropHover))
+        PageView(tab: tab, accent: theme.accent(scheme), splitDrop: store.splitDrop(onto: tab, place: place, hover: onDropHover))
             .overlay {
                 if let reader = store.reader, reader.tabID == tab.id {
                     ReaderView(article: reader)

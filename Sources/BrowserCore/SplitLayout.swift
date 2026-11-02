@@ -31,6 +31,14 @@ public enum SplitEdge: Sendable {
     fileprivate var isBefore: Bool { self == .left || self == .top }
 }
 
+/// Where a dragged tab lands.
+public enum SplitPlace: Equatable, Sendable {
+    /// On one side of a pane, taking half of it.
+    case pane(UUID, SplitEdge)
+    /// Along one side of the whole split, taking half of that.
+    case split(SplitEdge)
+}
+
 /// How a split's panes sit: a pane, or a group of these side by side or
 /// stacked. Any pane can split again the other way, so panes can make any
 /// bento: one across the top with two below is a stack of a pane and a row.
@@ -70,10 +78,23 @@ extension SplitNode {
         }
     }
 
+    public func placing(_ id: UUID, at place: SplitPlace) -> SplitNode {
+        switch place {
+        case .pane(let target, let edge): placing(id, by: target, on: edge)
+        case .split(let edge): placing(id, along: edge)
+        }
+    }
+
     /// With `id` taking half of `target`'s place, on `edge`. If it's already
     /// here it moves there, and what it leaves closes up.
     public func placing(_ id: UUID, by target: UUID, on edge: SplitEdge) -> SplitNode {
         (removing(id) ?? self).splitting(target, with: id, on: edge)
+    }
+
+    /// With `id` taking half of the whole layout, along `edge`.
+    public func placing(_ id: UUID, along edge: SplitEdge) -> SplitNode {
+        let halves = [removing(id) ?? self, .pane(id)].map { SplitChild(node: $0, share: 0.5) }
+        return Self.tidied(edge.direction, edge.isBefore ? halves.reversed() : halves) ?? self
     }
 
     private func splitting(_ target: UUID, with id: UUID, on edge: SplitEdge) -> SplitNode {
@@ -191,6 +212,25 @@ extension SplitNode {
                 }
             }
         }
+    }
+
+    /// How close to the split's outer edge a tab has to be to run along it.
+    public static let outerBand = 36.0
+
+    /// Where a tab dragged to `point`, over `pane`, lands: along the split
+    /// close to its outer edge, or else on the side of the pane it's nearest.
+    public func place(at point: CGPoint, over pane: UUID, in bounds: CGRect, gap: Double) -> SplitPlace {
+        if case .group = self {
+            let distances = [
+                (SplitEdge.left, point.x - bounds.minX), (.right, bounds.maxX - point.x),
+                (.top, point.y - bounds.minY), (.bottom, bounds.maxY - point.y),
+            ]
+            if let nearest = distances.min(by: { $0.1 < $1.1 }), nearest.1 < Self.outerBand {
+                return .split(nearest.0)
+            }
+        }
+        let frame = geometry(in: bounds, gap: gap).panes[pane] ?? bounds
+        return .pane(pane, SplitEdge(x: (point.x - frame.minX) / frame.width, y: (point.y - frame.minY) / frame.height))
     }
 
     /// With `divider` moved by `distance`, taken from the parts either side of it.

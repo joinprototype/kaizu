@@ -48,11 +48,12 @@ private final class StandInDrag: NSObject, NSDraggingInfo {
 /// `split` splits with the most recent tab, stacks it, then closes it.
 /// `splitdrop` hands each page a stand-in for AppKit's drag (a real one from the
 /// sidebar isn't simulated): shows the preview on each side of a page, drops there
-/// to build rows, stacks and bentos, drags the dividers with mouse events sent
-/// through the window, logs each rule as ok or FAILED, leaves one pane above two,
-/// saves and quits, with pictures in the folder KAIZU_SHOTS if set. Run again on
-/// the same KAIZU_SUPPORT to check what came back, or on a session from an older
-/// build to log the split it kept. Opens tabs: use with KAIZU_SUPPORT.
+/// and at the split's outer edge to build rows, stacks and bentos, drags the
+/// dividers with mouse events sent through the window, logs each rule as ok or
+/// FAILED, leaves one pane above two, saves and quits, with pictures in the folder
+/// KAIZU_SHOTS if set. Run again on the same KAIZU_SUPPORT to check what came
+/// back, or on a session from an older build to log the split it kept. Opens
+/// tabs: use with KAIZU_SUPPORT.
 /// `open` opens KAIZU_URL and logs whether the page is showing after 6 s.
 /// `bugreport` opens Report a Bug, then writes a report and logs its path.
 /// `brokensite` opens KAIZU_URL, pauses blocking there and takes the toast's
@@ -530,16 +531,19 @@ enum DebugHooks {
             shots += 1
             saveShot(of: store.window, to: "\(folder)/\(shots)-\(name).png")
         }
-        /// Drags `tab` near that edge of `target`'s page, shows the preview for
-        /// a moment, then drops it.
-        func drop(_ tab: BrowserTab, on target: BrowserTab, _ edge: SplitEdge) async {
+        /// Drags `tab` towards that edge of `target`'s page, or right up to
+        /// it for the split's own edge, shows the preview for a moment, then
+        /// drops it.
+        func drop(_ tab: BrowserTab, on target: BrowserTab, _ edge: SplitEdge, outer: Bool = false) async {
             guard let catcher = page(showing: target)?.dropTarget else { return check("the page is showing", false) }
             let box = catcher.convert(catcher.bounds, to: nil)
+            let across = outer ? 10 : box.width / 4
+            let down = outer ? 10 : box.height / 4
             let point = switch edge {
-            case .left: NSPoint(x: box.minX + 20, y: box.midY)
-            case .right: NSPoint(x: box.maxX - 20, y: box.midY)
-            case .top: NSPoint(x: box.midX, y: box.maxY - 20)
-            case .bottom: NSPoint(x: box.midX, y: box.minY + 20)
+            case .left: NSPoint(x: box.minX + across, y: box.midY)
+            case .right: NSPoint(x: box.maxX - across, y: box.midY)
+            case .top: NSPoint(x: box.midX, y: box.maxY - down)
+            case .bottom: NSPoint(x: box.midX, y: box.minY + down)
             }
             let drag = StandInDrag(tab.id, at: point)
             _ = catcher.draggingEntered(drag)
@@ -584,9 +588,6 @@ enum DebugHooks {
 
             let wide = frame(of: first)
             let gap = NSPoint(x: wide.maxX + 4, y: wide.midY)
-            // The first click behind other apps only wakes the window.
-            await mouse(in: window, at: gap)
-            try? await Task.sleep(for: .milliseconds(500))
             await mouse(in: window, at: gap, dragTo: NSPoint(x: gap.x + 60, y: gap.y))
             try? await Task.sleep(for: .milliseconds(300))
             shot("divider-across")
@@ -604,7 +605,7 @@ enum DebugHooks {
             await drop(fourth, on: first, .top)
             check("each column stacks, into a grid", layout() == "[[d / a] | [b / c]]")
             check("four is the limit", page(showing: third)?.dropTarget.draggingEntered(StandInDrag(fifth.id, at: .zero)) == [])
-            store.split(third, with: fifth.id, on: .top)
+            store.split(third, with: fifth.id, at: .pane(third.id, .top))
             check("a fifth changes nothing", layout() == "[[d / a] | [b / c]]")
             check("but its panes still move", store.canSplit(third, with: second.id))
             await drop(second, on: third, .right)
@@ -619,6 +620,15 @@ enum DebugHooks {
             store.select(fifth)
             store.addToSplit(third)
             check("a split with another tab starts a row", layout() == "[e | c]")
+
+            await drop(first, on: third, .bottom, outer: true)
+            check("the bottom edge of a split takes a row across it", layout() == "[[e | c] / a]")
+            check("under both panes", close(frame(of: first).width, frame(of: fifth).width + frame(of: third).width + 8))
+            await drop(second, on: third, .top, outer: true)
+            check("the top edge joins the rows", layout() == "[b / [e | c] / a]")
+            await drop(second, on: third, .right, outer: true)
+            check("a pane moves to the side of the whole split", layout() == "[[[e | c] / a] | b]")
+            check("beside everything", close(frame(of: second).height, frame(of: first).height + frame(of: third).height + 8))
 
             store.closeSplit()
             store.select(first)
@@ -1183,7 +1193,7 @@ enum DebugHooks {
                 try? await Task.sleep(for: .seconds(2))
                 logPageCount(store, "split")
                 if let tab = store.selectedTab, let other = store.activeSpace.splitTabs.first(where: { $0 !== tab }) {
-                    store.split(other, with: tab.id, on: .bottom)
+                    store.split(other, with: tab.id, at: .pane(other.id, .bottom))
                 }
                 try? await Task.sleep(for: .seconds(2))
                 logPageCount(store, "stacked")
@@ -1475,12 +1485,18 @@ enum DebugHooks {
             window.sendEvent(event)
             try? await Task.sleep(for: .milliseconds(30))
         }
-        await send(.leftMouseDown, start)
         if let end {
+            // Behind other apps, a click after a pause only wakes the window.
+            await send(.leftMouseDown, start)
+            await send(.leftMouseUp, start)
+            try? await Task.sleep(for: .milliseconds(500))
+            await send(.leftMouseDown, start)
             for step in 1...10 {
                 let progress = CGFloat(step) / 10
                 await send(.leftMouseDragged, NSPoint(x: start.x + (end.x - start.x) * progress, y: start.y + (end.y - start.y) * progress))
             }
+        } else {
+            await send(.leftMouseDown, start)
         }
         await send(.leftMouseUp, end ?? start)
     }

@@ -69,9 +69,11 @@ struct PageView: View {
 /// opens in split view there.
 struct SplitDrop {
     var accepts: (UUID) -> Bool
-    var perform: (UUID, SplitEdge) -> Void
+    /// Where a tab at a point on the page, from its top left, would land.
+    var place: (CGPoint) -> SplitPlace
+    var perform: (UUID, SplitPlace) -> Void
     /// Where the tab would land; nil once it leaves or drops.
-    var hover: ((tab: UUID, edge: SplitEdge)?) -> Void
+    var hover: ((tab: UUID, place: SplitPlace)?) -> Void
 }
 
 extension View {
@@ -173,7 +175,7 @@ final class WebContainerView: NSView {
 private final class TabDropCatcher: NSView {
     var tabDrop: SplitDrop?
     private var draggedTab: UUID?
-    private var dropEdge: SplitEdge?
+    private var dropPlace: SplitPlace?
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -195,30 +197,30 @@ private final class TabDropCatcher: NSView {
     override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
         guard draggedTab != nil else { return [] }
         let point = convert(sender.draggingLocation, from: nil)
-        setDropEdge(SplitEdge(x: point.x / bounds.width, y: 1 - point.y / bounds.height))
+        setDropPlace(tabDrop?.place(CGPoint(x: point.x, y: bounds.maxY - point.y)))
         return .move
     }
 
     override func draggingExited(_ sender: NSDraggingInfo?) {
-        setDropEdge(nil)
+        setDropPlace(nil)
     }
 
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
-        guard let draggedTab, let dropEdge, let tabDrop else { return false }
-        setDropEdge(nil)
-        tabDrop.perform(draggedTab, dropEdge)
+        guard let draggedTab, let dropPlace, let tabDrop else { return false }
+        setDropPlace(nil)
+        tabDrop.perform(draggedTab, dropPlace)
         return true
     }
 
     override func draggingEnded(_ sender: NSDraggingInfo) {
-        setDropEdge(nil)
+        setDropPlace(nil)
         draggedTab = nil
     }
 
-    private func setDropEdge(_ edge: SplitEdge?) {
-        guard edge != dropEdge else { return }
-        dropEdge = edge
-        tabDrop?.hover(edge.flatMap { edge in draggedTab.map { ($0, edge) } })
+    private func setDropPlace(_ place: SplitPlace?) {
+        guard place != dropPlace else { return }
+        dropPlace = place
+        tabDrop?.hover(place.flatMap { place in draggedTab.map { ($0, place) } })
     }
 }
 
