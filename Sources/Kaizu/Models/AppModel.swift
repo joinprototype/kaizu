@@ -199,6 +199,7 @@ final class AppModel {
     func discard(_ tabs: [BrowserTab]) {
         for tab in tabs {
             extensions.didClose(tab)
+            tab.markNotificationsRead()
             tab.discard()
         }
     }

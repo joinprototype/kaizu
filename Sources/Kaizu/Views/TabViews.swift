@@ -51,6 +51,10 @@ struct TabRow: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 4)
+            if tab.unreadNotifications > 0 {
+                NotificationDot()
+                    .help(tab.unreadNotifications.counted("new notification"))
+            }
             if tab.isPlayingMedia || tab.isMuted {
                 RowAction(
                     systemName: tab.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
@@ -110,6 +114,15 @@ private struct RenameField: View {
                 onCancel()
             }
             .onChange(of: isEditing) { if !isEditing, !isCancelled { onCommit(draft) } }
+    }
+}
+
+/// A notification from this tab is waiting for you.
+private struct NotificationDot: View {
+    var body: some View {
+        Circle()
+            .fill(.tint)
+            .frame(width: 7, height: 7)
     }
 }
 
@@ -190,6 +203,11 @@ struct FavoriteTile: View {
                 ZStack {
                     Circle().strokeBorder(Ink.gilt(scheme).opacity(isSelected ? 0.95 : 0.6), lineWidth: 1)
                     Circle().strokeBorder(Ink.gilt(scheme).opacity(0.3), lineWidth: 0.5).padding(3)
+                }
+            }
+            .overlay(alignment: .topTrailing) {
+                if tab.unreadNotifications > 0 {
+                    NotificationDot()
                 }
             }
             .frame(maxWidth: .infinity)

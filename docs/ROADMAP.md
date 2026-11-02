@@ -91,6 +91,7 @@ default-browser capable · curated themes · app icon.
 | Capture / screenshots | ✓ | ✓ | — | S | `takeSnapshot`, `createPDF` ✓ |
 | Extensions | Chrome Web Store | ✓ Chrome Web Store, Firefox Add-ons, Safari | — | L | `WKWebExtension` ✓ (macOS 15.4+) |
 | Password managers | extensions | via extensions, not yet tried by hand | verify | L | 1Password/Bitwarden web extensions |
+| Site notifications | ✓ | on the tab and Dock; macOS banners need Developer ID | P6 | M | no public `Notification` delivery: a page script plus `UserNotifications`; macOS refuses ad-hoc signed apps |
 | Passkeys | ✓ | blocked | P6 | — | needs Apple's browser passkey entitlement |
 | Import (Arc / Chrome / Safari) | ✓ | ✓ | — | M | Arc keeps its sidebar in `StorableSidebar.json`; Chromium browsers share one history and bookmarks format; Safari exports a .zip |
 | Boosts (per-site CSS/JS) | ✓ | Hide Distracting Items only | P5, if asked | M | `WKUserScript` ✓ |
@@ -200,6 +201,7 @@ What makes someone keep it as their default browser.
 - [x] Reader (⇧⌘R): Mozilla Readability in an isolated world, set in a serif on vellum, scripts off **M**
 - [x] Location permission, remembered per site (macOS 27+; WebKit's own prompt before) **S**
 - [x] Print (⌘P) **S**
+- [x] Site notifications: ask on a click, Ask/Allow/Block in the site popover; allowed sites stay loaded and hear pushes in the background; a dot on the tab and a count on the Dock, with macOS banners once Kaizu has a Developer ID **M**
 
 ## Phase 3: Arc signature features
 
@@ -257,7 +259,7 @@ modes, Quick Keys, inline action parameters.)
 
 ## Phase 6: Ship it
 
-- [ ] Apple Developer Program; Developer ID signing; hardened runtime; notarization **M**
+- [ ] Apple Developer Program; Developer ID signing; hardened runtime; notarization (macOS won't show a site's notifications before this) **M**
 - [ ] Request the browser passkey entitlement (Google passkey sign-in) **S** + Apple review time
 - [x] Auto-updates (own signed updater, no Sparkle), DMG **M**
 - [x] Logs, crash reports (MetricKit + macOS .ips, kept locally), Help → Report a Bug (Mail draft with a zip) **S**

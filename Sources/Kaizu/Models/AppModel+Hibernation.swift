@@ -34,9 +34,25 @@ extension AppModel {
         let now = Date()
         let cutoff = now.addingTimeInterval(-interval)
         for tab in Set(spaces.flatMap(\.allTabs)) where tab.isLoaded && !isOnScreen(tab) {
+            if tab.needsRebuildToNotify, await !tab.isInUse, !isOnScreen(tab) {
+                tab.hibernate()
+                tab.activate()
+            }
             // Re-checked after the await: the user may have switched to it meanwhile.
             guard (tab.lastActiveAt ?? now) <= cutoff, await !tab.isBusy, !isOnScreen(tab) else { continue }
             tab.hibernate()
+        }
+    }
+
+    /// Sites you let notify you have no push service behind them: one tab of
+    /// each has to be running. They'd otherwise wait to be clicked after a
+    /// relaunch, like every other tab.
+    func wakeTabsThatNotify() {
+        var awake = Set(spaces.flatMap(\.allTabs).filter(\.isLoaded).compactMap { $0.url?.host() })
+        for tab in spaces.flatMap(\.allTabs) where tab.mayNotify {
+            if let host = tab.url?.host(), awake.insert(host).inserted {
+                tab.activate()
+            }
         }
     }
 

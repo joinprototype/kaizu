@@ -46,6 +46,7 @@ final class ContentBlocker {
     @ObservationIgnored private var listGeneration = 0
     @ObservationIgnored private let controllers = NSHashTable<WKUserContentController>.weakObjects()
     @ObservationIgnored private var installed: [ObjectIdentifier: Setup] = [:]
+    @ObservationIgnored private var tabScripts: [ObjectIdentifier: [WKUserScript]] = [:]
     @ObservationIgnored private var currentSite: [ObjectIdentifier: String] = [:]
     @ObservationIgnored private var readyHandlers: [@MainActor () -> Void] = []
     /// Scripts every page gets whatever the blocking settings; reinstalls
@@ -154,12 +155,16 @@ final class ContentBlocker {
     // MARK: - Tabs
 
     /// A fresh controller for a new web view, with blocking installed.
-    func makeUserContentController() -> WKUserContentController {
+    /// `tabScripts` are for this tab alone. They're kept here because
+    /// installing replaces every script, whenever the lists or a site's
+    /// pause change.
+    func makeUserContentController(tabScripts scripts: [WKUserScript] = []) -> WKUserContentController {
         let controller = WKUserContentController()
         let key = ObjectIdentifier(controller)
         // Identifiers of deallocated controllers can be reused.
         installed[key] = nil
         currentSite[key] = nil
+        tabScripts[key] = scripts
         controllers.add(controller)
         install(on: controller)
         return controller
@@ -184,6 +189,7 @@ final class ContentBlocker {
         controller.removeAllContentRuleLists()
         controller.removeAllUserScripts()
         standardScripts.forEach(controller.addUserScript)
+        tabScripts[key]?.forEach(controller.addUserScript)
         if wanted.blocking {
             // autoconsent only rejects pop-ups it can see, so the cookie-banner
             // hiding list stands aside while it's on (it prehides known ones itself).

@@ -81,15 +81,22 @@ extension AppModel {
     /// A Spotlight result was opened: show that tab in its space.
     func openSpotlightItem(_ identifier: String) {
         guard let id = UUID(uuidString: identifier) else { return }
-        let owner = spaces.first { $0.pinned.tabs.contains { $0.id == id } }
-            ?? ([regularFront.activeSpace] + spaces).first { $0.profile.favorites.contains { $0.id == id } }
+        reveal(tabWithID: id)
+    }
+
+    /// Brings Kaizu forward on a tab, for something outside the app that
+    /// points at one. Returns the tab, or nil if it's gone since.
+    @discardableResult
+    func reveal(tabWithID id: UUID) -> BrowserTab? {
+        let owner = ([regularFront.activeSpace] + spaces).first { $0.allTabs.contains { $0.id == id } }
         let tab = owner?.tab(id: id)
         let store = tab.flatMap(store(showing:)) ?? regularFront
         store.window?.makeKeyAndOrderFront(nil)
         NSApp.activate()
         // Gone since it was indexed: Kaizu still comes forward.
-        guard let space = owner, let tab else { return }
+        guard let space = owner, let tab else { return nil }
         store.switchTo(space)
         store.select(tab, in: space)
+        return tab
     }
 }

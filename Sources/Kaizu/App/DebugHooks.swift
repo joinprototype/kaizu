@@ -4,7 +4,7 @@ import BrowserCore
 import CoreSpotlight
 
 /// Lets screenshots / manual QA jump straight into a UI state:
-///   KAIZU_DEBUG=commandbar|currency|location|space|settings|history|private|peek|switcher|extension|nosidebar|reader|pin|split|splitdrop|capture|quickbar|open|swipe|spotlight|spotlightreset|commands|learn|appearance|hide|hotkeys|tour|bugreport|brokensite|windows|privatewindow|tabmoves|stress|sites|showcase|browsingdata|arcimport|arcimport-run .build/debug/Kaizu
+///   KAIZU_DEBUG=commandbar|currency|notifications|notifywake|location|space|settings|history|private|peek|switcher|extension|nosidebar|reader|pin|split|splitdrop|capture|quickbar|open|swipe|spotlight|spotlightreset|commands|learn|appearance|hide|hotkeys|tour|bugreport|brokensite|windows|privatewindow|tabmoves|stress|sites|showcase|browsingdata|arcimport|arcimport-run .build/debug/Kaizu
 /// With `commandbar` or `quickbar`, KAIZU_TYPE="gi" types into it key by key (through
 /// the real field editor, so inline completion runs).
 /// `reader` shows Reader for the selected tab, or for KAIZU_URL.
@@ -51,6 +51,147 @@ enum DebugHooks {
         else { return }
         view.cacheDisplay(in: view.bounds, to: picture)
         try? picture.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
+    }
+
+    private static func qaNotifications(_ store: BrowserStore) {
+        let app = store.app
+        let settings = store.settings
+        func say(_ text: String) {
+            FileHandle.standardError.write(Data("QA notify \(text)\n".utf8))
+        }
+        func check(_ name: String, _ passed: Bool) {
+            say("\(passed ? "ok" : "FAILED"): \(name)")
+        }
+        func settle(_ seconds: Double = 0.5) async {
+            try? await Task.sleep(for: .seconds(seconds))
+        }
+        func page(_ tab: BrowserTab, _ script: String) async -> String {
+            (try? await tab.webView.evaluateJavaScript("String(\(script))")) as? String ?? "failed"
+        }
+        var delivered: [String] = []
+        SiteNotifications.onDeliver = { delivered.append($0) }
+        settings.sitePermissions["example.com"] = [SiteNotifications.permission: true]
+        settings.sitePermissions["example.org"] = [SiteNotifications.permission: false]
+
+        Task {
+            let blocked = store.openTab(URL(string: "https://example.org/"))
+            await settle(3)
+            let asked = store.openTab(URL(string: "https://example.net/"))
+            await settle(3)
+            let allowed = store.openTab(URL(string: "https://example.com/"))
+            await settle(3)
+
+            check("pages get no window.webkit", await page(allowed, "typeof window.webkit") == "undefined")
+            check("allowed site reads granted", await page(allowed, "Notification.permission") == "granted")
+            check("tabs made before the blocker was ready get it too", await page(blocked, "Notification.permission") == "denied")
+            check("unasked site reads default", await page(asked, "Notification.permission") == "default")
+            let query = "void navigator.permissions.query({ name: 'notifications' }).then(s => { window.__state = s.state })"
+            _ = await page(allowed, query)
+            await settle()
+            check("permissions.query agrees", await page(allowed, "window.__state") == "granted")
+            check("subframes keep WebKit's own", await page(allowed, """
+                (() => { const f = document.createElement('iframe'); document.body.append(f); return f.contentWindow.Notification.permission })()
+                """) != "granted")
+
+            _ = await page(allowed, "void new Notification('Hello', { body: 'From the page', tag: 'one' })")
+            await settle()
+            check("allowed site reaches macOS", delivered == ["example.com: Hello"])
+            _ = await page(allowed, "void ServiceWorkerRegistration.prototype.showNotification.call({}, 'From a worker')")
+            await settle()
+            check("registration.showNotification too", delivered.contains("example.com: From a worker"))
+            delivered = []
+            _ = await page(blocked, "void Object.assign(new Notification('Nope'), { onerror() { window.__refused = true } })")
+            await settle()
+            let refused = await page(blocked, "window.__refused")
+            check("blocked site doesn't", delivered.isEmpty && refused == "true")
+            let site = URL(string: "https://example.com/")!
+            store.contentBlocker.togglePause(on: site, temporarily: true)
+            allowed.reload()
+            await settle(3)
+            check("pausing blocking keeps it", await page(allowed, "Notification.permission") == "granted")
+            store.contentBlocker.togglePause(on: site, temporarily: true)
+            allowed.reload()
+            await settle(3)
+            _ = await page(blocked, """
+                void window.dispatchEvent(new CustomEvent('kaizu-notification-ask', { detail: JSON.stringify({ kind: 'show', id: 'x', title: 'Forged', ref: 99 }) }))
+                """)
+            await settle()
+            check("nor by talking to the relay itself", delivered.isEmpty)
+            _ = await page(asked, "void Notification.requestPermission().then(s => { window.__asked = s })")
+            await settle()
+            let unasked = await page(asked, "window.__asked")
+            check("no question without a click", unasked == "default" && store.window?.attachedSheet == nil)
+
+            let count = "void (window.__ticks = 0, setInterval(() => window.__ticks++, 1000))"
+            _ = await page(allowed, count)
+            _ = await page(blocked, count)
+            store.select(asked)
+            say("waiting 60 s with both in the background")
+            await settle(60)
+            let awake = Int(await page(allowed, "window.__ticks")) ?? 0
+            let asleep = Int(await page(blocked, "window.__ticks")) ?? 0
+            say("background ticks: allowed \(awake), other \(asleep)")
+            check("an allowed tab keeps running in the background", awake >= 25)
+            check("others get paused", asleep < awake / 2)
+
+            store.select(asked)
+            await settle()
+            let shown = app.reveal(tabWithID: allowed.id)
+            await settle()
+            check("a click brings its tab forward", shown === allowed && store.selectedTab === allowed)
+            check("a closed tab is reported gone", app.reveal(tabWithID: UUID()) == nil)
+
+            store.select(asked)
+            await settle()
+            await app.hibernateIdleTabs(olderThan: 0)
+            await settle()
+            check("hibernation spares it", allowed.isLoaded && !blocked.isLoaded)
+            blocked.activate()
+            await settle(3)
+
+            let hidden = app.openPrivateWindow()
+            await settle()
+            let inPrivate = hidden.openTab(URL(string: "https://example.com/"))
+            await settle(3)
+            check("private windows keep WebKit's own", await page(inPrivate, "Notification.toString().includes('native code')") == "true")
+            check("and aren't awake", !inPrivate.mayNotify)
+            hidden.window?.performClose(nil)
+            await settle()
+
+            store.select(asked)
+            await settle()
+            _ = await page(allowed, "void new Notification('While away')")
+            await settle()
+            check("it waits on its tab, away from it", allowed.unreadNotifications == 1 && NSApp.dockTile.badgeLabel == "1")
+            saveShot(of: store.window)
+            store.select(allowed)
+            await settle()
+            check("until you look", allowed.unreadNotifications == 0 && NSApp.dockTile.badgeLabel == nil)
+            if NSApp.isActive {
+                _ = await page(allowed, "void new Notification('While looking')")
+                await settle()
+                check("nothing waits when you're looking", allowed.unreadNotifications == 0)
+            }
+            store.select(blocked)
+            await settle(3)
+            store.select(allowed)
+            await settle()
+            settings.sitePermissions["example.org"] = [SiteNotifications.permission: true]
+            check("allowing a site mid-session calls for a rebuild", blocked.needsRebuildToNotify)
+            await app.hibernateIdleTabs()
+            await settle(3)
+            let policy = blocked.isLoaded ? blocked.webView.configuration.preferences.inactiveSchedulingPolicy : .suspend
+            check("it's rebuilt off screen, on the same page", policy == .throttle && !blocked.needsRebuildToNotify && blocked.url?.host() == "example.org")
+            settings.sitePermissions["example.org"] = [SiteNotifications.permission: false]
+            let macOS = await SiteNotifications.requestDelivery()
+            say("macOS delivers: \(macOS.map(String.init(describing:)) ?? "won't for this build")")
+            store.select(asked)
+            await settle()
+            app.save()
+            await settle()
+            say("done")
+            NSApp.terminate(nil)
+        }
     }
 
     private static func qaPrivateWindow(_ store: BrowserStore) {
@@ -749,6 +890,19 @@ enum DebugHooks {
             qaWindows(store)
         case "privatewindow":
             qaPrivateWindow(store)
+        case "notifications":
+            qaNotifications(store)
+        case "notifywake":
+            // After a "notifications" run: its allowed tab comes back loaded.
+            Task {
+                try? await Task.sleep(for: .seconds(6))
+                let tabs = store.app.spaces.flatMap(\.allTabs)
+                let allowed = tabs.first { $0.url?.host() == "example.com" }
+                let other = tabs.first { $0.url?.host() == "example.org" }
+                let passed = allowed?.isLoaded == true && allowed !== store.selectedTab && other?.isLoaded == false
+                FileHandle.standardError.write(Data("QA notify \(passed ? "ok" : "FAILED"): allowed tab woke at launch, another stayed asleep\n".utf8))
+                NSApp.terminate(nil)
+            }
         case "tabmoves":
             qaTabMoves(store)
         case "showcase":

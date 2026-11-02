@@ -56,6 +56,9 @@ struct SiteSettingsView: View {
                         permissionRow("Camera", device: "camera", host: host)
                         permissionRow("Microphone", device: "microphone", host: host)
                         permissionRow("Location", device: "location", host: host)
+                        permissionRow("Notifications", device: SiteNotifications.permission, host: host) { allowed in
+                            tab.setNotifications(allowed)
+                        }
                     }
                 }
                 .font(.system(size: 13))
@@ -96,12 +99,15 @@ struct SiteSettingsView: View {
         }
     }
 
-    private func permissionRow(_ title: String, device: String, host: String) -> some View {
+    private func permissionRow(
+        _ title: String, device: String, host: String, onChange: ((Bool?) -> Void)? = nil
+    ) -> some View {
         GridRow {
             Text(title)
             Picker(title, selection: Binding(
                 get: { store.settings.sitePermissions[host]?[device] },
                 set: { allowed in
+                    if let onChange { return onChange(allowed) }
                     store.settings.sitePermissions[host, default: [:]][device] = allowed
                     if store.settings.sitePermissions[host]?.isEmpty == true {
                         store.settings.sitePermissions[host] = nil

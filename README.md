@@ -15,7 +15,7 @@ Found a bug? Choose Help → Report a Bug in Kaizu, or write to
 ## What's in it
 
 - **Sidebar**: spaces (two-finger swipe), favorites, pinned tabs and folders, Today tabs that archive themselves, peek on hover when hidden
-- **Command bar** (⌘T): addresses with inline completion, open tabs, history, archived tabs, commands by name (every menu item too), `20+20`, `10 km to mi`, `100 usd to eur`, `yt lofi`; optionally from any app with a shortcut (Settings → General), like Spotlight; pinned tabs and favorites show up in the system Spotlight too
+- **Command bar** (⌘T): addresses with inline completion, open tabs, history, archived tabs, commands by name (every menu item too), `20+20`, `10 km to mi`, `time in tokyo`, `100 usd to eur`, `yt lofi`; optionally from any app with a shortcut (Settings → General), like Spotlight; pinned tabs and favorites show up in the system Spotlight too
 - **Windows**: little windows for links from other apps, private windows, split view (up to 4; drag a tab onto the page), link peek, ⌃Tab recent-tab switcher
 - **Privacy, built in**: ads and trackers blocked (EasyList/EasyPrivacy, updated daily), YouTube ads, cookie pop-ups rejected automatically, tracking parameters stripped, HTTPS first, Global Privacy Control; per-site pause
 - **Light on the Mac**: idle tabs hibernate (and on memory pressure) and wake where you left them
@@ -24,6 +24,7 @@ Found a bug? Choose Help → Report a Bug in Kaizu, or write to
 - **Capture** (⇧⌘2): drag over part of the page to copy it as an image
 - **Hide Distracting Items**: click away banners and clutter; the site remembers
 - **Reading**: Reader (⇧⌘R), picture in picture when you leave a playing video, per-tab mute
+- **Site notifications**: sites you allow can reach you from the background, with a dot on the tab and a count on the Dock
 - **Remembers per site**: camera, microphone and location answers, zoom; all of it (plus blocking and clearing the site's data) in a popover from the address pill's lock
 
 ## Run

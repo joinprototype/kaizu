@@ -1,14 +1,32 @@
 import AppKit
 import CoreSpotlight
+import UserNotifications
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let app = AppModel()
+    private var notificationClicks: NotificationClicks?
 
     func applicationWillFinishLaunching(_ notification: Notification) {
         // Kaizu's windows are spaces and tabs, never system tabs of each other.
         NSWindow.allowsAutomaticWindowTabbing = false
         Typeface.register()
+        listenForNotificationClicks()
+    }
+
+    /// Set before launch finishes: a click can be what launched Kaizu. Runs
+    /// without a bundle during development, where macOS refuses the center.
+    private func listenForNotificationClicks() {
+        guard Bundle.main.bundleIdentifier != nil else { return }
+        let clicks = NotificationClicks { [app] tab, page, url in
+            if let shown = tab.flatMap(app.reveal(tabWithID:)) {
+                SiteNotifications.tell(shown, notification: page, happened: "click")
+            } else if let url {
+                app.regularFront.openTab(url)
+            }
+        }
+        notificationClicks = clicks
+        UNUserNotificationCenter.current().delegate = clicks
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -19,9 +37,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate()
         app.applyQuickBarKey()
         Updates.start(app: app)
+        Task { [app] in
+            // After the window's first tab, which matters more.
+            try? await Task.sleep(for: .seconds(3))
+            app.wakeTabsThatNotify()
+        }
         #if DEBUG
         DebugHooks.apply(to: app.front)
         #endif
+    }
+
+    func applicationDidBecomeActive(_ notification: Notification) {
+        for store in app.stores {
+            store.selectedTab?.markNotificationsRead()
+        }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {

@@ -235,6 +235,7 @@ final class BrowserStore {
     func setSelected(_ tab: BrowserTab?, in space: Space) {
         selectedTabIDs[space.id] = tab?.id
         guard let tab else { return }
+        tab.markNotificationsRead()
         let panes = Set(space.panes(with: tab).map(\.id))
         for other in app.stores where other !== self && other.selectedTabIDs.values.contains(where: panes.contains) {
             other.selectedTabIDs = other.selectedTabIDs.filter { !panes.contains($0.value) }
