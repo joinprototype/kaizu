@@ -42,7 +42,7 @@ Pulled forward from the phases below, in order:
    - [x] Global Privacy Control (macOS 27+), HTTPS-first navigation
    - [x] cookie pop-ups auto-rejected v1 (DuckDuckGo's autoconsent standalone, MPL-2.0; page world, all frames)
    - [ ] autoconsent v2: isolated content world + native rule filtering (DDG-style), smaller per-frame cost. Measured Nov 2: on ten heavy sites the 600 KB script costs about 100 MB of 2.4 GB, inside the noise between runs, so memory is no reason to do this. Moving to an isolated world needs a native bridge for the rules that `eval` page state (DDG evaluates those in the page world), and must be checked on real CMPs before it replaces v1
-   - [x] filter list auto-updates (daily; newer of downloaded vs bundled wins)
+   - [x] filter list auto-updates (daily, also in a Kaizu left open for days, and retried hourly while offline; newer of downloaded vs bundled wins)
    - [x] per-site "pause blocking" (shield in address pill, per-tab controllers, no recompiles)
    - [x] broken-site reporting (site popover, Help menu, the toast after pausing): a Mail draft with the site's name, never the page unless asked; records whether turning blocking off fixed it
    - [x] strip tracking parameters (utm_*, fbclid, gclid…) on navigation and Copy Link

@@ -42,6 +42,7 @@ enum RuleListCompiler {
         let helper = Process()
         helper.executableURL = executable
         helper.arguments = [argument, name]
+        helper.qualityOfService = .utility
         return await withCheckedContinuation { continuation in
             helper.terminationHandler = { continuation.resume(returning: $0.terminationStatus == EXIT_SUCCESS) }
             do {

@@ -65,14 +65,23 @@ final class ContentBlocker {
         state = .preparing
         Task {
             await loadLists()
-            if await FilterListUpdater.updateIfDue() {
-                await loadLists()
+            while true {
+                await refreshLists()
+                try? await Task.sleep(for: FilterListUpdater.checkEvery)
             }
         }
         Task { [weak self] in
             try? await Task.sleep(for: Self.readyTimeout)
             self?.hasTimedOut = true
             self?.runReadyHandlers()
+        }
+    }
+
+    /// Fetches newer lists if they're due. Open pages keep the rules they
+    /// loaded with; their next load gets the new ones.
+    func refreshLists() async {
+        if await FilterListUpdater.updateIfDue() {
+            await loadLists()
         }
     }
 

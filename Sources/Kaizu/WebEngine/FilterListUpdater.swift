@@ -11,6 +11,8 @@ enum FilterListUpdater {
         "cookies": URL(string: "https://secure.fanboy.co.nz/fanboy-cookiemonster.txt")!,
     ]
     static let interval: TimeInterval = 24 * 60 * 60
+    /// How often a running app asks whether `interval` has passed.
+    static let checkEvery: Duration = .seconds(60 * 60)
     private static let lastCheckKey = "filterListsLastChecked"
     private static let log = Logger(subsystem: Log.subsystem, category: "FilterListUpdater")
 
@@ -49,6 +51,8 @@ enum FilterListUpdater {
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
 
         let session = URLSession(configuration: .ephemeral)
+        defer { session.finishTasksAndInvalidate() }
+        var reachedAny = false
         var changed = false
         for (name, url) in sources {
             guard let (data, response) = try? await session.data(from: url),
@@ -59,13 +63,17 @@ enum FilterListUpdater {
                 log.error("Couldn't update \(name, privacy: .public)")
                 continue
             }
+            reachedAny = true
             if text != Self.text(for: name) {
                 try? data.write(to: directory.appending(path: "\(name).txt"), options: .atomic)
                 changed = true
                 log.info("Updated \(name, privacy: .public)")
             }
         }
-        defaults.set(Date().timeIntervalSince1970, forKey: lastCheckKey)
+        // Offline, as a laptop often is on waking: the next check tries again.
+        if reachedAny {
+            defaults.set(Date().timeIntervalSince1970, forKey: lastCheckKey)
+        }
         return changed
     }
 
