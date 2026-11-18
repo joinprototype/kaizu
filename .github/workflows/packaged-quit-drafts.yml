@@ -1,14 +1,14 @@
-name: Inspect multi-window draft restore on macOS 15
+name: Exercise independent Back navigation during macOS 15 restore
 on:
   push:
-    branches: [qa/restore-window-observation]
+    branches: [qa/quit-restore-navigation-order]
 permissions:
   contents: read
   actions: read
 jobs:
   observe:
     runs-on: macos-15
-    timeout-minutes: 12
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
         with:

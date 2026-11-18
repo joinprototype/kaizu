@@ -26,10 +26,7 @@ class Page(BaseHTTPRequestHandler):
             return
         profile, route = parts
         server = self.server
-        if route == "traverse":
-            server.traverse.wait(90)
-            body = ""
-        elif route == "edit":
+        if route == "edit":
             if not server.edit.wait(60):
                 self.send_error(504)
                 return
@@ -38,10 +35,20 @@ class Page(BaseHTTPRequestHandler):
             with server.condition:
                 server.events.add((profile, route))
                 server.condition.notify_all()
+            if server.reading:
+                print(f"Reader reported {profile}/{route}", flush=True)
             body = ""
         elif route in ("start", "draft"):
             if server.reading:
                 print(f"Reader requested {profile}/{route}", flush=True)
+                if route == "draft" and server.first and profile != server.first:
+                    # Serve this window only after its peer has already gone Back.
+                    # The server is threaded so the peer can request and render normally.
+                    with server.condition:
+                        earlier_back = server.condition.wait_for(
+                            lambda: (server.first, "back") in server.events, timeout=15)
+                    print(f"Serving {profile}/draft after peer Back={earlier_back}", flush=True)
+                    server.order_observed = earlier_back
             previous, updated, final = (json.dumps(v) for v in server.values[profile])
             if server.reading:
                 expected = final if profile == "B" else updated
@@ -56,7 +63,6 @@ class Page(BaseHTTPRequestHandler):
                             first === {previous} ? 'previous' : 'different';
                         addEventListener('popstate', () => fetch(location.pathname.endsWith('/start') ? './back' : './wrong-entry'));
                         await fetch('./' + result);
-                        await fetch('./traverse');
                         history.back();
                     }}
                 """
@@ -131,12 +137,13 @@ def trial(app, number):
         origin = f"http://127.0.0.1:{server.server_port}"
         if number == 1:
             support.mkdir(parents=True, exist_ok=False)
-        print(f"Starting trial {number} with two fresh profiles", flush=True)
+        server.first = (None, "B", "A")[(number - 1) % 3]
+        server.order_observed = False
+        print(f"Starting trial {number} with two fresh profiles, first Back={server.first or 'unconstrained'}", flush=True)
         ids = seed(support, origin)
         server.values = {key: [secrets.token_hex(16) for _ in range(3)] for key in ids}
         server.condition = threading.Condition()
         server.edit = threading.Event()
-        server.traverse = threading.Event()
         server.events = set()
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
@@ -151,8 +158,9 @@ def trial(app, number):
                             states = {"match", "missing", "previous", "different", "storage-error"}
                             wait_for(server, lambda: all(any((label, state) in server.events for state in states) for label in ids), proc)
                             outcomes = {label: next(s for s in states if (label,s) in server.events) for label in ids}
-                            server.traverse.set()
                             wait_for(server, lambda: all((label,"back") in server.events for label in ids), proc)
+                            if server.first and not server.order_observed:
+                                raise RuntimeError("Both pages reported but the requested navigation order was not observed")
                         else:
                             wait_for(server, lambda: all((label,"seeded") in server.events for label in ids), proc)
                             while not all(stored(origin_store / profile.lower(), server.values[label][0])
@@ -198,12 +206,11 @@ def trial(app, number):
                         persistent = stored(origin_store / profile.lower(), expected)
                         print(f"After writer quit, {label}: selected in restored window={shown}, "
                               f"history bytes={state_bytes}, latest draft row matches={persistent}", flush=True)
-                        assert shown and state_bytes > 0, f"Lost saved selection or history for {label}"
+                        assert shown and state_bytes > 0 and persistent, f"Missing saved selection, history or draft for {label}"
             print(f"Trial {number}: normal edit={outcomes['A']}, pagehide edit={outcomes['B']}, both tab histories restored",flush=True)
             return all(s == "match" for s in outcomes.values())
         finally:
             server.edit.set()
-            server.traverse.set()
             server.shutdown()
             thread.join()
 
@@ -211,6 +218,6 @@ def trial(app, number):
 if os.environ.get("GITHUB_ACTIONS") != "true" or os.environ.get("RUNNER_ENVIRONMENT") != "github-hosted":
     raise SystemExit("Run only on a fresh GitHub-hosted Mac.")
 app = Path(sys.argv[1]).resolve(strict=True)
-results = [trial(app, n) for n in range(1, 7)]
+results = [trial(app, n) for n in range(1, 13)]
 if not all(results):
-    raise SystemExit(f"{results.count(False)} of six paired-profile restores failed")
+    raise SystemExit(f"{results.count(False)} of {len(results)} paired-profile restores failed")
