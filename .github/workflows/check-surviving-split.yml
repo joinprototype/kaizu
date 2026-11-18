@@ -1,0 +1,50 @@
+name: Compare focused-pane removal before and after the fix
+on:
+  push:
+    branches: [qa/check-surviving-split-panes]
+permissions:
+  contents: read
+jobs:
+  compare:
+    runs-on: xcode-27
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 3
+          persist-credentials: false
+      - name: Exercise Close Tab and Arc import Undo in isolated browser windows
+        env:
+          RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        run: |
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          export KAIZU_ARC="$GITHUB_WORKSPACE/Tests/BrowserCoreTests/Fixtures/Arc Data Export.md"
+          files=(Sources/Kaizu/Models/BrowserStore+Tabs.swift Sources/Kaizu/Models/AppModel+ImportUndo.swift)
+          for version in baseline fixed; do
+            if [[ "$version" == baseline ]]; then
+              git restore --source=08360089bc7e22ac616723edcdd1d03379bd63ab -- "${files[@]}"
+            else
+              git restore --source=HEAD -- "${files[@]}"
+            fi
+            make app
+            for scenario in split-capacity arcimport-undo-edits; do
+              export KAIZU_SUPPORT="$RUNNER_TEMP/$version-$scenario"
+              log="$RUNNER_TEMP/$version-$scenario.log"
+              result=0
+              KAIZU_DEBUG="$scenario" build/Kaizu.app/Contents/MacOS/Kaizu >"$log" 2>&1 || result=$?
+              cat "$log"
+              if [[ "$version" == baseline ]]; then
+                test "$result" = 1
+                if [[ "$scenario" == split-capacity ]]; then
+                  grep -Fxq 'Closing the selected pane hid the surviving favorite' "$log"
+                else
+                  grep -Fxq 'Undo hid the surviving split panes' "$log"
+                fi
+              else
+                test "$result" = 0
+                if [[ "$scenario" == arcimport-undo-edits ]]; then
+                  KAIZU_DEBUG=arcimport-undo-restored build/Kaizu.app/Contents/MacOS/Kaizu
+                fi
+              fi
+            done
+          done
