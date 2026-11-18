@@ -1,0 +1,31 @@
+name: Verify selected video paths in a real relayed and direct call
+on:
+  push:
+    branches: [qa/selected-video-relay]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  paths:
+    runs-on: xcode-27
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          github-token: ${{ github.token }}
+          run-id: 44411481050
+          name: kaizu-runtime-check
+          path: ${{ runner.temp }}
+      - run: HOMEBREW_NO_AUTO_UPDATE=1 brew install coturn
+      - name: Compare actual selected video paths
+        env:
+          RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        run: |
+          ditto -x -k "$RUNNER_TEMP/Kaizu.zip" "$RUNNER_TEMP/launch"
+          codesign --verify --strict "$RUNNER_TEMP/launch/Kaizu.app"
+          sed '/^fixture=/,$d' .github/scripts/check-relayed-call.sh > "$RUNNER_TEMP/paths.sh"
+          echo 'python3 -u .github/scripts/compare-selected-paths.py "$1"' >> "$RUNNER_TEMP/paths.sh"
+          bash "$RUNNER_TEMP/paths.sh" "$RUNNER_TEMP/launch/Kaizu.app"
