@@ -25,6 +25,8 @@
 
 ## At home in Kaizu
 
+These features describe the current development build. See which changes are in the download in the [changelog](CHANGELOG.md).
+
 - **Bring your Arc setup.** Preview your spaces, folders, favorites and tabs before importing them. If you moved Macs, choose a saved sidebar JSON or Arc’s Markdown export in **File → Import from Arc…**. You can also import bookmarks and history from Chromium browsers or a Safari export.
 - **Give each project a space.** Pin the pages you keep coming back to and let Today tabs archive themselves. Use separate profiles when you want separate logins and cookies.
 - **Stay on the keyboard.** Press ⌘T to jump to an open tab, find an archived page, run a menu command or convert a measurement. Press ⌘/ to see the shortcuts.
