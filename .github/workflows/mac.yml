@@ -77,6 +77,8 @@ jobs:
           codesign --verify --strict "$RUNNER_TEMP/launch/Kaizu.app"
       - name: Launch release and verify WebKit navigation
         if: matrix.scenario == 'clean-launch'
+        env:
+          RUNNER_ENVIRONMENT: ${{ runner.environment }}
         run: python3 .github/scripts/check-release-launch.py "$RUNNER_TEMP/launch/Kaizu.app"
       - name: Upgrade the published app with a saved tab and login cookie
         if: matrix.scenario == 'upgrade-from-0.2.5'

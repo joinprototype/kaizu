@@ -267,6 +267,8 @@ def main():
     mode.add_argument("--extension-windows", action="store_true")
     mode.add_argument("--media-call", action="store_true")
     args = parser.parse_args()
+    if os.environ.get("RUNNER_ENVIRONMENT") != "github-hosted":
+        raise SystemExit("This test requires a disposable GitHub-hosted runner account")
     candidate = args.candidate.resolve(strict=True)
     with HTTPServer(("127.0.0.1", 0), Page) as server:
         server.timeout = 1
@@ -283,8 +285,6 @@ def main():
             print("On the first external page, WebKit blocked the matching script and ran the control script with cookies.")
             return
 
-        if os.environ.get("RUNNER_ENVIRONMENT") != "github-hosted":
-            raise SystemExit("This test requires a disposable GitHub-hosted runner account")
         # Open the test link as a saved tab using the app's current-space setting.
         settings = json.dumps({"externalLinks": "currentSpace"}).encode().hex()
         subprocess.run(["defaults", "write", "com.joinprototype.kaizu", "settings", "-data", settings], check=True)
