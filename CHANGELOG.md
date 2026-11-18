@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+Repeating an Arc sidebar import respects Today tabs you already imported and then navigated, moved within the same profile, or auto-archived. This uses the original tab ID saved by new JSON imports. Older imports still match open pages by address.
+
 Reopening a recently auto-archived tab restores its Back and Forward history, including after restarting Kaizu. The 32 newest archive entries can each keep up to 1 MiB of navigation state. Other entries reopen at their saved address.
 
 Reopen Closed Tab (⇧⌘T) restores Back and Forward history for the 32 most recently closed Today tabs when each snapshot fits in 1 MiB. Older tabs and larger pages reopen at their saved address. After Clear Today, Undo skips tabs you already reopened.

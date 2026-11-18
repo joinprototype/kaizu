@@ -1,24 +1,28 @@
 import Foundation
 
 extension ArcImport {
-    private typealias Candidate = (space: SpaceRecord, sharedAddresses: Int)
+    private typealias Candidate = (space: SpaceRecord, sharedItems: Int, sharedAddresses: Int)
 
     static func matchDestinations(
-        _ sidebar: ArcSidebar, profiles: [ProfileRecord], spaces: [SpaceRecord]
+        _ sidebar: ArcSidebar, profiles: [ProfileRecord], spaces: [SpaceRecord], archivedBySpace: [UUID: [ArchivedTabRecord]]
     ) -> (spaces: [Int: SpaceRecord], profiles: [String: UUID]) {
         let byName = Dictionary(grouping: spaces) { $0.name.folding(options: .caseInsensitive, locale: nil) }
         let candidates: [[Candidate]] = sidebar.spaces.map { arc in
             let named = byName[arc.name.folding(options: .caseInsensitive, locale: nil)] ?? []
-            guard named.count > 1 else { return named.map { ($0, 0) } }
+            guard named.count > 1 else { return named.map { ($0, 0, 0) } }
+            let sourceItems = Set(arc.today.compactMap(\.itemID))
             let sourceTabs = Set((arc.pinned.tabs + arc.today).map(\.url))
             let sourceFavorites = Set((sidebar.favorites[arc.profile] ?? []).map(\.url))
             return named.map { space -> Candidate in
-                let tabs = (space.pinned.tabs + space.today).compactMap { $0.pinnedURL ?? $0.url }
+                let live = space.pinned.tabs + space.today
+                let tabs = live.compactMap { $0.pinnedURL ?? $0.url }
+                let archived = archivedBySpace[space.id]?.map(\.tab) ?? []
+                let sharedItems = sourceItems.intersection((live + archived).compactMap(\.arcItemID)).count
                 let favorites = profiles.first { $0.id == space.profileID }?.favorites ?? []
                 let score = sourceTabs.intersection(tabs).count
                     + sourceFavorites.intersection(favorites.compactMap { $0.pinnedURL ?? $0.url }).count
-                return (space, score)
-            }.sorted { $0.sharedAddresses > $1.sharedAddresses } // Stable ties keep sidebar order.
+                return (space, sharedItems, score)
+            }.sorted { ($0.sharedItems, $0.sharedAddresses) > ($1.sharedItems, $1.sharedAddresses) } // Stable ties keep sidebar order.
         }
 
         var profileIDs = inferredProfiles(sidebar, candidates: candidates)
@@ -62,8 +66,8 @@ extension ArcImport {
                 sharedOwners = sharedOwners?.intersection(owners) ?? owners
                 guard owners.count > 1 else { continue }
                 needsDisambiguation.insert(profile)
-                if best.sharedAddresses > 0 {
-                    let leaders = named.prefix { $0.sharedAddresses == best.sharedAddresses }
+                if best.sharedItems > 0 || best.sharedAddresses > 0 {
+                    let leaders = named.prefix { ($0.sharedItems, $0.sharedAddresses) == (best.sharedItems, best.sharedAddresses) }
                     let bestOwners = Set(leaders.map { $0.space.profileID })
                     if bestOwners.count == 1 { addressMatches.formUnion(bestOwners) }
                 }

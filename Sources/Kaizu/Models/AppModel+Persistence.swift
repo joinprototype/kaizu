@@ -71,7 +71,7 @@ extension AppModel {
     func makeTab(_ record: TabRecord, profile: Profile) -> BrowserTab {
         let tab = BrowserTab(
             id: record.id, profile: profile, app: self, url: record.url, title: record.title,
-            pinnedURL: record.pinnedURL, lastActiveAt: record.lastActiveAt
+            pinnedURL: record.pinnedURL, lastActiveAt: record.lastActiveAt, arcItemID: record.arcItemID
         )
         tab.savedState = tabStateFiles.read(record.id)
         tab.customTitle = record.customTitle

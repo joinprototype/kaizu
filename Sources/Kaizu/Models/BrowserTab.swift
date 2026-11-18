@@ -14,6 +14,7 @@ final class BrowserTab: NSObject, Identifiable {
     var pinnedURL: URL?
     /// The name given to it, if any; the page's title otherwise.
     var customTitle: String?
+    let arcItemID: UUID?
     var favicon: NSImage?
     var isLoading = false
     var progress = 0.0
@@ -68,10 +69,12 @@ final class BrowserTab: NSObject, Identifiable {
         title: String = "",
         pinnedURL: URL? = nil,
         lastActiveAt: Date? = Date(),
+        arcItemID: UUID? = nil,
         configuration: WKWebViewConfiguration? = nil
     ) {
         self.id = id
         self.profile = profile
+        self.arcItemID = arcItemID
         self.app = app
         self.url = url
         self.title = title
@@ -83,7 +86,7 @@ final class BrowserTab: NSObject, Identifiable {
     }
 
     convenience init(reopening record: TabRecord, id: UUID = UUID(), profile: Profile, app: AppModel?, navigationState: Data?) {
-        self.init(id: id, profile: profile, app: app, url: record.url, title: record.title)
+        self.init(id: id, profile: profile, app: app, url: record.url, title: record.title, arcItemID: record.arcItemID)
         customTitle = record.customTitle
         savedState = navigationState
     }
@@ -546,7 +549,7 @@ final class BrowserTab: NSObject, Identifiable {
     }
 
     var record: TabRecord {
-        TabRecord(id: id, title: title, url: url, pinnedURL: pinnedURL, lastActiveAt: lastActiveAt, customTitle: customTitle)
+        TabRecord(id: id, title: title, url: url, pinnedURL: pinnedURL, lastActiveAt: lastActiveAt, customTitle: customTitle, arcItemID: arcItemID)
     }
 
     // MARK: - State sync

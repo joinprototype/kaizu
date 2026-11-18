@@ -5,7 +5,8 @@ import SwiftUI
 extension BrowserStore {
     func arcImport(of sidebar: ArcSidebar, includesToday: Bool) -> ArcImport {
         ArcImport(
-            sidebar, profiles: profiles.map(\.record), spaces: spaces.map(\.record), includesToday: includesToday,
+            sidebar, profiles: profiles.map(\.record), spaces: spaces.map(\.record), archivedTabs: app.archive,
+            includesToday: includesToday,
             hues: Theme.all.map(\.hue), symbols: Space.symbols
         )
     }

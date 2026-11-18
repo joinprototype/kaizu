@@ -376,6 +376,51 @@ import Testing
         #expect(second.today.isEmpty)
     }
 
+    @Test func archivedTodayItemsIdentifyTheirOriginalAccountsAfterTheExportIsReordered() throws {
+        var source = try ArcSidebarTests.fixture()
+        let first = try #require(source.spaces[0].today.first)
+        let second = try #require(source.spaces[1].today.first)
+        _ = try #require(first.itemID)
+        _ = try #require(second.itemID)
+        source.favorites = [:]
+        for index in source.spaces.indices {
+            source.spaces[index].name = "Inbox"
+            source.spaces[index].pinned = []
+        }
+        source.spaces[0].today = [first]
+        source.spaces[1].today = [second]
+        let work = Self.emptySpace(name: "Inbox")
+        var home = Self.emptySpace(name: "Inbox")
+        home.profileID = UUID()
+        let profiles = [ProfileRecord(id: work.profileID, name: "Work", favorites: []),
+                        ProfileRecord(id: home.profileID, name: "Home", favorites: [])]
+        let elsewhere = URL(string: "https://later.example.test/")!
+        let archive = [(work, first), (home, second)].map { space, item in
+            ArchivedTabRecord(tab: TabRecord(id: UUID(), title: "Later", url: elsewhere, arcItemID: item.itemID),
+                              spaceID: space.id, archivedAt: Self.now)
+        }
+        source.spaces.reverse()
+        // Arc exported a new Today item at the same URL as the archived one.
+        var newItem = second
+        newItem.itemID = UUID()
+        source.spaces[0].today.append(newItem)
+        func plan(_ archive: [ArchivedTabRecord]) -> ArcImport {
+            ArcImport(source, profiles: profiles, spaces: [work, home], archivedTabs: archive,
+                      includesToday: true, hues: Self.hues, symbols: Self.symbols)
+        }
+        let result = plan(archive)
+        #expect(result.summary.map(\.profileName) == ["Home", "Work"])
+        #expect(result.summary.map(\.sidebarPosition) == [2, 1])
+        #expect(result.tabCount == 1)
+        #expect(result.today[home.id]?.map(\.arcItemID) == [newItem.itemID])
+        #expect(result.today[work.id] == nil)
+        // An unrelated local archive entry has no import identity.
+        var local = archive
+        local[1].tab.arcItemID = nil
+        let fallback = plan(local)
+        #expect(fallback.today[home.id]?.count == 2)
+    }
+
     @Test func repeatImportKeepsEditedFoldersAndNavigatedPins() throws {
         let home = Self.tab("https://b.test/")
         let nested = Self.tab("https://nested.test/")

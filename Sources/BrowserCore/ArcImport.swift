@@ -47,18 +47,36 @@ public struct ArcImport: Equatable, Sendable {
     /// when made by hand; a space keeps Arc's color when it has one.
     public init(
         _ sidebar: ArcSidebar, profiles: [ProfileRecord], spaces: [SpaceRecord],
-        includesToday: Bool, hues: [Double], symbols: [String], now: Date = Date()
+        archivedTabs: [ArchivedTabRecord] = [], includesToday: Bool, hues: [Double], symbols: [String], now: Date = Date()
     ) {
-        var (matches, kaizuProfile) = Self.matchDestinations(sidebar, profiles: profiles, spaces: spaces)
+        let archivedBySpace = Dictionary(grouping: archivedTabs, by: \.spaceID)
+        var (matches, kaizuProfile) = Self.matchDestinations(sidebar, profiles: profiles, spaces: spaces,
+                                                            archivedBySpace: archivedBySpace)
         if matches.isEmpty, spaces.count == 1, let only = spaces.first, only.pinned.isEmpty, only.today.isEmpty,
            let index = sidebar.spaces.firstIndex(where: { $0.profile == ArcSidebar.defaultProfile }) {
             let arc = sidebar.spaces[index]
             matches[index] = only
             takeover = Takeover(spaceID: only.id, name: arc.name, hue: arc.hue)
         }
+        // A Today tab may have navigated, moved within its profile, or gone to the archive.
+        // Its Arc item ID still identifies it without conflating the same URL in another account.
+        var importedByProfile: [UUID: Set<UUID>] = [:]
+        for profile in profiles {
+            importedByProfile[profile.id] = Set(profile.favorites.compactMap(\.arcItemID))
+        }
+        for space in spaces {
+            let archived = archivedBySpace[space.id]?.map(\.tab) ?? []
+            let items = space.today + space.pinned.tabs + archived
+            importedByProfile[space.profileID, default: []].formUnion(items.compactMap(\.arcItemID))
+        }
         var spaceCount = spaces.count
         for (index, arc) in sidebar.spaces.enumerated() {
-            let today = includesToday ? arc.today : []
+            let owner = matches[index]?.profileID ?? kaizuProfile[arc.profile]
+            let imported = owner.flatMap { importedByProfile[$0] } ?? []
+            let today = includesToday ? arc.today.filter { tab in
+                guard let id = tab.itemID else { return true }
+                return !imported.contains(id)
+            } : []
             if let match = matches[index], let position = spaces.firstIndex(where: { $0.id == match.id }) {
                 let profile = profiles.first { $0.id == match.profileID }
                 let favorites = profile?.favorites ?? []
@@ -153,7 +171,7 @@ public struct ArcImport: Equatable, Sendable {
 
     /// Stamped now, so the clock on archiving starts from the import.
     private static func record(_ tab: ArcSidebar.Tab, now: Date) -> TabRecord {
-        TabRecord(id: UUID(), title: tab.title, url: tab.url, lastActiveAt: now, customTitle: tab.customTitle)
+        TabRecord(id: UUID(), title: tab.title, url: tab.url, lastActiveAt: now, customTitle: tab.customTitle, arcItemID: tab.itemID)
     }
 }
 
