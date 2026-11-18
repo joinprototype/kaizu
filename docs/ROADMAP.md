@@ -62,6 +62,10 @@ On macOS 27.0.1, fresh profiles with content blocking and automatic rejection tu
 
 On Didomi's public demo, the SDK loaded but showed no notice in the control profile, including with the vendor's country-preview option. Rejection on that provider remains unverified. [Didomi sandbox](https://sandbox.didomi.io/cmp.html) · [Preview option](https://developers.didomi.io/cmp/web-sdk/getting-started)
 
+### Notification clicks across profiles
+
+On macOS 27.0.1, clicking through Kaizu’s notification-response handler used to reopen a closed Work tab in the front Personal window. The development build now records the profile and space when the page posts a notification. In a two-window test, a WebKit page created a notification, received its show event, then received its click event when Kaizu handled the response. After a cold launch, the saved notification reopened the original address in Work. Clicking an older notification after navigating elsewhere preserved the newer page. Deleting the Work profile left Personal untouched on a later click. The test exercises routing using the payload stored with a macOS notification. Displaying and clicking an actual system banner remains a signing and release check.
+
 ### Media calls and permissions
 
 The packaged browser sent synthesized audio, canvas video and a data message between two local WebRTC peers on macOS 15.8.2 and 27.0.1. The receiver decoded non-silent audio, rendered a video frame and returned the message. On macOS 27.0.1, disconnecting the oscillator made the audio check fail while video and data still worked. A separate native-sheet test confirmed that declining a microphone request preserves an existing camera permission, and that private windows ask independently. [Packaged audio, video and data check](https://github.com/joinprototype/kaizu/actions/runs/44313608354) · [Permissions check](https://github.com/joinprototype/kaizu/actions/runs/44293624816)

@@ -28,7 +28,7 @@ final class SiteNotifications: NSObject, WKScriptMessageHandlerWithReply {
     private static let maximumBody = 1000
     #if DEBUG
     /// Tells the QA hook what was handed to macOS.
-    static var onDeliver: ((String) -> Void)?
+    static var onDeliver: ((String, SiteNotificationDestination) -> Void)?
     #endif
 
     private weak var tab: BrowserTab?
@@ -104,8 +104,10 @@ final class SiteNotifications: NSObject, WKScriptMessageHandlerWithReply {
             ask(host: host, tab: tab, window: window) { replyHandler(Self.state($0), nil) }
         case "show":
             guard answer == true else { return replyHandler(false, nil) }
+            let destination = SiteNotificationDestination(tab: tab, page: body["id"] as? String ?? "",
+                                                          url: message.frameInfo.request.url)
             Task {
-                tab.noteNotification(deliveredByMacOS: await Self.deliver(body, host: host, tab: tab))
+                tab.noteNotification(deliveredByMacOS: await Self.deliver(body, host: host, tab: tab, destination: destination))
                 replyHandler(true, nil)
             }
         case "close":
@@ -148,10 +150,11 @@ final class SiteNotifications: NSObject, WKScriptMessageHandlerWithReply {
         }
     }
 
-    private static func deliver(_ body: [String: Any], host: String, tab: BrowserTab) async -> Bool {
+    private static func deliver(_ body: [String: Any], host: String, tab: BrowserTab,
+                                destination: SiteNotificationDestination) async -> Bool {
         let title = String((body["title"] as? String ?? "").prefix(maximumTitle))
         #if DEBUG
-        onDeliver?("\(host): \(title)")
+        onDeliver?("\(host): \(title)", destination)
         #endif
         guard let center, await center.notificationSettings().authorizationStatus == .authorized else { return false }
         let content = UNMutableNotificationContent()
@@ -162,9 +165,7 @@ final class SiteNotifications: NSObject, WKScriptMessageHandlerWithReply {
         if body["silent"] as? Bool != true {
             content.sound = .default
         }
-        content.userInfo = [
-            "tab": tab.id.uuidString, "page": body["id"] as? String ?? "", "url": tab.url?.absoluteString ?? "",
-        ]
+        content.userInfo = destination.userInfo
         if let icon = icon(of: tab) {
             content.attachments = [icon]
         }
@@ -297,15 +298,6 @@ final class SiteNotifications: NSObject, WKScriptMessageHandlerWithReply {
 }
 
 extension AppModel {
-    /// A click on a notification: its tab if it's still around, else its page.
-    func openNotification(tab id: UUID?, page: String, url: URL?) {
-        if let tab = id.flatMap(reveal(tabWithID:)) {
-            SiteNotifications.fireClick(on: tab, notification: page)
-        } else if let url {
-            regularFront.openTab(url)
-        }
-    }
-
     /// The Dock's count of notifications you haven't looked at yet.
     func updateDockBadge() {
         let waiting = Set(spaces.flatMap(\.allTabs)).reduce(0) { $0 + $1.unreadNotifications }
@@ -330,10 +322,7 @@ final class NotificationClicks: NSObject, UNUserNotificationCenterDelegate {
     }
 
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
-        let info = response.notification.request.content.userInfo
-        let tab = (info["tab"] as? String).flatMap(UUID.init(uuidString:))
-        let page = info["page"] as? String ?? ""
-        let url = (info["url"] as? String).flatMap(URL.init(string:))
-        await app.openNotification(tab: tab, page: page, url: url)
+        let destination = SiteNotificationDestination(userInfo: response.notification.request.content.userInfo)
+        await app.openNotification(destination)
     }
 }
