@@ -13,8 +13,9 @@ window.addEventListener("unhandledrejection", event => reportFailure(String(even
 <script type="module">
 // The two local peers exchange a canvas video and a synthesized audio track.
 let stage = "creating peers";
-const caller = new RTCPeerConnection({iceServers: []});
-const receiver = new RTCPeerConnection({iceServers: []});
+const config = await (await fetch("/media-call/ice")).json();
+const caller = new RTCPeerConnection(config);
+const receiver = new RTCPeerConnection(config);
 const canvas = document.querySelector("canvas");
 const context = canvas.getContext("2d");
 const video = document.querySelector("video");
@@ -77,6 +78,12 @@ async function call() {
     stage = "waiting for decoded audio";
     while (true) {
         const stats = await receiver.getStats();
+        if (config.iceTransportPolicy === "relay") {
+            const selectedRelay = [...stats.values()].some(report =>
+                report.type === "candidate-pair" && report.state === "succeeded" && report.nominated &&
+                stats.get(report.localCandidateId)?.candidateType === "relay");
+            if (!selectedRelay) throw new Error("The receiving peer did not report a nominated relay candidate pair");
+        }
         for (const report of stats.values()) {
             if (report.type === "inbound-rtp" && report.kind === "audio" &&
                 report.totalAudioEnergy > 0 && report.totalSamplesDuration > 0) return;

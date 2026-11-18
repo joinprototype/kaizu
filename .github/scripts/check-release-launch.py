@@ -56,6 +56,18 @@ class Page(BaseHTTPRequestHandler):
             self.send_response(204)
             self.end_headers()
             server.rendered = True
+        elif self.path == "/media-call/ice":
+            config = {"iceServers": []}
+            password = os.environ.get("KAIZU_TEST_TURN_PASSWORD")
+            if password:
+                config = {"iceTransportPolicy": "relay", "iceServers": [{
+                    "urls": "turn:127.0.0.1:3478?transport=tcp", "username": "kaizu-test", "credential": password
+                }]}
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(json.dumps(config).encode())
         elif self.path == "/media-call":
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
