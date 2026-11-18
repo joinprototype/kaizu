@@ -1935,6 +1935,11 @@ enum DebugHooks {
                 try? await Task.sleep(for: .seconds(2))
                 saveShot(ofWindow: "Import from Arc")
             }
+        case "bookmark-import-undo":
+            Task {
+                await checkBookmarkImportUndo(in: store)
+                NSApp.terminate(nil)
+            }
         case "arcimport-undo-restored":
             Task {
                 await checkRestoredArcImportUndo(in: store)
