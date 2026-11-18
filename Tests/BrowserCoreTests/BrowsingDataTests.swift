@@ -348,4 +348,79 @@ import Testing
         await store.remove([Self.docs], profile: profile)
         #expect(await store.recent(profile: profile).map(\.url) == [Self.example])
     }
+
+    @Test func undoImportKeepsSubsequentVisitsAndIsRepeatable() async throws {
+        let file = try folder().appending(path: "history.sqlite")
+        let importer = try HistoryStore(fileURL: file)
+        let browser = try HistoryStore(fileURL: file)
+        let profile = UUID()
+        let other = UUID()
+        let then = Date(timeIntervalSince1970: 100)
+        let later = Date(timeIntervalSince1970: 200)
+        let visits = [
+            BrowsingData.Visit(url: Self.example, title: "Imported", count: 3, lastVisit: then),
+            BrowsingData.Visit(url: Self.example, title: "Imported", count: 7, lastVisit: then),
+            BrowsingData.Visit(url: Self.docs, title: "Guide", count: 1, lastVisit: then),
+        ]
+        let receipt = try await importer.importVisits(visits, profile: profile)
+        _ = try await importer.importVisits(visits, profile: profile)
+        await browser.recordVisit(profile: other, url: Self.docs, title: "Work", at: later)
+        await browser.recordVisit(profile: profile, url: Self.example, title: "Homepage", at: later)
+        await browser.recordVisit(profile: profile, url: Self.example, title: "Homepage", at: later)
+        try await importer.undoImport(receipt)
+        try await importer.undoImport(receipt)
+
+        #expect(await browser.recent(profile: profile) == [
+            .init(url: Self.example, title: "Homepage", visitCount: 2, lastVisit: later)
+        ])
+        #expect(await browser.recent(profile: other) == [
+            .init(url: Self.docs, title: "Work", visitCount: 1, lastVisit: later)
+        ])
+    }
+
+    @Test func earlierUndoKeepsRecreatedPagesAndLaterImports() async throws {
+        let store = try HistoryStore(fileURL: folder().appending(path: "history.sqlite"))
+        let profile = UUID()
+        let date = Date(timeIntervalSince1970: 100)
+        let receipt = try await store.importVisits([
+            .init(url: Self.example, title: "Example", count: 1, lastVisit: date),
+            .init(url: Self.docs, title: "Guide", count: 2, lastVisit: date),
+        ], profile: profile)
+        await store.remove(Self.example, profile: profile)
+        await store.recordVisit(profile: profile, url: Self.example, title: "Example", at: date)
+        _ = try await store.importVisits([.init(url: Self.docs, title: "Guide", count: 6, lastVisit: date)], profile: profile)
+        try await store.undoImport(receipt)
+
+        let entries = await store.recent(profile: profile)
+        #expect(entries.first { $0.url == Self.example }?.visitCount == 1)
+        #expect(entries.first { $0.url == Self.docs }?.visitCount == 6)
+    }
+
+    @Test func migratingHistoryPreservesExistingRowsAndFailedImportsRollBack() async throws {
+        let file = try folder().appending(path: "history.sqlite")
+        let profile = UUID()
+        var db: OpaquePointer?
+        try #require(sqlite3_open(file.path, &db) == SQLITE_OK)
+        defer { sqlite3_close(db) }
+        try #require(sqlite3_exec(db, """
+            CREATE TABLE visits (profile TEXT NOT NULL, url TEXT NOT NULL, title TEXT NOT NULL DEFAULT '',
+                visit_count INTEGER NOT NULL DEFAULT 1, last_visit REAL NOT NULL, PRIMARY KEY (profile, url));
+            INSERT INTO visits VALUES ('\(profile.uuidString)', 'https://existing.example/', 'Existing', 9, 100);
+            CREATE TRIGGER fail_write BEFORE INSERT ON visits WHEN NEW.url = '\(Self.docs.absoluteString)'
+                BEGIN SELECT RAISE(ABORT, 'simulated write failure'); END;
+            """, nil, nil, nil) == SQLITE_OK)
+        let store = try HistoryStore(fileURL: file)
+        let visits = [Self.example, Self.docs].map {
+            BrowsingData.Visit(url: $0, title: "", count: 3, lastVisit: Date(timeIntervalSince1970: 200))
+        }
+        await #expect(throws: HistoryStore.Failure.self) {
+            try await store.importVisits(visits, profile: profile)
+        }
+        let existing = HistoryStore.Entry(url: URL(string: "https://existing.example/")!, title: "Existing",
+                                          visitCount: 9, lastVisit: Date(timeIntervalSince1970: 100))
+        #expect(await store.recent(profile: profile) == [existing])
+        let receipt = try await store.importVisits([visits[0]], profile: profile)
+        try await store.undoImport(receipt)
+        #expect(await store.recent(profile: profile) == [existing])
+    }
 }

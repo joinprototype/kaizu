@@ -5,8 +5,21 @@ import SwiftUI
 /// where the command bar finds them; bookmarks become a closed pinned folder.
 extension AppModel {
     func importBrowsingData(_ visits: [BrowsingData.Visit], bookmarks: BookmarkImport?, into space: Space) async {
-        let profile = space.profile.id
-        let added = await history?.add(visits, profile: profile) ?? []
+        let receipt: HistoryStore.ImportUndo?
+        if visits.isEmpty {
+            receipt = nil
+        } else {
+            guard let history else {
+                regularFront.showToast("Couldn’t import pages because history is unavailable", symbol: "exclamationmark.triangle")
+                return
+            }
+            do {
+                receipt = try await history.importVisits(visits, profile: space.profile.id)
+            } catch {
+                regularFront.showToast("Couldn’t save the imported history", symbol: "exclamationmark.triangle")
+                return
+            }
+        }
         let item = bookmarks.map { makeItem(.folder($0.folder), profile: space.profile) }
         let folderID = item?.id
         let imported = Set(item.map { [$0].tabs.map(\.id) } ?? [])
@@ -19,8 +32,15 @@ extension AppModel {
         let summary = [pages, bookmarks?.count.counted("bookmark")].compactMap(\.self).joined(separator: " and ")
         regularFront.showToast("Imported \(summary)", symbol: "square.and.arrow.down", undo: { [weak self] in
             guard let self else { return }
-            // Pages that were here already stay, as they were left.
-            Task { await self.history?.remove(added, profile: profile) }
+            if let receipt, let history = self.history {
+                Task {
+                    do {
+                        try await history.undoImport(receipt)
+                    } catch {
+                        self.regularFront.showToast("Couldn’t undo the history import", symbol: "exclamationmark.triangle")
+                    }
+                }
+            }
             if let folderID {
                 self.removeImportedItems(imported, returningToTodayFrom: folderID)
                 self.scheduleSave()

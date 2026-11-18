@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+Undoing a browsing history import keeps visits you made afterward, including pages you cleared and revisited.
+
 In **File → Import Browsing Data…**, a Safari ZIP containing multiple history or bookmark files now lets you choose the files to import. The destination shows both the space and its profile, so you can bring Work and Personal across separately.
 
 Repeating an Arc sidebar import respects Today tabs you already imported and then navigated, moved within the same profile, or auto-archived. This uses the original tab ID saved by new JSON imports. Older imports still match open pages by address.
