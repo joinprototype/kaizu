@@ -51,12 +51,25 @@ jobs:
           export KAIZU_UPDATE_KEY="$RUNNER_TEMP/test-update.key"
           public_key=$(swift scripts/update-sign.swift new "$KAIZU_UPDATE_KEY")
           version=$(plutil -extract CFBundleShortVersionString raw Resources/Info.plist)
-          scripts/release.sh "$version"
-          swiftc Sources/BrowserCore/SelfUpdate.swift .github/scripts/check-release-package.swift -o "$RUNNER_TEMP/check-package"
-          "$RUNNER_TEMP/check-package" site/version.json "$public_key" "$RUNNER_TEMP/package-check"
-          app="$RUNNER_TEMP/package-check/unpacked/Kaizu.app"
-          codesign -dvv "$app" 2>&1 | grep -q 'flags=[^ ]*runtime'
-          cp "site/updates/Kaizu-$version.zip" "$RUNNER_TEMP/Kaizu.zip"
+          # The disposable signer belongs only to the rehearsal source tree.
+          rehearsal="$RUNNER_TEMP/package-rehearsal"
+          mkdir -p "$rehearsal"
+          git archive HEAD | tar -x -C "$rehearsal"
+          if "$rehearsal/scripts/release.sh" "$version" >"$RUNNER_TEMP/wrong-key.log" 2>&1; then
+            echo "A foreign private key passed the release check" >&2
+            exit 1
+          fi
+          grep -Fq 'does not match Kaizu' "$RUNNER_TEMP/wrong-key.log"
+          printf 'public enum ReleaseUpdateKey { public static let base64 = "%s" }\n' "$public_key" > "$rehearsal/Sources/BrowserCore/ReleaseUpdateKey.swift"
+          "$rehearsal/scripts/release.sh" "$version"
+
+          # The bundle used by the production-feed and runtime checks retains the shipped verification key.
+          make app CONFIG=release
+          codesign --verify --strict build/Kaizu.app
+          codesign -dvv build/Kaizu.app 2>&1 | grep -q 'flags=[^ ]*runtime'
+          ditto -c -k --keepParent build/Kaizu.app "$RUNNER_TEMP/Kaizu.zip"
+          mkdir -p "$RUNNER_TEMP/package-check/unpacked"
+          ditto -x -k "$rehearsal/site/updates/Kaizu-$version.zip" "$RUNNER_TEMP/package-check/unpacked"
       - name: Install the loopback TURN relay
         run: HOMEBREW_NO_AUTO_UPDATE=1 brew install coturn
       - name: Verify a relayed WebRTC call in the packaged release

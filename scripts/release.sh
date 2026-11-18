@@ -24,6 +24,8 @@ key="${KAIZU_UPDATE_KEY:-$HOME/.config/kaizu/update-signing.key}"
 # A failed build or submission leaves the previous release ready to deploy.
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
+swiftc Sources/BrowserCore/{SelfUpdate,ReleaseUpdateKey}.swift scripts/check-release-package.swift -o "$work/check-package"
+"$work/check-package" --check-key "$key"
 mkdir "$work/source" "$work/stage"
 cp -R Makefile Package.swift Resources Sources Tests "$work/source/"
 plist="$work/source/Resources/Info.plist"
@@ -83,6 +85,7 @@ hdiutil verify -quiet "$work/$dmg"
 cat > "$work/version.json" <<JSON
 {"version":"$version","build":$build,"url":"https://kaizu.joinprototype.com/download","archive":"https://kaizu.joinprototype.com/updates/$zip","signature":"$signature"}
 JSON
+"$work/check-package" "$work/version.json" "$work/$zip"
 printf '/download /%s 302\n' "$dmg" > "$work/redirects"
 sed -E "s/(\"softwareVersion\": \"|[Vv]ersion )[0-9]+\.[0-9]+\.[0-9]+/\1$version/" site/index.html > "$work/index.html"
 
