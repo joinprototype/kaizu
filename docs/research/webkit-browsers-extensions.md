@@ -73,7 +73,7 @@ On November 18, 2026, a standalone WebKit test on macOS 27.0.1 compiled all 15,6
 | Request containing `&accept_cookies=1` | Loaded | Blocked |
 | Control request | Loaded | Loaded |
 
-This verifies a possible **Import Rule List…** feature for Kaizu. Someone with a published WebKit JSON list could select a file, let Kaizu compile it before activation, and disable or remove it later. Kaizu currently ships its own lists. Its extension picker accepts WebExtensions and has no standalone rule-list importer. The Hush result covers static rules only. A blocker that generates rules inside its Safari extension would need to offer an export or publish its lists separately.
+Kaizu’s development build implements **Settings → Privacy → Import Rule List…** for published WebKit JSON files. Kaizu compiles the selected file before activation and allows each list to be disabled or removed. [Packaged browser results](../ROADMAP.md#extension-compatibility) The Hush result covers static rules only. A blocker that generates rules inside its Safari extension would need to offer an export or publish its lists separately.
 
 ## Recommendations for Kaizu
 

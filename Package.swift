@@ -26,6 +26,7 @@ let package = Package(
                 ]),
             ]
         ),
+        .testTarget(name: "KaizuTests", dependencies: ["Kaizu"]),
         // Pure Swift logic with no AppKit/WebKit dependency, so it's unit-testable.
         .target(
             name: "BrowserCore",
