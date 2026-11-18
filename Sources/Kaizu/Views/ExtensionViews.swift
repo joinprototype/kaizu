@@ -61,6 +61,11 @@ private struct ExtensionButton: View {
         .onHoverFade($isHovering)
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
         .contextMenu {
+            if let site = store.extensions.availableSite(for: item, on: store.selectedTab) {
+                Button("Allow Access to \(site.host ?? site.string)…") {
+                    store.extensions.requestSite(for: item, on: store.selectedTab)
+                }
+            }
             if let options = item.context.optionsPageURL {
                 Button("Options") { store.openTab(options) }
             }
@@ -84,6 +89,11 @@ struct ExtensionSettings: View {
                 }
                 ForEach(host.installed) { item in
                     InstalledExtensionRow(item: item) { host.uninstall(item) }
+                    ForEach(host.additionalSites(for: item), id: \.self) { site in
+                        LabeledContent(site) {
+                            Button("Remove Access") { host.removeSite(site, for: item) }
+                        }
+                    }
                 }
                 HStack {
                     Button("Add Extension…", action: chooseExtension)

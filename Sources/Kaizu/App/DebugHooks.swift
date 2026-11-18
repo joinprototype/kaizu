@@ -303,7 +303,7 @@ enum DebugHooks {
         }
         let askOnClick = "void document.addEventListener('click', () => Notification.requestPermission().then(s => { window.__asked = s }))"
         var delivered: [String] = []
-        SiteNotifications.onDeliver = { delivered.append($0) }
+        SiteNotifications.onDeliver = { message, _ in delivered.append(message) }
         settings.sitePermissions["example.com"] = [permission: true]
         settings.sitePermissions["example.org"] = [permission: false]
         settings.sitePermissions["example.net"] = nil
@@ -1639,6 +1639,8 @@ enum DebugHooks {
 
     static func apply(to store: BrowserStore) {
         switch ProcessInfo.processInfo.environment["KAIZU_DEBUG"] {
+        case "notification-routing", "notification-routing-restored":
+            Task { await qaNotificationRouting(store) }
         case "open":
             // KAIZU_URL in a new tab.
             if let url = ProcessInfo.processInfo.environment["KAIZU_URL"].flatMap(URL.init(string:)) {

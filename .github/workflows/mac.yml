@@ -39,6 +39,13 @@ jobs:
           KAIZU_DEBUG: bookmark-import-undo
           KAIZU_SUPPORT: ${{ runner.temp }}/bookmark-undo-profile
         run: build/Kaizu.app/Contents/MacOS/Kaizu
+      - name: Route notification clicks after closing and restoring a work tab
+        timeout-minutes: 2
+        env:
+          KAIZU_SUPPORT: ${{ runner.temp }}/notification-profile
+        run: |
+          KAIZU_DEBUG=notification-routing build/Kaizu.app/Contents/MacOS/Kaizu
+          KAIZU_DEBUG=notification-routing-restored build/Kaizu.app/Contents/MacOS/Kaizu
       - name: Build release app
         run: |
           export KAIZU_UPDATE_KEY="$RUNNER_TEMP/test-update.key"
