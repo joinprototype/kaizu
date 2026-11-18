@@ -194,7 +194,7 @@ final class ExtensionHost: NSObject {
     }
 
     func didActivate(_ tab: BrowserTab, previous: BrowserTab?) {
-        guard !tab.profile.isPrivate else { return }
+        guard !tab.profile.isPrivate, tab !== previous else { return }
         controller.didActivateTab(tab, previousActiveTab: previous)
     }
 
