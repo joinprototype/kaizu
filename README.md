@@ -78,7 +78,7 @@ It uses Apple frameworks only.
 ## Docs
 
 - [Roadmap](docs/ROADMAP.md): what's missing vs Arc, phases, motion spec
-- [Extension compatibility](docs/ROADMAP.md#extension-compatibility) lists the tested builds of Bitwarden, uBlock Origin Lite and Dark Reader, plus options for 1Password.
+- [Extension compatibility](docs/ROADMAP.md#extension-compatibility) lists the tested builds of Bitwarden, uBlock Origin Lite, Dark Reader and TabCloser, plus options for 1Password.
 - [Architecture](docs/ARCHITECTURE.md): module layout, state model, rules
 - [Research](docs/research/): market and Arc analysis
 

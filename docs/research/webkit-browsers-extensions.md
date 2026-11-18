@@ -2,6 +2,8 @@
 
 *Research snapshot as of 2026-10-24, written for Kaizu. Claims are linked inline. Anything not confirmed from a primary source or from code is marked **(unverified)**.*
 
+For package versions and results from running extensions in Kaizu, see the [compatibility table](../ROADMAP.md#extension-compatibility).
+
 ## TL;DR
 
 - **Safari Web Extensions can be reused. Safari content blockers and Safari App Extensions cannot.** Orion (since v130, Dec 2024), Nook (since Feb 2026) and one hobby browser load the web half of a Safari Web Extension straight from the `.appex` inside the app in `/Applications`. None of them can reach the extension's native companion code.
@@ -58,7 +60,7 @@ Three things do **not** carry over:
 
 Apple's public answer since 2015 has been to compile your own rules. WebKit bug [148632](https://bugs.webkit.org/show_bug.cgi?id=148632), "Please allow WKWebView to use Content Blocking extensions", was closed as a duplicate of "Expose public APIs for content filters", the request that became `WKContentRuleList`. An Orion user confirms that "Wipr doesn't work outside of Safari" ([forum](https://orionfeedback.org/d/11879-requesting-more-powerful-inbuilt-adblocking-functionality-equivalent-to-ublock-origin-or-adguard-safari)). The local `AdGuard for Safari.app` contains six content-blocker appexes plus one `com.apple.Safari.extension` popup and **no** web extension, so nothing in it is loadable.
 
-**Safari App Extensions: NO.** `com.apple.Safari.extension.appexpt` requires `com.apple.private.extension-host.safari-extension`. Kagi called them "closed source proprietary format", and later status reports confirm they still do not work. The web-extension point itself requires `com.apple.private.can-load-any-content-blocker` to host the native handler. That is the root reason native messaging to Safari companions is impossible.
+**Safari App Extensions: NO.** `com.apple.Safari.extension.appexpt` requires `com.apple.private.extension-host.safari-extension`. Kagi called them "closed source proprietary format", and later status reports confirm they still do not work. On macOS 27.0.1 the installed Safari web-extension point also names `com.apple.private.can-load-any-content-blocker` as its host entitlement. Apple documents a default native-message route for extensions loaded from an app bundle. WebKit asks macOS to resolve the bundle’s native handler and returns an unsupported error if that lookup fails. Kaizu uses the bundle loader and the default route. Bitwarden’s Safari build reported unsupported native messaging in Kaizu even though standalone autofill worked. [Apple’s delegate contract](https://developer.apple.com/documentation/webkit/wkwebextensioncontrollerdelegate) · [WebKit’s runtime implementation](https://github.com/WebKit/WebKit/blob/main/Source/WebKit/UIProcess/Extensions/Cocoa/API/WebExtensionContextAPIRuntimeCocoa.mm)
 
 ## Recommendations for Kaizu
 
@@ -88,6 +90,6 @@ Apple's public answer since 2015 has been to compile your own rules. WebKit bug 
 - DDG third-party extensions: internal-only in code, but they could be enabled remotely.
 - Whether Apple's iCloud Passwords helper accepts browsers other than Chrome, Edge and similar.
 - Whether Nook's Bitwarden biometric stand-in passes Keychain ACLs.
-- Whether uBO Lite's Safari build runs under `WKWebExtension`.
+- Whether the App Store build of uBlock Origin Lite blocks on the first navigation. The [Safari ZIP test](../ROADMAP.md#extension-compatibility) covered a later request.
 - Whether a sandboxed app can enumerate `/Applications/*/Contents/PlugIns` without the user selecting the app.
 - That Crest's pre-0.7 stack was `WKWebExtension`-based (inferred from paths and commit messages).

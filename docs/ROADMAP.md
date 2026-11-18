@@ -72,12 +72,15 @@ On macOS 27.0.1, two fresh profiles with camera and microphone denied reached Ji
 
 In **Settings → Extensions → Add Extension…**, select the Mac app that contains a Safari web extension or choose a WebExtension ZIP. Kaizu reads the web extension in place from a Mac app, so keep the app installed. Safari App Extensions and Safari content-blocker bundles use different APIs. For example, AdGuard for Safari 3.0.0 contains six content blockers and a Safari App Extension. Kaizu's built-in ad and tracker blocker is available for that use case. [Apple's web extension loader](https://developer.apple.com/documentation/webkit/wkwebextension/init(appextensionbundle:)) · [Safari App Extensions](https://developer.apple.com/documentation/safariservices/safari-app-extensions)
 
+Some tab-management extensions need access to the website whose tabs they manage. On the site, right-click the extension’s icon in the sidebar, choose **Allow Access to [host]…**, and review the site in the confirmation. This grants that extension access on that scheme and host across regular profiles. To revoke a grant, open **Settings → Extensions → Remove Access** next to the site.
+
 These checks ran on a Kaizu development build on macOS 27.0.1 in fresh profiles.
 
 | Extension package | What worked in Kaizu | Coverage |
 |---|---|---|
 | [uBlock Origin Lite 2026.1116.1650](https://github.com/uBlockOrigin/uBOL-home/releases/tag/2026.1116.1650), Safari ZIP | After restarting Kaizu, an EasyList rule blocked a matching request while a control request loaded. With the extension absent, both loaded. Kaizu's own blocker was off in both profiles. | The first matching request after launch got through before the extension rules took effect. Advanced filtering, cosmetic rules and the App Store bundle need separate checks. |
 | [Dark Reader 4.9.135](https://github.com/darkreader/darkreader/releases/tag/v4.9.135), Chrome MV3 ZIP | After restarting Kaizu, Dark Reader applied its dynamic theme to a light page. The background changed from white to RGB(24, 26, 27) and black text became RGB(232, 230, 227). | One controlled page, default settings. |
+| [TabCloser v4.3.0](https://github.com/sethcottle/tabcloser/releases/tag/v4.3.0), Safari app, Chrome and Firefox ZIPs | With access granted to `https://open.spotify.com/*`, all three packages closed a matching tab by 18 seconds and left the control tab open. | At default permissions, the matching tab stayed open for 25 seconds. The Safari package in this release reports 4.2.0 in its web manifest. Other service patterns remain untested. |
 
 #### Password-manager alternatives
 
@@ -88,6 +91,8 @@ On a development build running on macOS 27.0.1, Safari extension **2026.10.1**, 
 Desktop unlock, biometrics, passkeys and Bitwarden cloud accounts still need separate checks. The Mac App Store extension from the 2026.10.2 build also opened its welcome screen. Both Safari builds reported unsupported native messaging and a notification event. [Bitwarden desktop release](https://github.com/bitwarden/clients/releases/tag/desktop-v2026.10.2) · [Mac App Store extension build](https://github.com/bitwarden/clients/actions/runs/41090170889)
 
 **1Password** distributes its Safari extension as a separate Mac App Store app. The desktop app also offers Universal Autofill (Command–Backslash) and Quick Access (Shift–Command–Space). Site recognition and filling through those shortcuts still need a Kaizu test. For browser-to-desktop communication, 1Password documents adding a signed browser in Applications. That route uses the Chrome or Firefox extension and requires working native messaging. On Mac, the signed browser must be in Applications. [Safari distribution](https://support.1password.com/update-extension/) · [Universal Autofill](https://support.1password.com/mac-universal-autofill/) · [Additional browsers](https://support.1password.com/additional-browsers/)
+
+**KeePassXC** offers an extension-free alternative for people with a local vault. Its Global Auto-Type selects entries using the focused window title and types into the focused fields. A page controls its title, so users need to check the address before filling. Kaizu has yet to verify this workflow with a disposable KeePassXC database. [KeePassXC Auto-Type guide](https://keepassxc.org/docs/KeePassXC_UserGuide#_auto_type)
 
 ## Strategy (Oct 2026)
 

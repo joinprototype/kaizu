@@ -26,6 +26,8 @@ final class ExtensionHost: NSObject {
         var path: String
         /// The store listing it came from (`ExtensionGallery.Listing.source`).
         var source: String?
+        /// Additional sites the user approved from the extension's toolbar menu.
+        var additionalSites: [String]?
 
         /// Where it is now. Copied extensions are found by their folder's
         /// name, so moving the data folder (a rename of the app) keeps them.
@@ -48,7 +50,7 @@ final class ExtensionHost: NSObject {
     /// Bumped when an extension updates its toolbar action (badge, icon), so views refresh.
     private(set) var actionRevision = 0
 
-    @ObservationIgnored private var records: [Record] = []
+    private var records: [Record] = []
     @ObservationIgnored private let log = Logger(subsystem: Log.subsystem, category: "Extensions")
     private static let recordsKey = "installedExtensions"
     nonisolated private static let safariExtensionPoint = "com.apple.Safari.web-extension"
@@ -84,7 +86,6 @@ final class ExtensionHost: NSObject {
     }
 
     func isInstalled(_ listing: ExtensionGallery.Listing) -> Bool {
-        // Through `installed`, which views observe; records aren't.
         installed.contains { item in records.contains { $0.id == item.id && $0.source == listing.source } }
     }
 
@@ -173,6 +174,45 @@ final class ExtensionHost: NSObject {
 
     // MARK: - Actions
 
+    func additionalSites(for item: Installed) -> [String] {
+        records.first { $0.id == item.id }?.additionalSites ?? []
+    }
+
+    func availableSite(for item: Installed, on tab: BrowserTab?) -> WKWebExtension.MatchPattern? {
+        guard let tab, !tab.profile.isPrivate, let url = tab.url,
+              let scheme = url.scheme, ["https", "http"].contains(scheme),
+              let host = url.host(), !host.isEmpty, !host.contains("*"),
+              item.context.hasPermission(.tabs), !item.context.hasAccess(to: url) else { return nil }
+        return try? WKWebExtension.MatchPattern(scheme: scheme, host: host, path: "/*")
+    }
+
+    func requestSite(for item: Installed, on tab: BrowserTab?) {
+        guard let tab, let pattern = availableSite(for: item, on: tab) else { return }
+        let alert = NSAlert()
+        alert.messageText = "Allow “\(item.name)” on \(pattern.host ?? pattern.string)?"
+        alert.informativeText = "This extension can read and change pages matching \(pattern.string) across regular profiles. You can remove this access in Settings → Extensions."
+        alert.addButton(withTitle: "Allow")
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn,
+              availableSite(for: item, on: tab)?.string == pattern.string,
+              let index = records.firstIndex(where: { $0.id == item.id }) else { return }
+        item.context.setPermissionStatus(.grantedExplicitly, for: pattern)
+        records[index].additionalSites = Array(Set((records[index].additionalSites ?? []) + [pattern.string])).sorted()
+        persist()
+        didChange(.URL, for: tab)
+    }
+
+    func removeSite(_ site: String, for item: Installed) {
+        guard let index = records.firstIndex(where: { $0.id == item.id }),
+              records[index].additionalSites?.contains(site) == true,
+              let pattern = try? WKWebExtension.MatchPattern(string: site) else { return }
+        records[index].additionalSites?.removeAll { $0 == site }
+        if !item.context.webExtension.allRequestedMatchPatterns.contains(pattern) {
+            item.context.setPermissionStatus(.unknown, for: pattern)
+        }
+        persist()
+    }
+
     func action(for item: Installed, on tab: BrowserTab?) -> WKWebExtension.Action? {
         _ = actionRevision  // observe action updates
         return item.context.action(for: tab)
@@ -238,6 +278,11 @@ final class ExtensionHost: NSObject {
         }
         for pattern in webExtension.allRequestedMatchPatterns {
             context.setPermissionStatus(.grantedExplicitly, for: pattern)
+        }
+        for site in record.additionalSites ?? [] {
+            if let pattern = try? WKWebExtension.MatchPattern(string: site) {
+                context.setPermissionStatus(.grantedExplicitly, for: pattern)
+            }
         }
         try controller.load(context)
         installed.append(Installed(id: record.id, context: context))
