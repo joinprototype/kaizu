@@ -13,7 +13,7 @@ Effort: **S** = an evening, **M** = a few sessions, **L** = a project.
 | --- | --- | --- |
 | Moving to Kaizu | Arc sidebar import with a preview, bookmark and history import | Verify common password-manager extensions by hand |
 | First launch | Mac download and signed automatic updates | Developer ID signing and Apple notarization |
-| Everyday browsing | Split view, tab hibernation and daily filter updates while Kaizu is open | Compare content-blocking coverage and test cookie consent handling on real sites |
+| Everyday browsing | Split view, tab hibernation, daily filter updates and verified cookie rejection on two live sites | Compare content-blocking coverage and test more consent providers and regions |
 | Browser integration | Per-site permissions and notification counts in the tab and Dock | Request Apple’s browser passkey entitlement and test macOS notification banners |
 
 See the [changelog](../CHANGELOG.md) for version-by-version changes. The phases below track implementation details.
@@ -46,6 +46,17 @@ On a fresh macOS 27.0.1 account, Safari visited and bookmarked a local page. Its
 On macOS 15.8.2, the published v0.2.5 app opened a saved tab and received a persistent login cookie from a local test site. After the app quit, the runner replaced its bundle and launched the candidate without a URL. The same tab reopened in its original space and profile, and the site received its original cookie. CI repeats this [upgrade check](https://github.com/joinprototype/kaizu/actions/runs/44264250004) alongside a clean launch. A separate [production-feed check](https://github.com/joinprototype/kaizu/actions/runs/44281594637) lowered the test bundle’s advertised build number, then let the candidate download and verify the public v0.2.5 archive. Quitting installed build 10. The original tab and test login survived. The exact minimum macOS 15.4 and Apple notarization remain open checks.
 
 On macOS 27.0.1, the Firefox Add-ons builds of Bitwarden 2026.10.2 and 1Password 8.12.44.33 both installed in separate empty Kaizu profiles. Bitwarden opened a loading popup. Selecting 1Password on a loaded page showed no sign-in interface. WebKit loaded both background pages. Bitwarden reported an unsupported notification click event and 1Password reported a missing `chrome.notifications.onClicked` API. Sign-in, autofill and desktop integration remain unverified for both versions.
+
+### Cookie consent on live sites
+
+On macOS 27.0.1, fresh profiles with content blocking and automatic rejection turned off showed a banner on both sites below. Both providers initially reported that the visitor had made no choice. With Kaizu's default settings, both recorded a response. After quitting and reopening the browser with both protections off, each site still reported the same decision without showing its banner again.
+
+| Site | What the site recorded |
+| --- | --- |
+| [Cookiebot help](https://www.cookiebot.com/en/help/) | `Cookiebot.hasResponse` became true. Necessary cookies were allowed. Preferences, statistics and marketing were declined. A separate profile with only automatic rejection enabled produced the same result. |
+| [CookieYes documentation](https://www.cookieyes.com/documentation/retrieving-consent-data-using-api-getckyconsent/) | `getCkyConsent().isUserActionCompleted` became true. Necessary cookies were allowed. Functional, analytics, performance and advertisement cookies were declined. |
+
+On Didomi's public demo, the SDK loaded but showed no notice in the control profile, including with the vendor's country-preview option. Rejection on that provider remains unverified. [Didomi sandbox](https://sandbox.didomi.io/cmp.html) · [Preview option](https://developers.didomi.io/cmp/web-sdk/getting-started)
 
 ### Media calls and permissions
 
