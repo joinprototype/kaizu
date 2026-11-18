@@ -51,10 +51,24 @@ jobs:
           codesign -dvv "$app" 2>&1 | grep -q 'flags=[^ ]*runtime'
           cp "site/updates/Kaizu-$version.zip" "$RUNNER_TEMP/Kaizu.zip"
       - name: Exercise WebRTC in the packaged release on the build Mac
+        id: packaged-call
         timeout-minutes: 3
         env:
           RUNNER_ENVIRONMENT: ${{ runner.environment }}
-        run: python3 .github/scripts/check-release-launch.py "$RUNNER_TEMP/package-check/unpacked/Kaizu.app" --media-call
+        run: |
+          sw_vers
+          python3 .github/scripts/check-release-launch.py "$RUNNER_TEMP/package-check/unpacked/Kaizu.app" --media-call
+      - name: Compare WebRTC with the same executable without hardened runtime
+        if: failure() && steps.packaged-call.outcome == 'failure'
+        timeout-minutes: 3
+        env:
+          RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        run: |
+          app="$RUNNER_TEMP/webrtc-control/Kaizu.app"
+          ditto "$RUNNER_TEMP/package-check/unpacked/Kaizu.app" "$app"
+          codesign --force --sign - --options 0 --entitlements Resources/Kaizu.entitlements "$app"
+          osascript -e 'tell application id "com.joinprototype.kaizu" to quit'
+          python3 .github/scripts/check-release-launch.py "$app" --media-call
       - uses: actions/upload-artifact@v7
         with:
           name: kaizu-runtime-check

@@ -85,8 +85,19 @@ async function call() {
     }
 }
 
-const timeout = setTimeout(() => {
-    reportFailure(`Timeout during ${stage}. Caller ${caller.connectionState}, receiver ${receiver.connectionState}, video readyState ${video.readyState}`);
+async function describeICE(peer) {
+    const counts = {};
+    for (const stat of (await peer.getStats()).values()) {
+        if (!["local-candidate", "remote-candidate", "candidate-pair"].includes(stat.type)) continue;
+        const key = stat.type + "/" + (stat.candidateType || stat.state);
+        counts[key] = (counts[key] || 0) + 1;
+    }
+    return [peer.connectionState, peer.iceGatheringState, peer.iceConnectionState, JSON.stringify(counts)].join(" ");
+}
+
+const timeout = setTimeout(async () => {
+    const summary = await Promise.all([describeICE(caller), describeICE(receiver)]);
+    reportFailure(`Timeout during ${stage}. Caller ${summary[0]}, receiver ${summary[1]}, video readyState ${video.readyState}`);
 }, 30000);
 try {
     await call();
