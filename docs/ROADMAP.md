@@ -51,7 +51,18 @@ On macOS 27.0.1, the Firefox Add-ons builds of Bitwarden 2026.10.2 and 1Password
 
 The packaged browser sent video between two local WebRTC peers on macOS 15.8.2 and 27.0.1. The receiver rendered a frame from a canvas camera and returned a message over the data channel. A separate native-sheet test confirmed that declining a microphone request preserves an existing camera permission, and that private windows ask independently. Physical camera and microphone capture, remote participants, and conferencing-service lobbies still need testing. [Packaged browser CI](https://github.com/joinprototype/kaizu/actions/runs/44293624816)
 
-### Password-manager alternatives
+### Extension compatibility
+
+In **Settings → Extensions → Add Extension…**, select the Mac app that contains a Safari web extension or choose a WebExtension ZIP. Kaizu reads the web extension in place from a Mac app, so keep the app installed. Safari App Extensions and Safari content-blocker bundles use different APIs. For example, AdGuard for Safari 3.0.0 contains six content blockers and a Safari App Extension. Kaizu's built-in ad and tracker blocker is available for that use case. [Apple's web extension loader](https://developer.apple.com/documentation/webkit/wkwebextension/init(appextensionbundle:)) · [Safari App Extensions](https://developer.apple.com/documentation/safariservices/safari-app-extensions)
+
+These checks ran on a Kaizu development build on macOS 27.0.1 in fresh profiles.
+
+| Extension package | What worked in Kaizu | Coverage |
+|---|---|---|
+| [uBlock Origin Lite 2026.1116.1650](https://github.com/uBlockOrigin/uBOL-home/releases/tag/2026.1116.1650), Safari ZIP | After restarting Kaizu, an EasyList rule blocked a matching request while a control request loaded. With the extension absent, both loaded. Kaizu's own blocker was off in both profiles. | The first matching request after launch got through before the extension rules took effect. Advanced filtering, cosmetic rules and the App Store bundle need separate checks. |
+| [Dark Reader 4.9.135](https://github.com/darkreader/darkreader/releases/tag/v4.9.135), Chrome MV3 ZIP | After restarting Kaizu, Dark Reader applied its dynamic theme to a light page. The background changed from white to RGB(24, 26, 27) and black text became RGB(232, 230, 227). | One controlled page, default settings. |
+
+#### Password-manager alternatives
 
 **Bitwarden for Safari.** In Kaizu, open **Settings → Extensions → Add Extension…** and select Bitwarden.app. Apps in Applications also appear under **From Safari**. Keep the app installed because Kaizu loads its extension in place.
 
@@ -304,7 +315,7 @@ What makes someone keep it as their default browser.
 ## Phase 4: Ecosystem
 
 - [x] Web extension host on `WKWebExtension`: toolbar actions with badges, popups, permission prompts, tab/window bridging, persisted installs **L**
-  - Targets to verify: uBlock Origin Lite, 1Password, Bitwarden, Dark Reader
+  - See [extension compatibility](#extension-compatibility) for the specific packages and features tested. 1Password sign-in and autofill remain open.
 - [x] Install flow: unpacked folder or .zip (Settings → Extensions), install confirmation listing access **M**
 - [x] Install from Chrome Web Store / Firefox Add-ons: "Add to Kaizu" on an extension's page (CRX unwrapped to its ZIP; XPI as is) **M**
 - [x] Import from Safari: Settings → Extensions lists Safari *web* extensions in /Applications and loads them via `WKWebExtension(appExtensionBundle:)` **M**
