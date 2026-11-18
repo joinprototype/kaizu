@@ -38,6 +38,12 @@ jobs:
           open -n -W --env KAIZU_DEBUG=little-window-promotion --env "KAIZU_SUPPORT=$KAIZU_SUPPORT" --stderr "$log" -a "$GITHUB_WORKSPACE/build/Kaizu.app"
           cat "$log"
           grep -Fxq 'Little-window promotion preserved the live page and its profile.' "$log"
+      - name: Keep all four split panes when an extra pane is requested
+        timeout-minutes: 2
+        env:
+          KAIZU_SUPPORT: ${{ runner.temp }}/split-capacity
+          KAIZU_DEBUG: split-capacity
+        run: build/Kaizu.app/Contents/MacOS/Kaizu
       - name: Recover an archive move after an interrupted session
         timeout-minutes: 3
         run: python3 .github/scripts/check-archive-recovery.py build/Kaizu.app/Contents/MacOS/Kaizu

@@ -70,8 +70,7 @@ struct TabRow: View {
             if isHovering, tab.hasWanderedFromPin {
                 RowAction(systemName: "arrow.uturn.backward", help: "Back to the pinned page") { tab.returnToPin() }
             }
-            if isHovering, !isSelected, !inSplit,
-               store.activeSpace.splitTabs.count < BrowserStore.maxSplitPanes {
+            if isHovering, !isSelected, store.canAddSplitPane, !store.shownTabs.contains(tab) {
                 RowAction(systemName: "rectangle.split.2x1", help: "Open in Split View (⌃⇧=)") { store.addToSplit(tab) }
             }
             if isHovering {
@@ -265,9 +264,10 @@ private struct TabContextMenu: View {
         }
         if store.isInSplit(tab) {
             Button("Remove from Split View") { store.removeFromSplit(tab) }
-        } else if tab !== store.selectedTab {
+        }
+        if tab !== store.selectedTab, !store.shownTabs.contains(tab) {
             Button("Open in Split View") { store.addToSplit(tab) }
-                .disabled(space.splitTabs.count >= BrowserStore.maxSplitPanes)
+                .disabled(!store.canAddSplitPane)
         }
         Divider()
         if tab.isPlayingMedia || tab.isMuted {

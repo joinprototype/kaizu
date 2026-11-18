@@ -53,7 +53,7 @@ extension BrowserTab {
     private func addDestinations(after opener: NSMenuItem, in menu: NSMenu) {
         guard let store else { return }
         var destinations: [(String, LinkDestination)] = []
-        if store.isShowing(self), store.peek !== self, store.activeSpace.splitTabs.count < BrowserStore.maxSplitPanes {
+        if store.isShowing(self), store.peek !== self, store.canAddSplitPane {
             destinations.append(("Open Link in Split View", .split))
         }
         if !profile.isPrivate {
@@ -101,6 +101,7 @@ extension BrowserStore {
     func open(_ url: URL, at destination: LinkDestination, from tab: BrowserTab) {
         switch destination {
         case .split:
+            guard canAddSplitPane else { return }
             addToSplit(openTab(url, after: tab, select: false))
         case .newWindow:
             moveToNewWindow(openTab(url, after: tab, select: false))

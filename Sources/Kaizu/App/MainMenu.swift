@@ -159,7 +159,8 @@ enum MainMenu {
         menu.addItem(ActionMenuItem("Show Reader", key: "r", modifiers: [.command, .shift], isOn: { app.front.reader != nil }) {
             if app.front.window?.isKeyWindow == true { app.front.toggleReader() }
         })
-        menu.addItem(ActionMenuItem("Split with Recent Tab", key: "=", modifiers: [.control, .shift]) { app.front.splitWithRecentTab() })
+        menu.addItem(ActionMenuItem("Split with Recent Tab", key: "=", modifiers: [.control, .shift],
+                                    available: { app.front.recentSplitPartner != nil }) { app.front.splitWithRecentTab() })
         menu.addItem(ActionMenuItem("Close Split View") { app.front.closeSplit() })
         menu.addItem(.separator())
         menu.addItem(ActionMenuItem("Block Ads & Trackers", isOn: { app.front.contentBlocker.isEnabled }) {

@@ -12,6 +12,10 @@ extension BrowserStore {
         activeSpace.split.contains(tab.id) && activeSpace.splitTabs.contains(tab)
     }
 
+    var canAddSplitPane: Bool {
+        (1..<Self.maxSplitPanes).contains(shownTabs.count) && !isSplitElsewhere
+    }
+
     /// Splits `tab` with the selected tab, or adds it to the split on
     /// screen. A split that isn't showing (another tab is selected) gives
     /// way to a new one with the selected tab.
@@ -22,7 +26,8 @@ extension BrowserStore {
         if space.splitTabs.isEmpty || current.map({ !space.splitTabs.contains($0) }) == true {
             guard let current, current !== tab else { return }
             space.splitLayout = .row([current.id, tab.id])
-        } else if !space.split.contains(tab.id), space.splitTabs.count < Self.maxSplitPanes {
+        } else if !space.split.contains(tab.id) {
+            guard canAddSplitPane else { return }
             space.splitLayout = space.splitLayout?.appending(tab.id)
         }
         takeOver(tab)
@@ -37,16 +42,17 @@ extension BrowserStore {
         return activeSpace.splitTabs.contains(where: elsewhere.contains)
     }
 
-    /// ⌃⇧=: splits the current tab with the one used most recently before it.
-    func splitWithRecentTab() {
-        guard let current = selectedTab else { return }
-        let elsewhere = tabsElsewhere
-        let recent = activeSpace.allTabs
-            .filter { $0 !== current && !isInSplit($0) && !elsewhere.contains($0) }
+    /// A pane in a hidden split is eligible when starting a new split from a standalone tab.
+    var recentSplitPartner: BrowserTab? {
+        guard canAddSplitPane else { return nil }
+        let unavailable = tabsElsewhere.union(shownTabs)
+        return activeSpace.allTabs.lazy
+            .filter { !unavailable.contains($0) }
             .max { ($0.lastActiveAt ?? .distantPast) < ($1.lastActiveAt ?? .distantPast) }
-        if let recent {
-            addToSplit(recent)
-        }
+    }
+
+    func splitWithRecentTab() {
+        if let recentSplitPartner { addToSplit(recentSplitPartner) }
     }
 
     /// Whether the sidebar tab `id` can be dropped on `target`'s page.
