@@ -74,11 +74,12 @@ final class ExtensionHost: NSObject {
         let data = UserDefaults.standard.data(forKey: Self.recordsKey)
         let saved = data.flatMap { try? JSONDecoder().decode([Record].self, from: $0) } ?? []
         for record in saved where !records.contains(where: { $0.id == record.id }) {
-            guard let webExtension = try? await Self.makeExtension(record) else {
-                log.error("Couldn't load extension at \(record.location.path, privacy: .public)")
-                continue
+            do {
+                let webExtension = try await Self.makeExtension(record)
+                try activate(webExtension, record: record)
+            } catch {
+                log.error("Couldn't load extension at \(record.location.path, privacy: .public): \(error.localizedDescription, privacy: .public)")
             }
-            activate(webExtension, record: record)
         }
     }
 
@@ -115,6 +116,10 @@ final class ExtensionHost: NSObject {
     /// Asks the user, then installs: a folder or `.zip` is copied into
     /// Application Support; a Safari extension app is used in place.
     func install(from url: URL, askFirst: Bool = true, source: String? = nil) async {
+        var stagedFolder: URL?
+        defer {
+            if let stagedFolder { try? FileManager.default.removeItem(at: stagedFolder) }
+        }
         do {
             let id = UUID()
             let record: Record
@@ -123,6 +128,7 @@ final class ExtensionHost: NSObject {
             } else {
                 let directory = Self.directory
                 let destination = directory.appending(path: id.uuidString, directoryHint: .isDirectory)
+                stagedFolder = destination
                 // Off the main thread: a big extension takes a moment to unpack.
                 try await Task.detached(priority: .userInitiated) {
                     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -135,16 +141,15 @@ final class ExtensionHost: NSObject {
                 record = Record(id: id, kind: .folder, path: destination.path, source: source)
             }
             let webExtension = try await Self.makeExtension(record)
-            guard !askFirst || confirmInstall(of: webExtension) else {
-                if record.kind == .folder { try? FileManager.default.removeItem(at: record.location) }
-                return
-            }
-            activate(webExtension, record: record)
+            guard !askFirst || confirmInstall(of: webExtension) else { return }
+            try activate(webExtension, record: record)
+            stagedFolder = nil
             persist()
             app?.regularFront.showToast("Added \(webExtension.displayName ?? "extension")", symbol: "puzzlepiece.extension")
         } catch {
-            let alert = NSAlert(error: error)
+            let alert = NSAlert()
             alert.messageText = "Couldn't add the extension"
+            alert.informativeText = error.localizedDescription
             alert.runModal()
         }
     }
@@ -222,7 +227,7 @@ final class ExtensionHost: NSObject {
 
     // MARK: - Private
 
-    private func activate(_ webExtension: WKWebExtension, record: Record) {
+    private func activate(_ webExtension: WKWebExtension, record: Record) throws {
         let context = WKWebExtensionContext(for: webExtension)
         // WebKit generates the resource origin independently of the runtime ID.
         context.uniqueIdentifier = record.id.uuidString
@@ -234,14 +239,10 @@ final class ExtensionHost: NSObject {
         for pattern in webExtension.allRequestedMatchPatterns {
             context.setPermissionStatus(.grantedExplicitly, for: pattern)
         }
-        do {
-            try controller.load(context)
-            installed.append(Installed(id: record.id, context: context))
-            if !records.contains(where: { $0.id == record.id }) {
-                records.append(record)
-            }
-        } catch {
-            log.error("Couldn't start \(webExtension.displayName ?? "?", privacy: .public): \(error.localizedDescription, privacy: .public)")
+        try controller.load(context)
+        installed.append(Installed(id: record.id, context: context))
+        if !records.contains(where: { $0.id == record.id }) {
+            records.append(record)
         }
     }
 
@@ -281,8 +282,22 @@ final class ExtensionHost: NSObject {
         case .folder:
             return try await WKWebExtension(resourceBaseURL: url)
         case .safariApp:
-            guard let bundle = safariExtensionBundle(in: url) else { throw CocoaError(.fileNoSuchFile) }
+            guard FileManager.default.fileExists(atPath: url.path) else { throw CocoaError(.fileNoSuchFile) }
+            guard let bundle = safariExtensionBundle(in: url) else {
+                throw SafariInstallError.noWebExtension(url.lastPathComponent)
+            }
             return try await WKWebExtension(appExtensionBundle: bundle)
+        }
+    }
+
+    private enum SafariInstallError: LocalizedError {
+        case noWebExtension(String)
+
+        var errorDescription: String? {
+            switch self {
+            case .noWebExtension(let app):
+                "\(app) contains no Safari web extension. Choose a Mac app with a web extension, or add a WebExtension ZIP. For ad and tracker blocking, Kaizu also has a built-in blocker."
+            }
         }
     }
 

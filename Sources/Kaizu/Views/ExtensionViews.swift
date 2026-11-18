@@ -105,7 +105,7 @@ struct ExtensionSettings: View {
             } header: {
                 Text("From Safari")
             } footer: {
-                FooterText("Safari extensions run here without their companion app, so anything that needs the app (password autofill, for example) may not work.")
+                FooterText("Keep the Mac app installed. Kaizu loads its web extension from the app. Features that use a desktop connection, such as biometric vault unlock, may be unavailable.")
             }
         }
         .formStyle(.grouped)
