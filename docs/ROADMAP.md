@@ -35,6 +35,8 @@ Kaizu’s advantages to demonstrate are built-in tracking protection, a local si
 
 Two publicly available Arc sidebar samples were imported into separate, empty Kaizu sessions. The [linkcache fixture](https://github.com/adlio/linkcache/blob/95d64d3739b3d9afd4b4e3be58f8cd42e33c6062/test_data/StorableSidebar.json) produced 9 tabs in 2 spaces on 1 profile. The [A New Arc Begins fixture](https://github.com/Zarrar09/A-New-Arc-Begins/blob/41f0df8520c4ff13b7f25d387a9046547b927f31/tests/fixtures/sampleStorableSidebar.json) produced 78 tabs in 4 spaces on 2 profiles. After a restart, importing each sidebar again added zero tabs and preserved the saved session. Undo in a fresh run returned each session to one empty space. The source files retained their original hashes.
 
+Chrome 157 wrote a fresh test profile with a loopback visit and a bookmark. Kaizu imported both, kept the bookmarks folder collapsed, recognized the bookmark on a repeat preview, and removed the imported visit and folder on Undo. A tab added to the folder after import survived Undo. Both source files retained their original hashes.
+
 Still to verify with comparable evidence: a real Safari export, an upgrade with existing profile logins, and password-manager autofill.
 
 ## Strategy (Oct 2026)

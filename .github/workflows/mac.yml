@@ -14,7 +14,7 @@ jobs:
     runs-on: xcode-27
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Run Swift tests
@@ -23,3 +23,29 @@ jobs:
         run: make app CONFIG=release
       - name: Verify app bundle
         run: codesign --verify --strict build/Kaizu.app
+      - name: Package the verified app for launch testing
+        run: ditto -c -k --keepParent build/Kaizu.app "$RUNNER_TEMP/Kaizu.zip"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: kaizu-runtime-check
+          path: ${{ runner.temp }}/Kaizu.zip
+          retention-days: 1
+
+  launch-on-macos-15:
+    needs: verify
+    runs-on: macos-15
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          name: kaizu-runtime-check
+          path: ${{ runner.temp }}
+      - name: Launch release and verify WebKit navigation
+        run: |
+          sw_vers
+          ditto -x -k "$RUNNER_TEMP/Kaizu.zip" "$RUNNER_TEMP/launch"
+          codesign --verify --strict "$RUNNER_TEMP/launch/Kaizu.app"
+          python3 .github/scripts/check-release-launch.py "$RUNNER_TEMP/launch/Kaizu.app"
