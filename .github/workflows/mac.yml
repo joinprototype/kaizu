@@ -35,6 +35,13 @@ jobs:
           KAIZU_DEBUG: bookmark-import-undo
           KAIZU_SUPPORT: ${{ runner.temp }}/bookmark-undo-profile
         run: build/Kaizu.app/Contents/MacOS/Kaizu
+      - name: Route notification clicks after closing and restoring a work tab
+        timeout-minutes: 2
+        env:
+          KAIZU_SUPPORT: ${{ runner.temp }}/notification-profile
+        run: |
+          KAIZU_DEBUG=notification-routing build/Kaizu.app/Contents/MacOS/Kaizu
+          KAIZU_DEBUG=notification-routing-restored build/Kaizu.app/Contents/MacOS/Kaizu
       - name: Build release app
         run: make app CONFIG=release
       - name: Verify app bundle
@@ -82,7 +89,7 @@ jobs:
           ditto -x -k previous.zip installed
           codesign --verify --strict installed/Kaizu.app
           python3 "$GITHUB_WORKSPACE/.github/scripts/check-release-launch.py" launch/Kaizu.app installed/Kaizu.app
-      - name: Verify video and data transfer between WebRTC peers
+      - name: Verify audio, video and data transfer between WebRTC peers
         if: matrix.scenario == 'media-call'
         env:
           RUNNER_ENVIRONMENT: ${{ runner.environment }}

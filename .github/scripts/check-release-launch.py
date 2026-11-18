@@ -210,7 +210,7 @@ def main():
         subprocess.run(["defaults", "write", "com.joinprototype.kaizu", "settings", "-data", settings], check=True)
         if args.media_call:
             quit_app(launch(server, candidate, f"http://127.0.0.1:{server.server_port}/media-call"))
-            print("The receiving WebRTC peer rendered video from the sender and echoed a data-channel message.")
+            print("The receiving WebRTC peer decoded non-silent audio, rendered video and echoed a data-channel message.")
             return
         if args.extension_windows:
             install_test_extension()
