@@ -45,11 +45,18 @@ extension DebugHooks {
             app.settings.setPermission(SiteNotifications.permission, to: true, on: address.host()!)
             tab.webView.loadSimulatedRequest(URLRequest(url: address), responseHTML: """
                 <!doctype html><title>Notification routing</title><script>
+                window.fixtureStarted = true;
                 const message = new Notification("A work message");
                 message.onshow = () => window.shown = true;
                 message.onclick = () => window.clicked = true;
                 </script>
                 """)
+            // The first HTTPS navigation can wait for cold content rules before WebKit runs the page.
+            // Give delivery its own deadline once the fixture has actually started.
+            await withCheckedContinuation { continuation in
+                app.contentBlocker.whenReady(for: address) { continuation.resume() }
+            }
+            await waitForPageFlag("fixtureStarted", on: tab)
             await waitForPageFlag("shown", on: tab)
             let destination = posted!
             precondition(destination.url == address && destination.tabID == tab.id)
