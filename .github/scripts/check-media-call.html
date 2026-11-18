@@ -1,0 +1,84 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Kaizu WebRTC call check</title>
+<canvas width="160" height="90"></canvas>
+<video autoplay muted playsinline></video>
+<script>
+function reportFailure(message) {
+    location.replace("/media-call/failure?message=" + encodeURIComponent(message));
+}
+window.addEventListener("error", event => reportFailure(event.message));
+window.addEventListener("unhandledrejection", event => reportFailure(String(event.reason)));
+</script>
+<script type="module">
+// Use two local peers and a canvas camera so the test never needs a physical device.
+let stage = "creating peers";
+const caller = new RTCPeerConnection({iceServers: []});
+const receiver = new RTCPeerConnection({iceServers: []});
+const canvas = document.querySelector("canvas");
+const context = canvas.getContext("2d");
+const video = document.querySelector("video");
+const stream = canvas.captureStream(10);
+let frame = 0;
+const draw = setInterval(() => {
+    context.fillStyle = ++frame % 2 ? "tomato" : "navy";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+}, 100);
+
+async function connect(from, to, description) {
+    const pending = [];
+    from.onicecandidate = ({candidate}) => {
+        if (!candidate) return;
+        if (to.remoteDescription) {
+            to.addIceCandidate(candidate).catch(error => reportFailure(error.message));
+        } else {
+            pending.push(candidate);
+        }
+    };
+    stage = "signaling " + description.type;
+    await from.setLocalDescription(description);
+    await to.setRemoteDescription(description);
+    for (const candidate of pending) await to.addIceCandidate(candidate);
+}
+
+async function call() {
+    const receivedFrame = new Promise(resolve => {
+        receiver.ontrack = event => {
+            video.srcObject = event.streams[0];
+            video.requestVideoFrameCallback((_, metadata) => resolve(metadata));
+        };
+    });
+    const channel = caller.createDataChannel("call");
+    const reply = new Promise(resolve => {
+        receiver.ondatachannel = ({channel}) => {
+            channel.onmessage = ({data}) => channel.send("received " + data);
+        };
+        channel.onopen = () => channel.send("hello");
+        channel.onmessage = ({data}) => resolve(data);
+    });
+    caller.addTrack(stream.getVideoTracks()[0], stream);
+    await connect(caller, receiver, await caller.createOffer());
+    await connect(receiver, caller, await receiver.createAnswer());
+    stage = "waiting for video and data";
+    const [metadata, echo] = await Promise.all([receivedFrame, reply]);
+    if (metadata.width !== canvas.width || metadata.height !== canvas.height || echo !== "received hello") {
+        throw new Error("The receiving peer did not render the expected video and echo the call message");
+    }
+}
+
+const timeout = setTimeout(() => {
+    reportFailure(`Timeout during ${stage}. Caller ${caller.connectionState}, receiver ${receiver.connectionState}, video readyState ${video.readyState}`);
+}, 30000);
+try {
+    await call();
+    location.replace("/start");
+} catch (error) {
+    reportFailure(error.message);
+} finally {
+    clearTimeout(timeout);
+    clearInterval(draw);
+    stream.getTracks().forEach(track => track.stop());
+    caller.close();
+    receiver.close();
+}
+</script>

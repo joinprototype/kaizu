@@ -36,13 +36,20 @@ class Page(BaseHTTPRequestHandler):
             self.send_response(204)
             self.end_headers()
             server.rendered = True
+        elif self.path == "/media-call":
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(Path(__file__).with_name("check-media-call.html").read_bytes())
+        elif self.path.startswith(("/media-call/failure?", "/extension-test/failure?")):
+            server.page_failure = self.path
+            self.send_response(204)
+            self.end_headers()
         elif self.path.startswith("/extension-test/"):
             self.send_response(200)
             self.send_header("Content-Type", "text/html")
             self.end_headers()
             self.wfile.write(b"<!doctype html><title>Extension window check</title>")
-            if self.path.startswith("/extension-test/failure?"):
-                server.extension_failure = self.path
         else:
             self.send_response(404)
             self.end_headers()
@@ -51,7 +58,7 @@ class Page(BaseHTTPRequestHandler):
 def launch(server, app, *urls):
     server.rendered = False
     server.missing_cookie = False
-    server.extension_failure = None
+    server.page_failure = None
     server.challenge = secrets.token_hex(12)
     process = subprocess.Popen(["open", "-W", "-n", "-a", str(app), *urls])
     deadline = time.monotonic() + 90
@@ -60,8 +67,8 @@ def launch(server, app, *urls):
             raise SystemExit(f"{app} exited before rendering the page")
         if server.missing_cookie:
             raise SystemExit("The page loaded without the expected login cookie")
-        if server.extension_failure:
-            raise SystemExit(server.extension_failure)
+        if server.page_failure:
+            raise SystemExit(server.page_failure)
         if time.monotonic() >= deadline:
             raise SystemExit("Timed out waiting for Kaizu to render the page")
         server.handle_request()
@@ -165,6 +172,7 @@ def main():
     mode.add_argument("previous", type=Path, nargs="?")
     mode.add_argument("--signed-update", action="store_true")
     mode.add_argument("--extension-windows", action="store_true")
+    mode.add_argument("--media-call", action="store_true")
     args = parser.parse_args()
     candidate = args.candidate.resolve(strict=True)
     with HTTPServer(("127.0.0.1", 0), Page) as server:
@@ -172,7 +180,7 @@ def main():
         server.issue_cookie = True
         server.cookie = "kaizu_login=" + secrets.token_hex(16)
         url = f"http://127.0.0.1:{server.server_port}/start"
-        if args.previous is None and not (args.signed_update or args.extension_windows):
+        if args.previous is None and not (args.signed_update or args.extension_windows or args.media_call):
             launch(server, candidate, url)
             print("Release app opened the external link and WebKit executed the page with cookies.")
             return
@@ -182,6 +190,10 @@ def main():
         # Open the test link as a saved tab using the app's current-space setting.
         settings = json.dumps({"externalLinks": "currentSpace"}).encode().hex()
         subprocess.run(["defaults", "write", "com.joinprototype.kaizu", "settings", "-data", settings], check=True)
+        if args.media_call:
+            quit_app(launch(server, candidate, f"http://127.0.0.1:{server.server_port}/media-call"))
+            print("The receiving WebRTC peer rendered video from the sender and echoed a data-channel message.")
+            return
         if args.extension_windows:
             install_test_extension()
             quit_app(launch(server, candidate, f"http://127.0.0.1:{server.server_port}/extension-test/first"))
