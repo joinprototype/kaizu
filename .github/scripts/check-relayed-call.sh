@@ -32,7 +32,13 @@ if python3 "$fixture" "$1" --media-call; then exit 0; fi
 
 # A control result helps diagnose a failure but cannot pass the release gate.
 osascript -e 'if application id "com.joinprototype.kaizu" is running then tell application id "com.joinprototype.kaizu" to quit'
-echo "Comparing the same relayed call in a plain WebKit window"
+echo "Comparing raw video frames in the packaged app"
+if KAIZU_TEST_VIDEO_SOURCE=frames python3 "$fixture" "$1" --media-call; then
+    echo "The release rendered relayed video from generated frames; canvas capture failed"
+    exit 1
+fi
+osascript -e 'if application id "com.joinprototype.kaizu" is running then tell application id "com.joinprototype.kaizu" to quit'
+echo "Comparing generated frames in a plain WebKit window"
 swiftc -parse-as-library "$(dirname "$0")/check-webkit-call.swift" -o "$scratch/webkit-control"
-python3 "$fixture" "$scratch/webkit-control" --webkit-control
+KAIZU_TEST_VIDEO_SOURCE=frames python3 "$fixture" "$scratch/webkit-control" --webkit-control
 exit 1

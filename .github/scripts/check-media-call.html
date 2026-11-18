@@ -20,7 +20,26 @@ const receiver = new RTCPeerConnection(config);
 const canvas = document.querySelector("canvas");
 const context = canvas.getContext("2d");
 const video = document.querySelector("video");
-const stream = canvas.captureStream(10);
+const fromWorker = new URLSearchParams(location.search).get("source") === "frames";
+let worker;
+let generated = 0;
+function generatedStream() {
+    worker = new Worker("/media-call/video-source.js");
+    return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error("The video worker did not provide a track")), 5000);
+        worker.onerror = event => reportFailure("Video source worker: " + event.message);
+        worker.onmessage = ({data}) => {
+            if (data.track) {
+                clearTimeout(timeout);
+                resolve(new MediaStream([data.track]));
+            }
+            if (data.number) generated = data.number;
+            if (data.error) reportFailure("Video frame generation: " + data.error);
+        };
+        worker.postMessage({width: canvas.width, height: canvas.height});
+    });
+}
+const stream = fromWorker ? await generatedStream() : canvas.captureStream(10);
 const audio = new AudioContext();
 const microphone = audio.createMediaStreamDestination();
 const tone = audio.createOscillator();
@@ -28,7 +47,7 @@ tone.connect(microphone);
 tone.start();
 let frame = 0;
 let echoed = false;
-const draw = setInterval(() => {
+const draw = fromWorker ? null : setInterval(() => {
     context.fillStyle = ++frame % 2 ? "tomato" : "navy";
     context.fillRect(0, 0, canvas.width, canvas.height);
 }, 100);
@@ -85,6 +104,14 @@ async function call() {
     if (metadata.width !== canvas.width || metadata.height !== canvas.height || echo !== "received hello") {
         throw new Error("The receiving peer did not render the expected video and echo the call message");
     }
+    if (fromWorker) {
+        const sample = document.createElement("canvas").getContext("2d");
+        sample.drawImage(video, 0, 0, 1, 1);
+        const [red, green, blue] = sample.getImageData(0, 0, 1, 1).data;
+        if (Math.max(red, blue) < 150 || Math.abs(red - blue) < 80 || green > 110) {
+            throw new Error("The rendered frame did not contain the generated color");
+        }
+    }
     stage = "waiting for decoded audio";
     while (true) {
         const stats = await receiver.getStats();
@@ -132,7 +159,7 @@ async function describePeer(peer) {
 const timeout = setTimeout(async () => {
     const summary = await Promise.all([describePeer(caller), describePeer(receiver)]);
     const page = {
-        visibility: document.visibilityState, drawn: frame, echoed, audio: audio.state,
+        visibility: document.visibilityState, drawn: frame, generated, echoed, audio: audio.state,
         videoReady: video.readyState, videoPaused: video.paused,
         remoteVideo: video.srcObject?.getVideoTracks().map(track => ({state: track.readyState, muted: track.muted}))
     };
@@ -146,6 +173,7 @@ try {
 } finally {
     clearTimeout(timeout);
     clearInterval(draw);
+    worker?.terminate();
     tone.stop();
     microphone.stream.getTracks().forEach(track => track.stop());
     audio.close();
