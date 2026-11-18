@@ -13,6 +13,7 @@ window.addEventListener("unhandledrejection", event => reportFailure(String(even
 <script type="module">
 // The two local peers exchange a canvas video and a synthesized audio track.
 let stage = "creating peers";
+const compareVP8 = new URLSearchParams(location.search).get("codec") === "vp8";
 const config = await (await fetch("/media-call/ice")).json();
 const caller = new RTCPeerConnection(config);
 const receiver = new RTCPeerConnection(config);
@@ -26,6 +27,7 @@ const tone = audio.createOscillator();
 tone.connect(microphone);
 tone.start();
 let frame = 0;
+let echoed = false;
 const draw = setInterval(() => {
     context.fillStyle = ++frame % 2 ? "tomato" : "navy";
     context.fillRect(0, 0, canvas.width, canvas.height);
@@ -61,9 +63,17 @@ async function call() {
             channel.onmessage = ({data}) => channel.send("received " + data);
         };
         channel.onopen = () => channel.send("hello");
-        channel.onmessage = ({data}) => resolve(data);
+        channel.onmessage = ({data}) => {
+            echoed = data === "received hello";
+            resolve(data);
+        };
     });
-    caller.addTrack(stream.getVideoTracks()[0], stream);
+    const videoSender = caller.addTrack(stream.getVideoTracks()[0], stream);
+    if (compareVP8) {
+        const codecs = RTCRtpSender.getCapabilities("video").codecs.filter(codec => codec.mimeType.toLowerCase() === "video/vp8");
+        if (!codecs.length) throw new Error("The sender did not advertise VP8");
+        caller.getTransceivers().find(transceiver => transceiver.sender === videoSender).setCodecPreferences(codecs);
+    }
     const audioTrack = microphone.stream.getAudioTracks()[0];
     caller.addTrack(audioTrack, microphone.stream);
     stage = "starting synthesized audio";
@@ -78,6 +88,10 @@ async function call() {
     stage = "waiting for decoded audio";
     while (true) {
         const stats = await receiver.getStats();
+        if (compareVP8 && ![...stats.values()].some(report =>
+            report.type === "inbound-rtp" && report.kind === "video" && stats.get(report.codecId)?.mimeType.toLowerCase() === "video/vp8")) {
+            throw new Error("The receiver did not report VP8 video");
+        }
         if (config.iceTransportPolicy === "relay") {
             const selectedRelay = [...stats.values()].some(report =>
                 report.type === "candidate-pair" && report.state === "succeeded" && report.nominated &&
@@ -92,19 +106,37 @@ async function call() {
     }
 }
 
-async function describeICE(peer) {
+async function describePeer(peer) {
+    const stats = await peer.getStats();
     const counts = {};
-    for (const stat of (await peer.getStats()).values()) {
+    const media = [];
+    for (const stat of stats.values()) {
+        if (stat.type === "outbound-rtp" || stat.type === "inbound-rtp") {
+            media.push({
+                direction: stat.type, kind: stat.kind, codec: stats.get(stat.codecId)?.mimeType,
+                bytes: stat.bytesSent ?? stat.bytesReceived,
+                frames: stat.framesEncoded ?? stat.framesDecoded,
+                samples: stat.totalSamplesReceived, energy: stat.totalAudioEnergy
+            });
+        }
+        if (stat.type === "media-source") {
+            media.push({source: stat.kind, frames: stat.frames, energy: stat.totalAudioEnergy});
+        }
         if (!["local-candidate", "remote-candidate", "candidate-pair"].includes(stat.type)) continue;
         const key = stat.type + "/" + (stat.candidateType || stat.state);
         counts[key] = (counts[key] || 0) + 1;
     }
-    return [peer.connectionState, peer.iceGatheringState, peer.iceConnectionState, JSON.stringify(counts)].join(" ");
+    return [peer.connectionState, peer.iceGatheringState, peer.iceConnectionState, JSON.stringify(counts), JSON.stringify(media)].join(" ");
 }
 
 const timeout = setTimeout(async () => {
-    const summary = await Promise.all([describeICE(caller), describeICE(receiver)]);
-    reportFailure(`Timeout during ${stage}. Caller ${summary[0]}, receiver ${summary[1]}, video readyState ${video.readyState}`);
+    const summary = await Promise.all([describePeer(caller), describePeer(receiver)]);
+    const page = {
+        visibility: document.visibilityState, drawn: frame, echoed, audio: audio.state,
+        videoReady: video.readyState, videoPaused: video.paused,
+        remoteVideo: video.srcObject?.getVideoTracks().map(track => ({state: track.readyState, muted: track.muted}))
+    };
+    reportFailure(`Timeout during ${stage}. Caller ${summary[0]}, receiver ${summary[1]}, page ${JSON.stringify(page)}`);
 }, 30000);
 try {
     await call();

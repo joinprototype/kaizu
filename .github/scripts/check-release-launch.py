@@ -68,7 +68,7 @@ class Page(BaseHTTPRequestHandler):
             self.send_header("Cache-Control", "no-store")
             self.end_headers()
             self.wfile.write(json.dumps(config).encode())
-        elif self.path == "/media-call":
+        elif self.path in ("/media-call", "/media-call?codec=vp8"):
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.end_headers()
@@ -222,7 +222,8 @@ def main():
         settings = json.dumps({"externalLinks": "currentSpace"}).encode().hex()
         subprocess.run(["defaults", "write", "com.joinprototype.kaizu", "settings", "-data", settings], check=True)
         if args.media_call:
-            quit_app(launch(server, candidate, f"http://127.0.0.1:{server.server_port}/media-call"))
+            suffix = "?codec=vp8" if os.environ.get("KAIZU_TEST_VIDEO_CODEC") == "vp8" else ""
+            quit_app(launch(server, candidate, f"http://127.0.0.1:{server.server_port}/media-call{suffix}"))
             print("The receiving WebRTC peer decoded non-silent audio, rendered video and echoed a data-channel message.")
             return
         if args.extension_windows:

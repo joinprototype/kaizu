@@ -1,6 +1,11 @@
 #!/bin/bash
 set -euo pipefail
 
+if [[ "${RUNNER_ENVIRONMENT:-}" != "github-hosted" ]]; then
+    echo "This release check requires a disposable GitHub-hosted account" >&2
+    exit 1
+fi
+
 # Both WebRTC peers and the relay run on this Mac. The release fixture runs in a disposable account.
 scratch=$(mktemp -d)
 export KAIZU_TEST_TURN_PASSWORD
@@ -22,4 +27,11 @@ for ((i = 0; i < 50; i++)); do
 done
 nc -z 127.0.0.1 3478
 
-python3 "$(dirname "$0")/check-release-launch.py" "$1" --media-call
+fixture="$(dirname "$0")/check-release-launch.py"
+if python3 "$fixture" "$1" --media-call; then exit 0; fi
+
+# Compare software-capable VP8 on the same runner. The original failure still gates the package.
+osascript -e 'if application id "com.joinprototype.kaizu" is running then tell application id "com.joinprototype.kaizu" to quit'
+echo "Repeating with VP8 to isolate codec-dependent failures"
+KAIZU_TEST_VIDEO_CODEC=vp8 python3 "$fixture" "$1" --media-call
+exit 1
