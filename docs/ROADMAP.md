@@ -7,6 +7,17 @@ in [research/](research/).
 
 Effort: **S** = an evening, **M** = a few sessions, **L** = a project.
 
+## Where things stand
+
+| Area | Shipped | Planned work |
+| --- | --- | --- |
+| Moving to Kaizu | Arc sidebar import with a preview, bookmark and history import | Verify common password-manager extensions by hand |
+| First launch | Mac download and signed automatic updates | Developer ID signing and Apple notarization |
+| Everyday browsing | Split view, tab hibernation and daily filter updates while Kaizu is open | Compare content-blocking coverage and test cookie consent handling on real sites |
+| Browser integration | Per-site permissions and notification counts in the tab and Dock | Request Apple’s browser passkey entitlement and test macOS notification banners |
+
+See the [changelog](../CHANGELOG.md) for version-by-version changes. The phases below track implementation details.
+
 ## Strategy (Oct 2026)
 
 **Arc stops working on Dec 22, 2026** (announced Oct 22 on [arc.net](https://arc.net/);
@@ -288,7 +299,8 @@ modes, Quick Keys, inline action parameters.)
 - [ ] Request the browser passkey entitlement (Google passkey sign-in) **S** + Apple review time
 - [x] Auto-updates (own signed updater, no Sparkle), DMG **M**
 - [x] Logs, crash reports (MetricKit + macOS .ips, kept locally), Help → Report a Bug (Mail draft with a zip) **S**
-- [ ] Website, privacy policy, opt-in telemetry **M**
+- [x] Public website with the Mac download and first-launch instructions
+- [ ] Privacy policy and opt-in telemetry **M**
 - [x] Bundle ID is `com.joinprototype.kaizu` (Oct 30) **S**
 
 ## Notes
