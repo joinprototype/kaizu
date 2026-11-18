@@ -9,8 +9,6 @@ import OSLog
 @MainActor
 enum Updates {
     private static let feed = URL(string: "https://kaizu.joinprototype.com/version.json")!
-    /// The public half of ~/.config/kaizu/update-signing.key.
-    private static let publicKey = "tW8o1qF3ETJjP1wAnTWIEFj+1eG46UNUNUGEDCKw4U8="
     private static let firstCheck: Duration = .seconds(10)
     private static let between: Duration = .seconds(6 * 60 * 60)
     private static let log = Logger(subsystem: "com.joinprototype.kaizu", category: "updates")
@@ -98,7 +96,7 @@ enum Updates {
         else { throw UpdateFailure.notOffered }
 
         let folder = stagingRoot.appending(path: String(release.build), directoryHint: .isDirectory)
-        let stage = UpdateStage(folder: folder, bundleID: bundleID, publicKey: publicKey)
+        let stage = UpdateStage(folder: folder, bundleID: bundleID, publicKey: ReleaseUpdateKey.base64)
         let build = release.build
         let task = Task.detached(priority: .utility) {
             try await download(archive, into: folder, then: stage, build: build, signature: signature)

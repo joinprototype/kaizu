@@ -5,6 +5,10 @@ on:
     branches: [develop, master]
   push:
     branches: [develop, master]
+    paths-ignore:
+      - 'docs/**/*.md'
+      - 'README.md'
+      - 'CHANGELOG.md'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -65,11 +69,38 @@ jobs:
           KAIZU_DEBUG=notification-routing build/Kaizu.app/Contents/MacOS/Kaizu
           KAIZU_DEBUG=notification-routing-restored build/Kaizu.app/Contents/MacOS/Kaizu
       - name: Build release app
-        run: make app CONFIG=release
-      - name: Verify app bundle
-        run: codesign --verify --strict build/Kaizu.app
-      - name: Package the verified app for launch testing
-        run: ditto -c -k --keepParent build/Kaizu.app "$RUNNER_TEMP/Kaizu.zip"
+        run: |
+          export KAIZU_UPDATE_KEY="$RUNNER_TEMP/test-update.key"
+          public_key=$(swift scripts/update-sign.swift new "$KAIZU_UPDATE_KEY")
+          version=$(plutil -extract CFBundleShortVersionString raw Resources/Info.plist)
+          # The disposable signer belongs only to the rehearsal source tree.
+          rehearsal="$RUNNER_TEMP/package-rehearsal"
+          mkdir -p "$rehearsal"
+          git archive HEAD | tar -x -C "$rehearsal"
+          if "$rehearsal/scripts/release.sh" "$version" >"$RUNNER_TEMP/wrong-key.log" 2>&1; then
+            echo "A foreign private key passed the release check" >&2
+            exit 1
+          fi
+          grep -Fq 'does not match Kaizu' "$RUNNER_TEMP/wrong-key.log"
+          printf 'public enum ReleaseUpdateKey { public static let base64 = "%s" }\n' "$public_key" > "$rehearsal/Sources/BrowserCore/ReleaseUpdateKey.swift"
+          "$rehearsal/scripts/release.sh" "$version"
+
+          # The bundle used by the production-feed and runtime checks retains the shipped verification key.
+          make app CONFIG=release
+          codesign --verify --strict build/Kaizu.app
+          codesign -dvv build/Kaizu.app 2>&1 | grep -q 'flags=[^ ]*runtime'
+          ditto -c -k --keepParent build/Kaizu.app "$RUNNER_TEMP/Kaizu.zip"
+          mkdir -p "$RUNNER_TEMP/package-check/unpacked"
+          ditto -x -k "$rehearsal/site/updates/Kaizu-$version.zip" "$RUNNER_TEMP/package-check/unpacked"
+      - name: Install the loopback TURN relay
+        run: HOMEBREW_NO_AUTO_UPDATE=1 brew install coturn
+      - name: Verify a relayed WebRTC call in the packaged release
+        timeout-minutes: 5
+        env:
+          RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        run: |
+          sw_vers
+          .github/scripts/check-relayed-call.sh "$RUNNER_TEMP/package-check/unpacked/Kaizu.app"
       - uses: actions/upload-artifact@v7
         with:
           name: kaizu-runtime-check
