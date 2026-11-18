@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+In **File → Import Browsing Data…**, a Safari ZIP containing multiple history or bookmark files now lets you choose the files to import. The destination shows both the space and its profile, so you can bring Work and Personal across separately.
+
 Repeating an Arc sidebar import respects Today tabs you already imported and then navigated, moved within the same profile, or auto-archived. This uses the original tab ID saved by new JSON imports. Older imports still match open pages by address.
 
 Reopening a recently auto-archived tab restores its Back and Forward history, including after restarting Kaizu. The 32 newest archive entries can each keep up to 1 MiB of navigation state. Other entries reopen at their saved address.

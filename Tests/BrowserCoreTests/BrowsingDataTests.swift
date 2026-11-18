@@ -208,6 +208,42 @@ import Testing
         #expect(try FileManager.default.contentsOfDirectory(atPath: output.path) == ["Export.zip"])
     }
 
+    @Test func selectsSafariFilesByArchivePathBeforeCombiningProfiles() throws {
+        let root = try folder()
+        let archive = root.appending(path: "Export.zip")
+        for profile in ["Work", "Personal"] {
+            let directory = root.appending(path: profile, directoryHint: .isDirectory)
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
+            let site = "https://" + profile.lowercased() + ".example.test/"
+            let json = #"{"metadata":{"data_type":"history"},"history":[{"url":"\#(site)","time_usec":2}]}"#
+            try Data(json.utf8).write(to: directory.appending(path: "Historique [1].json"))
+            let html = #"<DL><DT><A HREF="\#(site)">\#(profile)</A></DL>"#
+            try Data(html.utf8).write(to: directory.appending(path: "Bookmarks.html"))
+        }
+        let zip = Process()
+        zip.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
+        zip.currentDirectoryURL = root
+        zip.arguments = ["-q", "-r", archive.path, "Personal", "Work"]
+        try zip.run()
+        zip.waitUntilExit()
+        try #require(zip.terminationStatus == 0)
+
+        let files = try SafariExport.readArchive(archive)
+        #expect(files.needsSelection)
+        #expect(files.historyFiles == ["Personal/Historique [1].json", "Work/Historique [1].json"])
+        #expect(files.bookmarkFiles == ["Personal/Bookmarks.html", "Work/Bookmarks.html"])
+        #expect(files.selected(history: .skip, bookmarks: .skip).isEmpty)
+        for profile in ["Work", "Personal"] {
+            let selected = files.selected(history: .file(profile + "/Historique [1].json"), bookmarks: .file(profile + "/Bookmarks.html"))
+            let page = try #require(URL(string: "https://" + profile.lowercased() + ".example.test/"))
+            #expect(selected.visits.map(\.url) == [page])
+            #expect(selected.bookmarks == [.page(title: profile, url: page)])
+        }
+        #expect(files.selected(history: .all, bookmarks: .skip).bookmarks.isEmpty)
+        #expect(files.selected(history: .all, bookmarks: .all) == files.combined)
+        #expect(files.combined.visits.count == 2 && files.combined.bookmarks.count == 2)
+    }
+
     @Test func aLoneHistoryFileComesNewestFirst() throws {
         let file = try folder().appending(path: "History.json")
         try Data(Self.historyJSON.utf8).write(to: file)

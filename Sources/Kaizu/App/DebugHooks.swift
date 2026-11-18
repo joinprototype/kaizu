@@ -1469,7 +1469,7 @@ enum DebugHooks {
         }
         Task {
             do {
-                let data = try await Task.detached { try source.read() }.value
+                let data = try await Task.detached { try source.read().data(history: .all, bookmarks: .all) }.value
                 let space = store.activeSpace
                 let profile = space.profile.id
                 let pinnedBefore = space.pinned.count
