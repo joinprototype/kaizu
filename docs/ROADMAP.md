@@ -29,6 +29,8 @@ The first release should carry an Arc user from importing a sidebar through a we
 | Ship safely | Add repeatable build and test checks. Sign with Developer ID, notarize and verify a clean install and a signed upgrade. Document what the browser sends off-device. | Test the downloadable release on the minimum supported macOS and a current Mac. Apple enrollment or a Developer ID certificate is pending. |
 | Match the switching workflow | Preserve sidebar organization, Peek, little windows, routing and split layouts. Verify real Arc and Safari imports with consented or redacted samples. | Compare the preview with the resulting spaces, folders and tabs. Repeat the import and check Undo. |
 
+**Open upgrade blocker.** Two macOS 15 runs reopened the v0.2.5 test tab with its HTTP-only login cookie, but the site could no longer read a local-storage value it had saved before quitting. This can affect work a site keeps on the device. The release check requires both the login and the saved value to survive. [First failure](https://github.com/joinprototype/kaizu/actions/runs/44340677064/job/134932840207) · [Second failure](https://github.com/joinprototype/kaizu/actions/runs/44348545682/job/134977973809) · [Same-version and upgrade comparison](https://github.com/joinprototype/kaizu/actions/runs/44348079729)
+
 Kaizu’s advantages to demonstrate are built-in tracking protection, a local sidebar with no account requirement, and mixed row-and-column splits. Performance comparisons require the same pages, hardware and measurement procedure in both browsers. Sync, Boosts, Easels and an AI panel are outside this proposed 1.0 scope. Cross-device sync remains a significant gap for people who use Arc on multiple devices.
 
 ### Archive recovery
