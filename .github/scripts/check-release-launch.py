@@ -24,14 +24,34 @@ class Page(BaseHTTPRequestHandler):
             if server.issue_cookie:
                 self.send_header("Set-Cookie", server.cookie + "; Max-Age=3600; Path=/; HttpOnly; SameSite=Strict")
             self.end_headers()
+            storage_check = ""
+            if getattr(server, "storage_token", None):
+                # Only the original app may create the marker. The restored page must read it.
+                seed = "localStorage.setItem('upgrade-test', marker);" if server.issue_cookie else ""
+                storage_check = f"""
+                    try {{
+                        const marker = {json.dumps(server.storage_token)};
+                        {seed}
+                        headers['X-Kaizu-Storage'] = localStorage.getItem('upgrade-test') === marker ? 'match' : 'missing';
+                    }} catch {{
+                        headers['X-Kaizu-Storage'] = 'unavailable';
+                    }}
+                """
             self.wfile.write(f"""<!doctype html><title>Kaizu launch test</title><link rel="icon" href="data:,">
                 <body><h1>Ready</h1><script>
-                if (document.querySelector('h1').textContent === 'Ready') fetch('/{server.challenge}');
+                const headers = {{}};
+                {storage_check}
+                if (document.querySelector('h1').textContent === 'Ready') fetch('/{server.challenge}', {{headers}});
                 </script></body>""".encode())
         elif self.path == "/" + server.challenge:
-            if server.cookie not in self.headers.get("Cookie", "").split("; "):
+            cookie_matches = server.cookie in self.headers.get("Cookie", "").split("; ")
+            storage = self.headers.get("X-Kaizu-Storage", "unreported")
+            check_storage = bool(getattr(server, "storage_token", None))
+            if not cookie_matches or (check_storage and storage != "match"):
+                phase = "initial launch" if server.issue_cookie else "restored launch"
+                server.page_failure = (f"{phase}: login cookie {'match' if cookie_matches else 'missing'}, "
+                                       f"local storage {storage if check_storage else 'not checked'}")
                 self.send_error(403)
-                server.missing_cookie = True
                 return
             self.send_response(204)
             self.end_headers()
@@ -57,7 +77,6 @@ class Page(BaseHTTPRequestHandler):
 
 def launch(server, app, *urls):
     server.rendered = False
-    server.missing_cookie = False
     server.page_failure = None
     server.challenge = secrets.token_hex(12)
     process = subprocess.Popen(["open", "-W", "-n", "-a", str(app), *urls])
@@ -65,8 +84,6 @@ def launch(server, app, *urls):
     while not server.rendered:
         if process.poll() is not None:
             raise SystemExit(f"{app} exited before rendering the page")
-        if server.missing_cookie:
-            raise SystemExit("The page loaded without the expected login cookie")
         if server.page_failure:
             raise SystemExit(server.page_failure)
         if time.monotonic() >= deadline:
@@ -179,6 +196,7 @@ def main():
         server.timeout = 1
         server.issue_cookie = True
         server.cookie = "kaizu_login=" + secrets.token_hex(16)
+        server.storage_token = secrets.token_hex(16) if args.previous or args.signed_update else None
         url = f"http://127.0.0.1:{server.server_port}/start"
         if args.previous is None and not (args.signed_update or args.extension_windows or args.media_call):
             launch(server, candidate, url)
@@ -214,7 +232,7 @@ def main():
         quit_app(launch(server, installed))
         if saved_tab(url) != before:
             raise SystemExit("The profile, space or tab identity changed across the upgrade")
-        print("Restored the tab in its original space and profile with its login cookie.")
+        print("Restored the tab in its original space and profile with its login cookie and local storage.")
 
 
 if __name__ == "__main__":
