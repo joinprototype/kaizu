@@ -1,0 +1,29 @@
+name: Check the packaged video call accepts only the intended frames
+on:
+  push:
+    branches: [qa/relay-frame-validation]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  frames:
+    runs-on: xcode-27
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          github-token: ${{ github.token }}
+          run-id: 44405191699
+          name: kaizu-runtime-check
+          path: ${{ runner.temp }}
+      - run: HOMEBREW_NO_AUTO_UPDATE=1 brew install coturn
+      - name: Send correct, incorrect-color and incorrect-size frames
+        env:
+          RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        run: |
+          ditto -x -k "$RUNNER_TEMP/Kaizu.zip" "$RUNNER_TEMP/launch"
+          codesign --verify --deep --strict "$RUNNER_TEMP/launch/Kaizu.app"
+          bash .github/scripts/check-relayed-call.sh "$RUNNER_TEMP/launch/Kaizu.app"
