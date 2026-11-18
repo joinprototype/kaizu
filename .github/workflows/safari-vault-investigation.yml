@@ -12,13 +12,14 @@ jobs:
     runs-on: xcode-27
     timeout-minutes: 40
     env:
-      RUNNER_ENVIRONMENT: ${{ runner.environment }}
       NIXPKGS: github:NixOS/nixpkgs/e21fec321d73511849707a7585e4ea155ee4bf40
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - uses: cachix/install-nix-action@3dc140bfc76c49fbd4dd958429132e3746bcb086
+      - name: Identify the disposable runner
+        run: echo "RUNNER_ENVIRONMENT=${{ runner.environment }}" >> "$GITHUB_ENV"
       - name: Prepare loopback vault and test website
         run: bash .github/qa/safari-vault/prepare.sh
       - name: Seed synthetic vault
