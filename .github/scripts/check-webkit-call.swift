@@ -9,13 +9,19 @@ import WebKit
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .nonPersistent()
         configuration.mediaTypesRequiringUserActionForPlayback = []
-        let frame = NSRect(x: 0, y: 0, width: 800, height: 600)
+        let url = URL(string: CommandLine.arguments[1])!
+        let side = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first { $0.name == "side" }?.value
+        let screen = NSScreen.main!.visibleFrame
+        let width = min(screen.width * 0.42, 560)
+        let frame = NSRect(x: side == "A" ? screen.minX : screen.maxX - width, y: screen.minY,
+                           width: width, height: min(screen.height * 0.55, 480))
         let view = WKWebView(frame: frame, configuration: configuration)
         let window = NSWindow(contentRect: frame, styleMask: [.titled], backing: .buffered, defer: false)
+        window.level = .floating
         window.contentView = view
         window.makeKeyAndOrderFront(nil)
         app.activate()
-        view.load(URLRequest(url: URL(string: CommandLine.arguments[1])!))
+        view.load(URLRequest(url: url))
         withExtendedLifetime(window) { app.run() }
     }
 }

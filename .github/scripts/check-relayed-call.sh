@@ -27,24 +27,5 @@ for ((i = 0; i < 50; i++)); do
 done
 nc -z 127.0.0.1 3478
 
-fixture="$(dirname "$0")/check-release-launch.py"
-if python3 "$fixture" "$1" --media-call; then
-    exit 0
-else
-    result=$?
-    [[ $result == 75 ]] || exit "$result"
-fi
-
-osascript -e 'if application id "com.joinprototype.kaizu" is running then tell application id "com.joinprototype.kaizu" to quit'
 swiftc -parse-as-library "$(dirname "$0")/check-webkit-call.swift" -o "$scratch/webkit-control"
-if python3 "$fixture" "$scratch/webkit-control" --webkit-control; then
-    echo "Plain WebKit captured canvas video on the same runner; the packaged browser failed" >&2
-    exit 1
-else
-    result=$?
-    [[ $result == 75 ]] || exit "$result"
-fi
-
-echo "Both canvas sources stalled before encoding. Checking decoded video from generated frames on the same relay."
-KAIZU_TEST_VIDEO_SOURCE=frames python3 "$fixture" "$1" --media-call
-KAIZU_TEST_VIDEO_SOURCE=frames python3 "$fixture" "$scratch/webkit-control" --webkit-control
+python3 -u "$(dirname "$0")/../qa/relay-peers/compare.py" "$1" "$scratch/webkit-control"

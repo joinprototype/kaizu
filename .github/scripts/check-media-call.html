@@ -4,14 +4,16 @@
 <canvas width="160" height="90"></canvas>
 <video autoplay muted playsinline></video>
 <script>
-function reportFailure(message, route = "failure") {
-    location.replace("/media-call/" + route + "?message=" + encodeURIComponent(message));
+function reportFailure(message) {
+    const side = new URLSearchParams(location.search).get("side");
+    void fetch("/result/" + side, {method: "POST", body: JSON.stringify({result: String(message)})}).catch(() => {});
 }
 window.addEventListener("error", event => reportFailure(event.message));
 window.addEventListener("unhandledrejection", event => reportFailure(String(event.reason)));
 </script>
 <script type="module">
 // The two local peers exchange a canvas video and a synthesized audio track.
+let firstRendered;
 let stage = "creating peers";
 const compareVP8 = new URLSearchParams(location.search).get("codec") === "vp8";
 const config = await (await fetch("/media-call/ice")).json();
@@ -52,28 +54,34 @@ const draw = fromWorker ? null : setInterval(() => {
     context.fillRect(0, 0, canvas.width, canvas.height);
 }, 100);
 
+const side = new URLSearchParams(location.search).get("side");
 async function connect(from, to, description) {
-    const pending = [];
-    from.onicecandidate = ({candidate}) => {
-        if (!candidate) return;
-        if (to.remoteDescription) {
-            to.addIceCandidate(candidate).catch(error => reportFailure(error.message));
-        } else {
-            pending.push(candidate);
-        }
-    };
-    stage = "signaling " + description.type;
+    stage = "gathering " + description.type;
     await from.setLocalDescription(description);
-    await to.setRemoteDescription(description);
-    for (const candidate of pending) await to.addIceCandidate(candidate);
+    if (from.iceGatheringState !== "complete") {
+        await new Promise(resolve => from.addEventListener("icegatheringstatechange", () => {
+            if (from.iceGatheringState === "complete") resolve();
+        }));
+    }
+    if (!from.localDescription.sdp.includes(" typ relay")) throw new Error("No relay candidate in local description");
+    stage = "exchanging " + description.type;
+    const response = await fetch("/signal/" + side + "/" + description.type, {
+        method: "POST", body: JSON.stringify(from.localDescription)
+    });
+    if (!response.ok) throw new Error("Remote description unavailable");
+    await to.setRemoteDescription(await response.json());
 }
-
 async function call() {
     const receivedFrame = new Promise(resolve => {
         receiver.ontrack = event => {
             if (event.track.kind !== "video") return;
             video.srcObject = event.streams[0];
-            video.requestVideoFrameCallback((_, metadata) => resolve(metadata));
+            function checkFrame(_, metadata) {
+                firstRendered ??= [metadata.width, metadata.height];
+                if (metadata.width === canvas.width && metadata.height === canvas.height) resolve(metadata);
+                else video.requestVideoFrameCallback(checkFrame);
+            }
+            video.requestVideoFrameCallback(checkFrame);
         };
     });
     const channel = caller.createDataChannel("call");
@@ -134,9 +142,9 @@ async function call() {
     stage = "waiting for decoded audio";
     while (true) {
         const stats = await receiver.getStats();
-        if (compareVP8 && ![...stats.values()].some(report =>
-            report.type === "inbound-rtp" && report.kind === "video" && stats.get(report.codecId)?.mimeType.toLowerCase() === "video/vp8")) {
-            throw new Error("The receiver did not report VP8 video");
+        if (![...stats.values()].some(report =>
+            report.type === "inbound-rtp" && report.kind === "video" && stats.get(report.codecId)?.mimeType.toLowerCase() === "video/h264")) {
+            throw new Error("The receiver did not report H.264 video");
         }
         if (config.iceTransportPolicy === "relay") {
             if (!usesRelay(stats)) throw new Error("The receiving peer did not report a nominated relay candidate pair");
@@ -155,18 +163,6 @@ function usesRelay(stats) {
         stats.get(report.localCandidateId)?.candidateType === "relay");
 }
 
-// The hosted Mac sometimes draws the canvas without delivering any frames to the video source.
-function stalledCanvasSource(sender, recipient, page) {
-    const sendsNothing = sender.media.some(m => m.direction === "outbound-rtp" && m.kind === "video" && m.frames === 0 && m.bytes === 0);
-    const receivesNothing = recipient.media.some(m => m.direction === "inbound-rtp" && m.kind === "video" && m.frames === 0 && m.bytes === 0);
-    const emptySource = sender.media.some(m => m.source === "video" && m.frames === 0);
-    const heardAudio = recipient.media.some(m => m.direction === "inbound-rtp" && m.kind === "audio" && m.samples > 0 && m.energy > 0);
-    return sender.connection === "connected" && recipient.connection === "connected" && sender.relay && recipient.relay &&
-        sendsNothing && receivesNothing && emptySource && heardAudio && page.echoed && page.visibility === "visible" &&
-        page.drawn >= 200 && page.generated === 0 && page.width === 0 && page.height === 0 && page.videoReady === 0 &&
-        page.remoteVideo?.some(track => track.state === "live" && !track.muted);
-}
-
 async function describePeer(peer) {
     const stats = await peer.getStats();
     const counts = {};
@@ -176,7 +172,9 @@ async function describePeer(peer) {
             media.push({
                 direction: stat.type, kind: stat.kind, codec: stats.get(stat.codecId)?.mimeType,
                 bytes: stat.bytesSent ?? stat.bytesReceived,
-                frames: stat.framesEncoded ?? stat.framesDecoded,
+                frames: stat.framesEncoded ?? stat.framesDecoded, framesSent: stat.framesSent,
+                quality: stat.qualityLimitationReason, target: stat.targetBitrate, pli: stat.pliCount,
+                implementation: stat.encoderImplementation ?? stat.decoderImplementation,
                 samples: stat.totalSamplesReceived, energy: stat.totalAudioEnergy
             });
         }
@@ -191,33 +189,25 @@ async function describePeer(peer) {
         relay: usesRelay(stats), counts, media};
 }
 
-async function reportState(reason) {
+let reported = false;
+async function finish(result) {
+    if (reported) return;
+    reported = true;
     const summary = await Promise.all([describePeer(caller), describePeer(receiver)]);
-    const page = {
-        visibility: document.visibilityState, drawn: frame, generated, echoed, audio: audio.state,
-        videoReady: video.readyState, videoPaused: video.paused, width: video.videoWidth, height: video.videoHeight,
-        remoteVideo: video.srcObject?.getVideoTracks().map(track => ({state: track.readyState, muted: track.muted}))
-    };
-    const canvasStalled = !fromWorker && config.iceTransportPolicy === "relay" && reason === "Timeout" &&
-        stage === "waiting for video and data" && stalledCanvasSource(summary[0], summary[1], page);
-    reportFailure(`${reason} during ${stage}: ${JSON.stringify({caller: summary[0], receiver: summary[1], page})}`,
-        canvasStalled ? "canvas-stall" : "failure");
+    await fetch("/result/" + side, {method: "POST", body: JSON.stringify({result, stage,
+        sender: summary[0], receiver: summary[1], generated, echoed, firstRendered,
+        visible: document.visibilityState, focus: document.hasFocus(), viewport: [innerWidth, innerHeight],
+        video: [video.videoWidth, video.videoHeight], audio: audio.state})});
+    // Keep sending until both processes have independently reported their result.
 }
-const timeout = setTimeout(() => reportState("Timeout"), 30000);
+await fetch("/ready/" + side);
+const timeout = setTimeout(() => finish("timeout"), 40000);
 try {
     await call();
-    location.replace("/start");
+    await finish("pass");
 } catch (error) {
-    await reportState(`${error.name}: ${error.message}`);
+    await finish(String(error));
 } finally {
     clearTimeout(timeout);
-    clearInterval(draw);
-    worker?.terminate();
-    tone.stop();
-    microphone.stream.getTracks().forEach(track => track.stop());
-    audio.close();
-    stream.getTracks().forEach(track => track.stop());
-    caller.close();
-    receiver.close();
 }
 </script>

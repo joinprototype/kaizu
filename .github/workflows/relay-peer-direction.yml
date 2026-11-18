@@ -1,0 +1,29 @@
+name: Compare relayed H.264 calls between browser processes
+on:
+  push:
+    branches: [qa/relay-peer-direction]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  compare:
+    runs-on: xcode-27
+    timeout-minutes: 24
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          github-token: ${{ github.token }}
+          run-id: 44395517220
+          name: kaizu-runtime-check
+          path: ${{ runner.temp }}/candidate
+      - run: HOMEBREW_NO_AUTO_UPDATE=1 brew install coturn
+      - name: Test the packaged candidate and plain WebKit in both directions
+        env:
+          RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        run: |
+          ditto -x -k "$RUNNER_TEMP/candidate/Kaizu.zip" "$RUNNER_TEMP/unpacked"
+          codesign --verify --deep --strict "$RUNNER_TEMP/unpacked/Kaizu.app"
+          bash .github/scripts/check-relayed-call.sh "$RUNNER_TEMP/unpacked/Kaizu.app"
