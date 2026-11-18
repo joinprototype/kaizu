@@ -53,6 +53,10 @@ On macOS 27.0.1, the Firefox Add-ons builds of Bitwarden 2026.10.2 and 1Password
 
 A second macOS 15 signed-update run installed v0.2.5 and restored the page. The page recovered its original local-storage value, but its request to the same server lacked the HTTP-only cookie. Cookie persistence through this update remains an open release gate. [Second failed update check](https://github.com/joinprototype/kaizu/actions/runs/44315757109/attempts/3)
 
+### Blocking on the first page
+
+On macOS 27.0.1, a fresh Kaizu profile fetched and executed a script matching a bundled EasyList rule when the previous three-second startup wait expired. With the navigation fix and an empty rule cache, the first page executed the control script and the local server received no request for the matching script. With blocking disabled in a separate fresh profile, both scripts reached the server and ran. Opening an external link on this Mac took 6.83 seconds with an empty rule cache and 0.57 seconds after relaunch. Both pages ran the control script and kept the matching request off the network. This check covers Kaizu’s built-in blocker. Extension filtering has its own startup behavior.
+
 ### Cookie consent on live sites
 
 On macOS 27.0.1, fresh profiles with content blocking and automatic rejection turned off showed a banner on both sites below. Both providers initially reported that the visitor had made no choice. With Kaizu's default settings, both recorded a response. After quitting and reopening the browser with both protections off, each site still reported the same decision without showing its banner again.
