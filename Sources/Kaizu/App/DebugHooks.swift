@@ -1717,6 +1717,8 @@ enum DebugHooks {
                 try? await Task.sleep(for: .seconds(1))
                 logPageCount(store, "closed")
             }
+        case "split-capacity":
+            checkSplitCapacity(store)
         case "splitdrop":
             qaSplitDrop(store)
         case "capture":

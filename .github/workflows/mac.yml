@@ -29,6 +29,12 @@ jobs:
           export KAIZU_ARC="$GITHUB_WORKSPACE/Tests/BrowserCoreTests/Fixtures/Arc Data Export.md"
           build/Kaizu.app/Contents/MacOS/Kaizu
           KAIZU_DEBUG=arcimport-undo-restored build/Kaizu.app/Contents/MacOS/Kaizu
+      - name: Keep all four split panes when an extra pane is requested
+        timeout-minutes: 2
+        env:
+          KAIZU_SUPPORT: ${{ runner.temp }}/split-capacity
+          KAIZU_DEBUG: split-capacity
+        run: build/Kaizu.app/Contents/MacOS/Kaizu
       - name: Recover an archive move after an interrupted session
         timeout-minutes: 3
         run: python3 .github/scripts/check-archive-recovery.py build/Kaizu.app/Contents/MacOS/Kaizu
