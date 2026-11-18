@@ -109,12 +109,12 @@ extension BrowserTab: WKWebExtensionTab {
     }
 
     func activate(for context: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
-        store?.select(self)
+        (extensionWindow?.store ?? store)?.select(self)
         completionHandler(nil)
     }
 
     func close(for context: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
-        store?.close(self)
+        (extensionWindow?.store ?? store)?.close(self)
         completionHandler(nil)
     }
 }

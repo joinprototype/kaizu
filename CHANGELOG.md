@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+An extension that activates a background tab now selects it in that tab’s own window. The focused window keeps its current space and page.
+
 Settings → Extensions now shows the errors WebKit reports for each installed extension. Extension pages opened with this build keep their address and local storage across restarts. Reopen any extension settings tabs saved by an older build from the extension's toolbar menu.
 
 Arc imports preserve custom tab names and keep independent Arc profiles separate when existing Kaizu spaces share a profile.
