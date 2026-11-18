@@ -96,7 +96,9 @@ enum MainMenu {
         menu.addItem(ActionMenuItem("Reopen Closed Tab", key: "t", modifiers: [.command, .shift]) { app.front.reopenClosedTab() })
         menu.addItem(ActionMenuItem("New Little Window", key: "n", modifiers: [.command, .option]) { app.front.openLittleWindow() })
         menu.addItem(ActionMenuItem("New Private Window", key: "p", modifiers: [.command, .shift]) { app.front.openPrivateWindow() })
-        menu.addItem(ActionMenuItem("Open Little Window in Kaizu", key: "o") { app.keyLittleWindow?.promote() })
+        menu.addItem(ActionMenuItem("Open Little Window in Kaizu", key: "o", available: { app.keyLittleWindow != nil }) {
+            app.keyLittleWindow?.promote()
+        })
         menu.addItem(.separator())
         menu.addItem(ActionMenuItem("New Space…", key: "n", modifiers: [.command, .shift]) { app.front.beginNewSpace() })
         menu.addItem(ActionMenuItem("Import from Arc…") { UtilityWindows.showArcImport(app: app) })

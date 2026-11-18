@@ -29,6 +29,15 @@ jobs:
           export KAIZU_ARC="$GITHUB_WORKSPACE/Tests/BrowserCoreTests/Fixtures/Arc Data Export.md"
           build/Kaizu.app/Contents/MacOS/Kaizu
           KAIZU_DEBUG=arcimport-undo-restored build/Kaizu.app/Contents/MacOS/Kaizu
+      - name: Promote little windows in their original space and profile
+        timeout-minutes: 2
+        env:
+          KAIZU_SUPPORT: ${{ runner.temp }}/little-window-profile
+        run: |
+          log="$RUNNER_TEMP/little-window.log"
+          open -n -W --env KAIZU_DEBUG=little-window-promotion --env "KAIZU_SUPPORT=$KAIZU_SUPPORT" --stderr "$log" -a "$GITHUB_WORKSPACE/build/Kaizu.app"
+          cat "$log"
+          grep -Fxq 'Little-window promotion preserved the live page and its profile.' "$log"
       - name: Keep all four split panes when an extra pane is requested
         timeout-minutes: 2
         env:
