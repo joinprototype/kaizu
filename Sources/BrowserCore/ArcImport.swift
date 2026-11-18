@@ -9,6 +9,9 @@ public struct ArcImport: Equatable, Sendable {
     public struct SpaceSummary: Equatable, Sendable {
         public var name: String
         public var isNew: Bool
+        /// One-based position in the sidebar after applying this plan.
+        public var sidebarPosition: Int
+        public var profileName: String?
         public var pinned: Int
         public var today: Int
     }
@@ -100,8 +103,9 @@ public struct ArcImport: Equatable, Sendable {
         var spaceCount = spaces.count
         for (index, arc) in sidebar.spaces.enumerated() {
             let today = includesToday ? arc.today : []
-            if let match = matches[index] {
-                let favorites = profiles.first { $0.id == match.profileID }?.favorites ?? []
+            if let match = matches[index], let position = spaces.firstIndex(where: { $0.id == match.id }) {
+                let profile = profiles.first { $0.id == match.profileID }
+                let favorites = profile?.favorites ?? []
                 let known = Self.addresses(of: match.pinned.tabs + match.today + favorites)
                 var folders: [UUID: [SidebarItemRecord]] = [:]
                 let pinned = Self.additions(arc.pinned, alongside: match.pinned, skipping: known, folders: &folders)
@@ -110,7 +114,10 @@ public struct ArcImport: Equatable, Sendable {
                 let fresh = today.filter { !known.contains($0.url) }.map { Self.record($0, now: now) }
                 if !pinned.isEmpty { self.pinned[match.id] = pinned }
                 if !fresh.isEmpty { self.today[match.id] = fresh }
-                summary.append(SpaceSummary(name: arc.name, isNew: false, pinned: pinnedCount, today: fresh.count))
+                summary.append(SpaceSummary(
+                    name: arc.name, isNew: false, sidebarPosition: position + 1, profileName: profile?.name,
+                    pinned: pinnedCount, today: fresh.count
+                ))
                 continue
             }
             let profileID = kaizuProfile[arc.profile] ?? UUID()
@@ -125,7 +132,11 @@ public struct ArcImport: Equatable, Sendable {
                 pinned: pinned, today: today.map { Self.record($0, now: now) }
             ))
             spaceCount += 1
-            summary.append(SpaceSummary(name: arc.name, isNew: true, pinned: pinned.tabCount, today: today.count))
+            let profile = profiles.first { $0.id == profileID } ?? newProfiles.first { $0.id == profileID }
+            summary.append(SpaceSummary(
+                name: arc.name, isNew: true, sidebarPosition: spaceCount, profileName: profile?.name,
+                pinned: pinned.tabCount, today: today.count
+            ))
         }
 
         // Favorites of an Arc profile with no space here have nowhere to go.

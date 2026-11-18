@@ -163,7 +163,7 @@ import Testing
         #expect(plan.today.values.first?.count == 1)
         #expect(plan.favorites[Self.profileID]?.count == 1)
         #expect(plan.tabCount == 4)
-        #expect(plan.summary == [.init(name: "personal", isNew: false, pinned: 2, today: 1)])
+        #expect(plan.summary == [.init(name: "personal", isNew: false, sidebarPosition: 1, profileName: "Personal", pinned: 2, today: 1)])
     }
 
     @Test func aLoneEmptySpaceBecomesTheFirstArcSpace() throws {
@@ -259,6 +259,8 @@ import Testing
         let workSpace = try #require(spaces.first { $0.profileID == workProfile.id })
         #expect(updated.tabCount == 1)
         #expect(updated.pinned[workSpace.id]?.tabs.map(\.pinnedURL) == [added.url])
+        #expect(updated.summary.map(\.profileName) == [workProfile.name, "Personal"])
+        #expect(updated.summary.first?.sidebarPosition == 2)
     }
 
     @Test func repeatImportUsesProfileFavoritesWhenSameNamedSpacesShareTheirTabs() throws {
@@ -268,8 +270,12 @@ import Testing
         let original = Self.emptySpace()
         let first = Self.plan(source, spaces: [original])
         let profiles = [ProfileRecord(id: Self.profileID, name: "Existing", favorites: [])] + first.newProfiles
+        #expect(first.summary.map(\.sidebarPosition) == [2, 3])
         let spaces = [original] + first.newSpaces.reversed()
-        #expect(Self.plan(source, profiles: profiles, spaces: spaces).tabCount == 0)
+        let repeatPlan = Self.plan(source, profiles: profiles, spaces: spaces)
+        #expect(repeatPlan.tabCount == 0)
+        #expect(repeatPlan.summary.map(\.sidebarPosition) == [3, 2])
+        #expect(repeatPlan.summary.allSatisfy { !$0.isNew })
         source.spaces[0].today.append(Self.tab("https://work-update.test/"))
         let updated = Self.plan(source, profiles: profiles, spaces: spaces)
         let work = try #require(first.newSpaces.first)
