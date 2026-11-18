@@ -36,25 +36,31 @@ for case in ("relayed", "stale-pair-state", "direct"):
     await fetch("/selected-path?result=" + encodeURIComponent(JSON.stringify(path)));
 """ + marker)
         page.write_text(html)
-        process = subprocess.run([sys.executable, str(fixture / "check-release-launch.py"), str(app), "--media-call"],
-                                 env=dict(os.environ, KAIZU_TEST_VIDEO_SOURCE="frames"), stdout=subprocess.PIPE,
-                                 stderr=subprocess.STDOUT, text=True, timeout=120)
-        lines = process.stdout.splitlines()
+        # A rejected call leaves LaunchServices waiting for the still-open browser.
+        # A regular file lets the test read the completed verifier's output immediately.
+        with (fixture / "test.log").open("w+") as log:
+            process = subprocess.run([sys.executable, str(fixture / "check-release-launch.py"), str(app), "--media-call"],
+                                     env=dict(os.environ, KAIZU_TEST_VIDEO_SOURCE="frames"), stdout=log,
+                                     stderr=subprocess.STDOUT, text=True, timeout=120)
+            log.seek(0)
+            output = log.read()
+        lines = output.splitlines()
         if case == "direct":
             errors = [line for line in lines if line.startswith("/media-call/failure?message=")]
             if not errors or not process.returncode:
-                raise SystemExit("Direct call did not fail the required relay check: " + process.stdout[-2500:])
+                raise SystemExit("Direct call did not fail the required relay check: " + output[-2500:])
             message = unquote(errors[-1].split("message=", 1)[1])
             state = json.loads(message[message.index("{"):])
             peer, page_info = state["receiver"], state["page"]
             decoded = any(r.get("kind") == "video" and r.get("codec", "").lower() == "video/h264" and r.get("frames", 0) > 0 for r in peer["media"])
             if peer["relay"] or "host" not in (peer["path"].get("local"), peer["path"].get("remote")) or not decoded or not page_info["echoed"]:
                 raise SystemExit("Expected decoded video and echoed data on an identified direct path: " + message)
+            subprocess.run(["osascript", "-e", 'tell application id "com.joinprototype.kaizu" to quit'], check=True, timeout=30)
             print("Rejected connected direct call with decoded H.264:", peer["path"], flush=True)
         else:
             evidence = [line for line in lines if "GET /selected-path?result=" in line]
             if process.returncode or not evidence:
-                raise SystemExit(f"{case}: " + unquote(process.stdout[-4000:]))
+                raise SystemExit(f"{case}: " + unquote(output[-4000:]))
             path = json.loads(unquote(evidence[-1].split("result=", 1)[1].split(" HTTP/", 1)[0]))
             if path["local"] != "relay" or path["remote"] != "relay" or (case == "stale-pair-state" and path["source"] == "nominated pair"):
                 raise SystemExit(f"{case}: unexpected transport {path}")
