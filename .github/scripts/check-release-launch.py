@@ -225,6 +225,8 @@ def staged_release(process):
             logs = subprocess.check_output(["/usr/bin/log", "show", "--last", "5m", "--style", "compact",
                                             "--predicate", predicate + ready], text=True, timeout=20)
             if any(line.endswith(f" Update {build} staged") for line in logs.splitlines()):
+                if (staged.parent.parent / "update.zip").exists():
+                    raise SystemExit("The updater retained the downloaded ZIP after staging the verified app")
                 return staged
         time.sleep(1)
     subprocess.run(["/usr/bin/log", "show", "--last", "5m", "--style", "compact", "--predicate", predicate],

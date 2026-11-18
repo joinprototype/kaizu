@@ -14,7 +14,7 @@ enum Updates {
     private static let log = Logger(subsystem: "com.joinprototype.kaizu", category: "updates")
     private static var announced: Int?
     /// The update checked and waiting to go in on quit.
-    private static let preparation = UpdatePreparation()
+    private static let preparation = UpdatePreparation(root: stagingRoot)
     private static var relaunchAfterQuit = false
 
     private static var currentBuild: Int {
@@ -100,7 +100,7 @@ enum Updates {
               let bundleID = Bundle.main.bundleIdentifier
         else { throw UpdateFailure.notOffered }
 
-        let folder = stagingRoot.appending(path: String(release.build), directoryHint: .isDirectory)
+        let folder = preparation.folder(for: release.build)
         let stage = UpdateStage(folder: folder, bundleID: bundleID, publicKey: ReleaseUpdateKey.base64)
         let build = release.build
         return try await Task.detached(priority: .utility) {
@@ -116,10 +116,9 @@ enum Updates {
         try manager.createDirectory(at: folder, withIntermediateDirectories: true)
         do {
             let (file, response) = try await URLSession(configuration: .ephemeral).download(for: URLRequest(url: archive))
+            defer { try? manager.removeItem(at: file) }
             guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw UpdateFailure.badDownload }
-            let saved = folder.appending(path: "update.zip")
-            try manager.moveItem(at: file, to: saved)
-            return try stage.stage(archive: saved, build: build, signature: signature)
+            return try stage.stage(archive: file, build: build, signature: signature)
         } catch {
             try? manager.removeItem(at: folder)
             throw error
