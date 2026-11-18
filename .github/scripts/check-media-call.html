@@ -206,6 +206,11 @@ async function reportState(reason) {
 const timeout = setTimeout(() => reportState("Timeout"), 30000);
 try {
     await call();
+    const stats = await receiver.getStats();
+    const incoming = [...stats.values()].find(item => item.type === "inbound-rtp" && item.kind === "video");
+    const codec = stats.get(incoming.codecId)?.mimeType;
+    if (!codec || !(incoming.framesDecoded > 0)) throw new Error("Missing decoded video statistics");
+    await fetch("/media-call/decoded?" + new URLSearchParams({codec, frames: incoming.framesDecoded}));
     location.replace("/start");
 } catch (error) {
     await reportState(`${error.name}: ${error.message}`);

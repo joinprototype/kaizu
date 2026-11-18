@@ -129,6 +129,9 @@ class Page(BaseHTTPRequestHandler):
             self.send_response(204)
             self.end_headers()
             server.rendered = True
+        elif self.path.startswith("/media-call/decoded?"):
+            self.send_response(204)
+            self.end_headers()
         elif self.path == "/media-call/video-source.js":
             self.send_response(200)
             self.send_header("Content-Type", "text/javascript")
@@ -358,6 +361,8 @@ def main():
         media_url = f"http://127.0.0.1:{server.server_port}/media-call"
         if os.environ.get("KAIZU_TEST_VIDEO_SOURCE") == "frames":
             media_url += "?source=frames"
+        if os.environ.get("KAIZU_TEST_VIDEO_CODEC") == "vp8":
+            media_url += ("&" if "?" in media_url else "?") + "codec=vp8"
         if args.webkit_control:
             process = subprocess.Popen([candidate, media_url])
             try:
@@ -376,8 +381,6 @@ def main():
         settings = json.dumps({"externalLinks": "currentSpace"}).encode().hex()
         subprocess.run(["defaults", "write", "com.joinprototype.kaizu", "settings", "-data", settings], check=True)
         if args.media_call:
-            if os.environ.get("KAIZU_TEST_VIDEO_CODEC") == "vp8":
-                media_url += ("&" if "?" in media_url else "?") + "codec=vp8"
             quit_app(launch(server, candidate, media_url))
             print("The receiving WebRTC peer decoded non-silent audio, rendered video and echoed a data-channel message.")
             return
