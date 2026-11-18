@@ -1,3 +1,4 @@
+import BrowserCore
 import Foundation
 
 /// Keeps memory in check and tabs where you left them: background tabs idle
