@@ -216,13 +216,13 @@ default-browser capable · curated themes · app icon.
 | Multiple / private windows | ✓ | ✓ | — | M | `WKWebsiteDataStore.nonPersistent()` |
 | Back/forward kept across restarts | ✓ | ✓ | — | S | `interactionState` ✓ |
 | Ad + tracker blocking | via extensions | ✓ built in | — | M | `WKContentRuleList` ✓ (same engine as Safari content blockers) |
-| Split view | ✓ | ✓ | — | L | several page views per window |
+| Split view | ✓ | Up to four panes in a mix of rows and columns | — | L | Each pane keeps its live page |
 | Peek (link preview overlay) | ✓ | ✓ | — | M | promote preview to tab without reload |
 | Little Arc (mini window) | ✓ | ✓ | — | M | On macOS 27.0.1, the File menu moved a live page and its unsaved draft back to its opening space across two windows. |
 | ⌃Tab recent-tab switcher | ✓ | ✓ | — | M | `takeSnapshot` ✓ for thumbnails |
 | Media: now playing, mute, auto-PiP | ✓ | ✓ | — | M | event-driven via isolated-world script; auto-PiP ✓ |
 | Capture / screenshots | ✓ | ✓ | — | S | `takeSnapshot`, `createPDF` ✓ |
-| Extensions | Chrome Web Store | ✓ Chrome Web Store, Firefox Add-ons, Safari | — | L | `WKWebExtension` ✓ (macOS 15.4+) |
+| Extensions | Chrome Web Store | Install from Chrome Web Store and Firefox Add-ons listings or a Mac app containing a Safari web extension | partial | L | WebKit API coverage varies by extension. [Tested packages and workflows](#extension-compatibility) |
 | Password managers | extensions | Bitwarden for Safari filled a self-hosted login | partial | L | Verify 1Password autofill and desktop unlock separately |
 | Site notifications | ✓ | on the tab and Dock; macOS banners need Developer ID | P6 | M | no public `Notification` delivery: a page script plus `UserNotifications`; macOS refuses ad-hoc signed apps |
 | Passkeys | ✓ | blocked | P6 | — | needs Apple's browser passkey entitlement |

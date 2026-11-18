@@ -28,8 +28,10 @@
 - **Bring your Arc setup.** On the Mac where you use Arc, choose **File → Import from Arc…** to preview your spaces, pinned folders, favorites and tabs. Use **File → Import Browsing Data…** for bookmarks and history from a Chromium browser or a Safari export.
 - **Give each project a space.** Pin the pages you keep coming back to and let Today tabs archive themselves. Use separate profiles when you want separate logins and cookies.
 - **Stay on the keyboard.** Press ⌘T to jump to an open tab, find an archived page, run a menu command or convert a measurement. Press ⌘/ to see the shortcuts.
-- **Keep your place.** Peek at a link, open it beside the page you’re reading, or split a window into up to four panes. Idle tabs can go to sleep and wake when you return.
+- **Keep your place.** Peek at a link, open it beside the page you’re reading, or arrange up to four pages in a mix of rows and columns. Idle tabs can go to sleep and wake when you return.
 - **Control what loads.** Kaizu blocks ads and trackers, rejects supported cookie prompts and strips tracking parameters. Open the site settings in the address bar to pause blocking for one site.
+
+Kaizu runs without a browser account and keeps your workspace on your Mac. If you rely on Arc Sync, Easels or Boosts, those features are outside the Mac 1.0 plan. For extensions, choose **Add to Kaizu** on a Chrome Web Store or Firefox Add-ons listing, or select a Mac app containing a Safari web extension in **Settings → Extensions**. Compatibility depends on which WebKit APIs each extension uses. [Tested extensions and password managers](docs/ROADMAP.md#extension-compatibility)
 
 On the development branch, **Import from Arc…** also opens a saved sidebar JSON or Markdown export from another Mac. You can browse recently archived tabs in History and import a WebKit content-blocker rule list in Settings. [Unreleased changes](CHANGELOG.md#unreleased)
 
