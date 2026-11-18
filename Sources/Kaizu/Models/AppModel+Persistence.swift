@@ -4,7 +4,7 @@ import Foundation
 /// Session save/restore (`~/Library/Application Support/Kaizu/session.json`).
 extension AppModel {
     private static var sessionURL: URL {
-        AppPaths.support.appending(path: "session.json")
+        SessionFiles(directory: AppPaths.support).primary
     }
 
     /// One write at a time, in order, so a late one can't undo a newer one.
@@ -42,8 +42,7 @@ extension AppModel {
         }
     }
 
-    func restore() {
-        let session = loadSession()
+    func restore(_ session: SessionFiles.Opened?) {
         if let session {
             apply(session.record)
         }
@@ -79,24 +78,6 @@ extension AppModel {
                 id: folder.id, name: folder.name, isExpanded: folder.isExpanded,
                 children: folder.children.map { makeItem($0, profile: profile) }
             ))
-        }
-    }
-
-    private func loadSession() -> (record: SessionRecord, migrated: Bool)? {
-        guard let data = try? Data(contentsOf: Self.sessionURL) else { return nil }
-        do {
-            let (record, sourceVersion) = try SessionRecord.decode(data)
-            if sourceVersion < SessionRecord.currentVersion {
-                Log.session.notice("Upgrading the session from version \(sourceVersion) to \(SessionRecord.currentVersion)")
-                // Keep the pre-migration file, just in case.
-                try? data.write(to: AppPaths.support.appending(path: "session.v\(sourceVersion).backup.json"))
-            }
-            return (record, sourceVersion < SessionRecord.currentVersion)
-        } catch {
-            Log.session.fault("Couldn't read the session, starting fresh (kept as session.unreadable.json): \(error.localizedDescription, privacy: .public)")
-            // Never overwrite a file we couldn't read without keeping a copy.
-            try? data.write(to: AppPaths.support.appending(path: "session.unreadable.json"))
-            return nil
         }
     }
 
