@@ -1,50 +1,39 @@
-name: Compare relayed video encoders on one hosted Mac
+name: Isolate release source and pixel format in H.264 calls
 on:
   push:
-    branches: [qa/paired-video-encoders]
+    branches: [qa/isolated-release-video]
 permissions:
   contents: read
-  actions: read
 jobs:
   compare:
     runs-on: xcode-27
-    timeout-minutes: 25
+    timeout-minutes: 32
     steps:
       - uses: actions/checkout@v7
         with:
+          fetch-depth: 6
           persist-credentials: false
-      - uses: actions/download-artifact@v8
-        with:
-          github-token: ${{ github.token }}
-          run-id: 44388753876
-          name: kaizu-runtime-check
-          path: ${{ runner.temp }}/master
-      - name: Build release app
+      - name: Package parent and candidate with the same signing and release path
         run: |
-          export KAIZU_UPDATE_KEY="$RUNNER_TEMP/test-update.key"
+          export KAIZU_UPDATE_KEY="$RUNNER_TEMP/disposable.key"
           public_key=$(swift scripts/update-sign.swift new "$KAIZU_UPDATE_KEY")
-          version=$(plutil -extract CFBundleShortVersionString raw Resources/Info.plist)
-          # The disposable signer belongs only to the rehearsal source tree.
-          rehearsal="$RUNNER_TEMP/package-rehearsal"
-          mkdir -p "$rehearsal"
-          git archive HEAD | tar -x -C "$rehearsal"
-          if "$rehearsal/scripts/release.sh" "$version" >"$RUNNER_TEMP/wrong-key.log" 2>&1; then
-            echo "A foreign private key passed the release check" >&2
-            exit 1
-          fi
-          grep -Fq 'does not match Kaizu' "$RUNNER_TEMP/wrong-key.log"
-          printf 'public enum ReleaseUpdateKey { public static let base64 = "%s" }\n' "$public_key" > "$rehearsal/Sources/BrowserCore/ReleaseUpdateKey.swift"
-          "$rehearsal/scripts/release.sh" "$version"
-
-          mkdir -p "$RUNNER_TEMP/package-check/unpacked"
-          ditto -x -k "$rehearsal/site/updates/Kaizu-$version.zip" "$RUNNER_TEMP/package-check/unpacked"
+          for version in parent candidate; do
+            case "$version" in
+              parent) commit=13baaf47323ae265a201d9b581a8138e05d5a9c6 ;;
+              candidate) commit=7c362974a6f1de7ff64b7a7f8419a16e51ba844a ;;
+            esac
+            source_path="$RUNNER_TEMP/rehearsal-$version"
+            mkdir "$source_path"
+            git archive "$commit" | tar -x -C "$source_path"
+            printf 'public enum ReleaseUpdateKey { public static let base64 = "%s" }\n' "$public_key" > "$source_path/Sources/BrowserCore/ReleaseUpdateKey.swift"
+            release=$(plutil -extract CFBundleShortVersionString raw "$source_path/Resources/Info.plist")
+            "$source_path/scripts/release.sh" "$release"
+            cp "$source_path/site/updates/Kaizu-$release.zip" "$RUNNER_TEMP/$version.zip"
+          done
       - name: Install the loopback TURN relay
         run: HOMEBREW_NO_AUTO_UPDATE=1 brew install coturn
-      - name: Compare decoded video, audio and relay data in Kaizu and standard WebKit
-        timeout-minutes: 14
+      - name: Check both packages at one install location and compare plain WebKit
+        timeout-minutes: 18
         env:
           RUNNER_ENVIRONMENT: ${{ runner.environment }}
-        run: |
-          ditto -x -k "$RUNNER_TEMP/master/Kaizu.zip" "$RUNNER_TEMP/reference"
-          codesign --verify --deep --strict "$RUNNER_TEMP/reference/Kaizu.app"
-          .github/scripts/check-relayed-call.sh "$RUNNER_TEMP/package-check/unpacked/Kaizu.app" "$RUNNER_TEMP/reference/Kaizu.app"
+        run: .github/scripts/check-relayed-call.sh

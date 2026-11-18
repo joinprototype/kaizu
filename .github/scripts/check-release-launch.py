@@ -361,6 +361,8 @@ def main():
         media_url = f"http://127.0.0.1:{server.server_port}/media-call"
         if os.environ.get("KAIZU_TEST_VIDEO_SOURCE") == "frames":
             media_url += "?source=frames"
+            if os.environ.get("KAIZU_TEST_PIXEL_FORMAT") == "NV12":
+                media_url += "&pixels=NV12"
         if os.environ.get("KAIZU_TEST_VIDEO_CODEC") == "vp8":
             media_url += ("&" if "?" in media_url else "?") + "codec=vp8"
         if args.webkit_control:

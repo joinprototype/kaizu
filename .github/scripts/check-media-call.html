@@ -36,7 +36,8 @@ function generatedStream() {
             if (data.number) generated = data.number;
             if (data.error) reportFailure("Video frame generation: " + data.error);
         };
-        worker.postMessage({width: canvas.width, height: canvas.height});
+        worker.postMessage({width: canvas.width, height: canvas.height,
+            format: new URLSearchParams(location.search).get("pixels") || "RGBA"});
     });
 }
 const stream = fromWorker ? await generatedStream() : canvas.captureStream(10);
@@ -209,7 +210,7 @@ try {
     const stats = await receiver.getStats();
     const incoming = [...stats.values()].find(item => item.type === "inbound-rtp" && item.kind === "video");
     const codec = stats.get(incoming.codecId)?.mimeType;
-    if (!codec || !(incoming.framesDecoded > 0)) throw new Error("Missing decoded video statistics");
+    if (codec?.toLowerCase() !== "video/h264" || !(incoming.framesDecoded > 0)) throw new Error("Missing decoded H.264 video");
     await fetch("/media-call/decoded?" + new URLSearchParams({codec, frames: incoming.framesDecoded}));
     location.replace("/start");
 } catch (error) {

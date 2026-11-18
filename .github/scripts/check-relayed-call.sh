@@ -31,17 +31,26 @@ fixture="$(dirname "$0")/check-release-launch.py"
 swiftc -parse-as-library "$(dirname "$0")/check-webkit-call.swift" -o "$scratch/webkit-control"
 export KAIZU_TEST_VIDEO_SOURCE=frames
 failures=0
+session="$HOME/Library/Application Support/Kaizu"
+install="$RUNNER_TEMP/matched-install"
+mkdir "$install"
+[[ ! -e "$session" ]]
 trial() {
-    local client="$1" codec="$2" round="$3" binary option outcome
-    case "$client" in
-        candidate) binary="$candidate_app"; option=--media-call ;;
-        master) binary="$master_app"; option=--media-call ;;
-        webkit) binary="$scratch/webkit-control"; option=--webkit-control ;;
-    esac
-    echo "Starting round=$round client=$client codec=$codec"
+    local client="$1" pixels="$2" round="$3" binary option outcome
+    if [[ "$client" == webkit ]]; then
+        binary="$scratch/webkit-control"
+        option=--webkit-control
+    else
+        ditto -x -k "$RUNNER_TEMP/$client.zip" "$install"
+        binary="$install/Kaizu.app"
+        codesign --verify --deep --strict "$binary"
+        shasum -a 256 "$binary/Contents/MacOS/Kaizu"
+        option=--media-call
+    fi
+    echo "Starting round=$round client=$client pixels=$pixels"
     outcome=0
-    KAIZU_TEST_VIDEO_CODEC="$codec" python3 "$fixture" "$binary" "$option" || outcome=$?
-    echo "Result round=$round client=$client codec=$codec status=$outcome"
+    KAIZU_TEST_PIXEL_FORMAT="$pixels" python3 "$fixture" "$binary" "$option" || outcome=$?
+    echo "Result round=$round client=$client pixels=$pixels status=$outcome"
     if [[ "$outcome" != 0 ]]; then failures=$((failures + 1)); fi
     if [[ "$client" != webkit ]]; then
         osascript -e 'if application id "com.joinprototype.kaizu" is running then tell application id "com.joinprototype.kaizu" to quit'
@@ -50,18 +59,15 @@ trial() {
             sleep .25
         done
         if pgrep -x Kaizu >/dev/null; then exit 1; fi
-        if [[ -d "$session" ]]; then mv "$session" "$scratch/session-$round-$client-$codec"; fi
+        mv "$binary" "$scratch/retired-$round-$client-$pixels.app"
+        if [[ -d "$session" ]]; then mv "$session" "$scratch/session-$round-$client-$pixels"; fi
     fi
 }
-candidate_app="$1"
-master_app="$2"
-session="$HOME/Library/Application Support/Kaizu"
-[[ ! -e "$session" ]]
-for codec in default vp8; do
-    for client in candidate webkit master; do trial "$client" "$codec" 1; done
+for pixels in RGBA NV12; do
+    for client in parent candidate webkit; do trial "$client" "$pixels" 1; done
 done
-for codec in vp8 default; do
-    for client in master webkit candidate; do trial "$client" "$codec" 2; done
+for pixels in NV12 RGBA; do
+    for client in webkit candidate parent; do trial "$client" "$pixels" 2; done
 done
-echo "$failures of twelve generated-video checks failed"
+echo "$failures of twelve H.264 checks failed"
 [[ "$failures" == 0 ]]
