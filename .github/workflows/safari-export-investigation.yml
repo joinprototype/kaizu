@@ -1,0 +1,25 @@
+name: Investigate Safari export on a clean Mac
+on:
+  push:
+    branches: [qa/safari-generated-export]
+permissions:
+  contents: read
+jobs:
+  export:
+    runs-on: xcode-27
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Inspect the clean Safari export interface
+        env:
+          RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        run: |
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          mkdir -p "$RUNNER_TEMP/fixture"
+          echo '<title>Kaizu migration fixture</title><h1>Safari export test page</h1>' > "$RUNNER_TEMP/fixture/index.html"
+          python3 -m http.server 18784 --bind 127.0.0.1 --directory "$RUNNER_TEMP/fixture" > "$RUNNER_TEMP/http.log" 2>&1 &
+          open -a Safari http://127.0.0.1:18784/
+          sleep 3
+          swift .github/qa/safari-export/inspect.swift
