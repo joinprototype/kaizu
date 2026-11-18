@@ -62,7 +62,9 @@ On Didomi's public demo, the SDK loaded but showed no notice in the control prof
 
 ### Media calls and permissions
 
-The packaged browser sent video between two local WebRTC peers on macOS 15.8.2 and 27.0.1. The receiver rendered a frame from a canvas camera and returned a message over the data channel. A separate native-sheet test confirmed that declining a microphone request preserves an existing camera permission, and that private windows ask independently. Physical camera and microphone capture, remote participants, and conferencing-service lobbies still need testing. [Packaged browser CI](https://github.com/joinprototype/kaizu/actions/runs/44293624816)
+The packaged browser sent video between two local WebRTC peers on macOS 15.8.2 and 27.0.1. The receiver rendered a frame from a canvas camera and returned a message over the data channel. The call check also sends a synthesized tone and reads the receiver's decoded audio energy. On macOS 27.0.1, disconnecting the oscillator caused the audio check to fail while video and data still worked. A separate native-sheet test confirmed that declining a microphone request preserves an existing camera permission, and that private windows ask independently. [Packaged video and permissions checks](https://github.com/joinprototype/kaizu/actions/runs/44293624816)
+
+On macOS 27.0.1, two fresh profiles with camera and microphone denied reached Jitsi Meet's prejoin screen. Kaizu rendered the display-name field, **Join meeting**, **Join options** and device controls. With capture denied, the page still displayed “Configuring devices…” after 40 seconds and its media elements had no tracks. The test ended in the lobby. Physical device capture and a call with a remote participant remain open. [Jitsi's pre-meeting device check](https://jitsi.org/blog/authentication-on-meet-jit-si/)
 
 ### Extension compatibility
 
