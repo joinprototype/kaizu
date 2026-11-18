@@ -90,7 +90,7 @@ struct ExtensionSettings: View {
                     Spacer()
                 }
             } footer: {
-                FooterText("Add an unpacked web extension or a .zip from Chrome or Firefox. Extensions that depend on browser APIs missing from WebKit may only work in part.")
+                FooterText("Choose a Mac app containing a Safari web extension, an unpacked extension folder, or a .zip. Some extensions depend on APIs their original browser provides.")
             }
             Section {
                 if safariApps.isEmpty {
@@ -116,9 +116,9 @@ struct ExtensionSettings: View {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = true
-        panel.allowedContentTypes = [.folder, .zip]
+        panel.allowedContentTypes = [.applicationBundle, .folder, .zip]
         panel.prompt = "Add"
-        panel.message = "Choose an extension folder (with manifest.json) or a .zip"
+        panel.message = "Choose a Mac app with a Safari web extension, an extension folder, or a .zip"
         guard panel.runModal() == .OK, let url = panel.url else { return }
         Task { await store.extensions.install(from: url) }
     }
