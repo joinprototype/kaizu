@@ -210,6 +210,28 @@ import Testing
         #expect(Set(plan.newSpaces.map(\.profileID)).count == 1)
     }
 
+    @Test func sameNamedDestinationsCannotCollapseIndependentArcProfiles() throws {
+        var source = Self.sidebar(name: "Client", profile: "Profile 1")
+        source.spaces.append(Self.sidebar(name: "Personal").spaces[0])
+        source.favorites[ArcSidebar.defaultProfile] = [Self.tab("https://personal.test/")]
+        let spaces = [Self.emptySpace(name: "Personal"), Self.emptySpace(name: "Client")]
+        let plan = Self.plan(source, spaces: spaces)
+        let client = try #require(plan.newProfiles.first)
+        #expect(client.favorites.map(\.url) == [URL(string: "https://f.test/")])
+        #expect(plan.favorites[Self.profileID]?.map(\.url) == [URL(string: "https://personal.test/")])
+        #expect(plan.newSpaces.map(\.profileID) == [client.id])
+        #expect(plan.pinned[spaces[1].id] == nil)
+
+        var personal = spaces[0]
+        personal.pinned = plan.pinned[personal.id] ?? []
+        personal.today = plan.today[personal.id] ?? []
+        let profiles = [ProfileRecord(id: Self.profileID, name: "Personal", favorites: plan.favorites[Self.profileID] ?? []), client]
+        let again = Self.plan(source, profiles: profiles, spaces: [personal, spaces[1]] + plan.newSpaces)
+        #expect(again.tabCount == 0)
+        #expect(again.newSpaces.isEmpty)
+        #expect(again.newProfiles.isEmpty)
+    }
+
     @Test func keepsArcsColorWhenThereIsOne() {
         var sidebar = Self.sidebar(name: "Work")
         sidebar.spaces[0].hue = 0.77
@@ -263,6 +285,11 @@ import Testing
         #expect(plan.takeover?.name == "Work")
         #expect(plan.newSpaces.map(\.name) == ["Home"])
         #expect(plan.newProfiles.map(\.name) == ["Home"])
+        let workID = try #require(plan.takeover?.spaceID)
+        let imported = try #require(plan.pinned[workID]?.tabs)
+        let renamed = try #require(imported.first { $0.title == "Handbook (renamed)" })
+        #expect(renamed.customTitle == "Handbook (renamed)")
+        #expect(imported.contains { $0.customTitle == nil })
         #expect(plan.tabCount > 0)
     }
 }

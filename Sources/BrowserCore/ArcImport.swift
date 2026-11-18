@@ -44,12 +44,22 @@ public struct ArcImport: Equatable, Sendable {
         includesToday: Bool, hues: [Double], symbols: [String], now: Date = Date()
     ) {
         var kaizuProfile: [String: UUID] = [:]
+        // Match the default profile first, even if a custom Arc space appears
+        // first in the file. Custom profiles must never claim its destination.
+        let defaultSpaces = sidebar.spaces.filter { $0.profile == ArcSidebar.defaultProfile }
+        if !defaultSpaces.isEmpty {
+            let existing = defaultSpaces.lazy.compactMap { arc in
+                spaces.first { $0.name.caseInsensitiveCompare(arc.name) == .orderedSame }
+            }.first
+            kaizuProfile[ArcSidebar.defaultProfile] = (existing ?? spaces.first)?.profileID
+        }
         var matches: [Int: SpaceRecord] = [:]
         var taken: Set<UUID> = []
         for (index, arc) in sidebar.spaces.enumerated() {
             let match = spaces.first { space in
-                !taken.contains(space.id) && space.name.caseInsensitiveCompare(arc.name) == .orderedSame
-                    && (kaizuProfile[arc.profile] ?? space.profileID) == space.profileID
+                guard !taken.contains(space.id), space.name.caseInsensitiveCompare(arc.name) == .orderedSame else { return false }
+                if let destination = kaizuProfile[arc.profile] { return destination == space.profileID }
+                return !kaizuProfile.values.contains(space.profileID)
             }
             guard let match else { continue }
             matches[index] = match
@@ -62,12 +72,6 @@ public struct ArcImport: Equatable, Sendable {
             matches[index] = only
             takeover = Takeover(spaceID: only.id, name: arc.name, hue: arc.hue)
         }
-        // Arc's default profile moves in with Kaizu's first; other Arc
-        // profiles have logins of their own to keep apart, so they stay apart.
-        if kaizuProfile[ArcSidebar.defaultProfile] == nil, let first = spaces.first {
-            kaizuProfile[ArcSidebar.defaultProfile] = first.profileID
-        }
-
         var spaceCount = spaces.count
         for (index, arc) in sidebar.spaces.enumerated() {
             let today = includesToday ? arc.today : []
@@ -124,12 +128,12 @@ public struct ArcImport: Equatable, Sendable {
     }
 
     private static func pinnedRecord(_ tab: ArcSidebar.Tab) -> TabRecord {
-        TabRecord(id: UUID(), title: tab.title, url: tab.url, pinnedURL: tab.url)
+        TabRecord(id: UUID(), title: tab.title, url: tab.url, pinnedURL: tab.url, customTitle: tab.customTitle)
     }
 
     /// Stamped now, so the clock on archiving starts from the import.
     private static func record(_ tab: ArcSidebar.Tab, now: Date) -> TabRecord {
-        TabRecord(id: UUID(), title: tab.title, url: tab.url, lastActiveAt: now)
+        TabRecord(id: UUID(), title: tab.title, url: tab.url, lastActiveAt: now, customTitle: tab.customTitle)
     }
 }
 
