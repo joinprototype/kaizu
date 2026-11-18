@@ -28,17 +28,23 @@ done
 nc -z 127.0.0.1 3478
 
 fixture="$(dirname "$0")/check-release-launch.py"
-if python3 "$fixture" "$1" --media-call; then exit 0; fi
-
-# A control result helps diagnose a failure but cannot pass the release gate.
-osascript -e 'if application id "com.joinprototype.kaizu" is running then tell application id "com.joinprototype.kaizu" to quit'
-echo "Comparing raw video frames in the packaged app"
-if KAIZU_TEST_VIDEO_SOURCE=frames python3 "$fixture" "$1" --media-call; then
-    echo "The release rendered relayed video from generated frames; canvas capture failed"
-    exit 1
+if python3 "$fixture" "$1" --media-call; then
+    exit 0
+else
+    result=$?
+    [[ $result == 75 ]] || exit "$result"
 fi
+
 osascript -e 'if application id "com.joinprototype.kaizu" is running then tell application id "com.joinprototype.kaizu" to quit'
-echo "Comparing generated frames in a plain WebKit window"
 swiftc -parse-as-library "$(dirname "$0")/check-webkit-call.swift" -o "$scratch/webkit-control"
+if python3 "$fixture" "$scratch/webkit-control" --webkit-control; then
+    echo "Plain WebKit captured canvas video on the same runner; the packaged browser failed" >&2
+    exit 1
+else
+    result=$?
+    [[ $result == 75 ]] || exit "$result"
+fi
+
+echo "Both canvas sources stalled before encoding. Checking decoded video from generated frames on the same relay."
+KAIZU_TEST_VIDEO_SOURCE=frames python3 "$fixture" "$1" --media-call
 KAIZU_TEST_VIDEO_SOURCE=frames python3 "$fixture" "$scratch/webkit-control" --webkit-control
-exit 1

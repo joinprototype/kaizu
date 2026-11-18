@@ -91,7 +91,7 @@ class Page(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.end_headers()
             self.wfile.write(Path(__file__).with_name("check-media-call.html").read_bytes())
-        elif self.path.startswith(("/media-call/failure?", "/extension-test/failure?")):
+        elif self.path.startswith(("/media-call/failure?", "/media-call/canvas-stall?", "/extension-test/failure?")):
             server.page_failure = self.path
             self.send_response(204)
             self.end_headers()
@@ -120,6 +120,9 @@ def wait_for_page(server, process, app):
         if process.poll() is not None:
             raise SystemExit(f"{app} exited before rendering the page")
         if server.page_failure:
+            if server.page_failure.startswith("/media-call/canvas-stall?"):
+                print(server.page_failure, flush=True)
+                raise SystemExit(75)  # The relay wrapper compares this result with plain WebKit.
             raise SystemExit(server.page_failure)
         if time.monotonic() >= deadline:
             raise SystemExit("Timed out waiting for Kaizu to render the page")

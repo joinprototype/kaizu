@@ -4,8 +4,8 @@
 <canvas width="160" height="90"></canvas>
 <video autoplay muted playsinline></video>
 <script>
-function reportFailure(message) {
-    location.replace("/media-call/failure?message=" + encodeURIComponent(message));
+function reportFailure(message, route = "failure") {
+    location.replace("/media-call/" + route + "?message=" + encodeURIComponent(message));
 }
 window.addEventListener("error", event => reportFailure(event.message));
 window.addEventListener("unhandledrejection", event => reportFailure(String(event.reason)));
@@ -139,10 +139,7 @@ async function call() {
             throw new Error("The receiver did not report VP8 video");
         }
         if (config.iceTransportPolicy === "relay") {
-            const selectedRelay = [...stats.values()].some(report =>
-                report.type === "candidate-pair" && report.state === "succeeded" && report.nominated &&
-                stats.get(report.localCandidateId)?.candidateType === "relay");
-            if (!selectedRelay) throw new Error("The receiving peer did not report a nominated relay candidate pair");
+            if (!usesRelay(stats)) throw new Error("The receiving peer did not report a nominated relay candidate pair");
         }
         for (const report of stats.values()) {
             if (report.type === "inbound-rtp" && report.kind === "audio" &&
@@ -150,6 +147,24 @@ async function call() {
         }
         await new Promise(resolve => setTimeout(resolve, 100));
     }
+}
+
+function usesRelay(stats) {
+    return [...stats.values()].some(report =>
+        report.type === "candidate-pair" && report.state === "succeeded" && report.nominated &&
+        stats.get(report.localCandidateId)?.candidateType === "relay");
+}
+
+// The hosted Mac sometimes draws the canvas without delivering any frames to the video source.
+function stalledCanvasSource(sender, recipient, page) {
+    const sendsNothing = sender.media.some(m => m.direction === "outbound-rtp" && m.kind === "video" && m.frames === 0 && m.bytes === 0);
+    const receivesNothing = recipient.media.some(m => m.direction === "inbound-rtp" && m.kind === "video" && m.frames === 0 && m.bytes === 0);
+    const emptySource = sender.media.some(m => m.source === "video" && m.frames === 0);
+    const heardAudio = recipient.media.some(m => m.direction === "inbound-rtp" && m.kind === "audio" && m.samples > 0 && m.energy > 0);
+    return sender.connection === "connected" && recipient.connection === "connected" && sender.relay && recipient.relay &&
+        sendsNothing && receivesNothing && emptySource && heardAudio && page.echoed && page.visibility === "visible" &&
+        page.drawn >= 200 && page.generated === 0 && page.width === 0 && page.height === 0 && page.videoReady === 0 &&
+        page.remoteVideo?.some(track => track.state === "live" && !track.muted);
 }
 
 async function describePeer(peer) {
@@ -172,7 +187,8 @@ async function describePeer(peer) {
         const key = stat.type + "/" + (stat.candidateType || stat.state);
         counts[key] = (counts[key] || 0) + 1;
     }
-    return [peer.connectionState, peer.iceGatheringState, peer.iceConnectionState, JSON.stringify(counts), JSON.stringify(media)].join(" ");
+    return {connection: peer.connectionState, gathering: peer.iceGatheringState, ice: peer.iceConnectionState,
+        relay: usesRelay(stats), counts, media};
 }
 
 async function reportState(reason) {
@@ -182,7 +198,10 @@ async function reportState(reason) {
         videoReady: video.readyState, videoPaused: video.paused, width: video.videoWidth, height: video.videoHeight,
         remoteVideo: video.srcObject?.getVideoTracks().map(track => ({state: track.readyState, muted: track.muted}))
     };
-    reportFailure(`${reason} during ${stage}. Caller ${summary[0]}, receiver ${summary[1]}, page ${JSON.stringify(page)}`);
+    const canvasStalled = !fromWorker && config.iceTransportPolicy === "relay" && reason === "Timeout" &&
+        stage === "waiting for video and data" && stalledCanvasSource(summary[0], summary[1], page);
+    reportFailure(`${reason} during ${stage}: ${JSON.stringify({caller: summary[0], receiver: summary[1], page})}`,
+        canvasStalled ? "canvas-stall" : "failure");
 }
 const timeout = setTimeout(() => reportState("Timeout"), 30000);
 try {
