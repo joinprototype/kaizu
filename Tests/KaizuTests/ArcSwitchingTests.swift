@@ -1,3 +1,5 @@
+// Only debug builds route AppModel writes to the disposable KAIZU_SUPPORT directory.
+#if DEBUG
 import AppKit
 import BrowserCore
 import Testing
@@ -121,3 +123,4 @@ struct ArcSwitchingTests {
         try #require(tab.webView.url == page && !tab.webView.isLoading)
     }
 }
+#endif
