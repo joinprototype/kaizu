@@ -62,6 +62,8 @@ copy that can't touch your real browser at all, give its Info.plist another
 
 ## Release
 
+In GitHub Actions, open **Mac build and tests**, choose **Run workflow**, and select the candidate branch or tag. The rehearsal builds one runtime package and checks migration from v0.2.5 and installation of the signed update on both hosted macOS 15 and macOS 27. Each upgrade checks the restored login, draft, tab, space and profile. The job logs report the exact macOS version. [Run the Mac checks](https://github.com/joinprototype/kaizu/actions/workflows/mac.yml)
+
 For a notarized Mac release, set `KAIZU_DEVELOPER_ID` to the **Developer ID Application** signing identity and `KAIZU_NOTARY_PROFILE` to a Keychain profile created with `xcrun notarytool store-credentials`. Set `version` to the release number.
 
 ```sh

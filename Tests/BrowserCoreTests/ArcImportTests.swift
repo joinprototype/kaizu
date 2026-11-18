@@ -232,6 +232,51 @@ import Testing
         #expect(again.newProfiles.isEmpty)
     }
 
+    @Test func repeatImportKeepsSameNamedWorkAndPersonalSpacesInTheirProfiles() throws {
+        var source = Self.sidebar(name: "Inbox", profile: "Work")
+        source.spaces[0].pinned = [.tab(Self.tab("https://work.test/"))]
+        var personal = Self.sidebar(name: "Inbox").spaces[0]
+        personal.pinned = [.tab(Self.tab("https://personal.test/"))]
+        source.spaces.append(personal)
+        source.favorites[ArcSidebar.defaultProfile] = [Self.tab("https://personal-mail.test/")]
+
+        var home = Self.emptySpace()
+        home.today = [TabRecord(id: UUID(), title: "Existing", url: URL(string: "https://existing.test/"))]
+        let first = Self.plan(source, spaces: [home])
+        let workProfile = try #require(first.newProfiles.first)
+        let profiles = [
+            ProfileRecord(id: Self.profileID, name: "Personal", favorites: first.favorites[Self.profileID] ?? []),
+            workProfile
+        ]
+        let spaces = [home] + first.newSpaces
+        let repeated = Self.plan(source, profiles: profiles, spaces: spaces)
+        #expect(repeated.tabCount == 0)
+        #expect(repeated.newSpaces.isEmpty)
+
+        let added = Self.tab("https://new-work.test/")
+        source.spaces[0].pinned.append(.tab(added))
+        let updated = Self.plan(source, profiles: profiles, spaces: spaces)
+        let workSpace = try #require(spaces.first { $0.profileID == workProfile.id })
+        #expect(updated.tabCount == 1)
+        #expect(updated.pinned[workSpace.id]?.tabs.map(\.pinnedURL) == [added.url])
+    }
+
+    @Test func repeatImportUsesProfileFavoritesWhenSameNamedSpacesShareTheirTabs() throws {
+        var source = Self.sidebar(name: "Inbox", profile: "Work")
+        source.spaces.append(Self.sidebar(name: "Inbox", profile: "Home").spaces[0])
+        source.favorites["Home"] = [Self.tab("https://personal-mail.test/")]
+        let original = Self.emptySpace()
+        let first = Self.plan(source, spaces: [original])
+        let profiles = [ProfileRecord(id: Self.profileID, name: "Existing", favorites: [])] + first.newProfiles
+        let spaces = [original] + first.newSpaces.reversed()
+        #expect(Self.plan(source, profiles: profiles, spaces: spaces).tabCount == 0)
+        source.spaces[0].today.append(Self.tab("https://work-update.test/"))
+        let updated = Self.plan(source, profiles: profiles, spaces: spaces)
+        let work = try #require(first.newSpaces.first)
+        #expect(updated.tabCount == 1)
+        #expect(updated.today[work.id]?.map(\.url) == [URL(string: "https://work-update.test/")])
+    }
+
     @Test func keepsArcsColorWhenThereIsOne() {
         var sidebar = Self.sidebar(name: "Work")
         sidebar.spaces[0].hue = 0.77

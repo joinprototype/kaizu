@@ -248,8 +248,9 @@ def report_cookie_checkpoint(server, path, phase):
     except OSError as error:
         status = f"file unavailable ({error.errno})"
     else:
-        token = server.cookie.partition("=")[2].encode()
-        status = f"fixture marker {'present' if token in data else 'absent'} in {len(data)} bytes"
+        strict = server.cookie.partition("=")[2].encode() in data
+        lax = server.navigation_cookie.partition("=")[2].encode() in data
+        status = f"Strict={strict}, Lax={lax}, {len(data)} bytes"
     print(f"Cookie checkpoint {phase}: {status}", flush=True)
 
 
@@ -279,6 +280,7 @@ def seed_legacy_session(server, app, url, stores):
     # v0.2.5 can exit after acknowledging a write but before WebKit commits it.
     process = launch(server, app, url)
     state = "waiting for saved tab"
+    cookie_file = None
     try:
         deadline = time.monotonic() + 30
         while process.poll() is None and time.monotonic() < deadline:
@@ -287,26 +289,37 @@ def seed_legacy_session(server, app, url, stores):
             except (FileNotFoundError, SystemExit):
                 pass  # The original app saves its new tab asynchronously.
             else:
-                state = storage_checkpoint(stores / str(uuid.UUID(profile)), server.storage_token)
+                profile_directory = stores / str(uuid.UUID(profile))
+                cookie_file = profile_directory / "Cookies/Cookies.binarycookies"
+                state = storage_checkpoint(profile_directory, server.storage_token)
                 if "value matches" in state.split(", "):
                     print("Confirmed the source value in the v0.2.5 profile before quit.", flush=True)
                     return
             time.sleep(.05)
         raise SystemExit(f"v0.2.5 did not commit the acknowledged value: {state}")
     finally:
+        if cookie_file:
+            report_cookie_checkpoint(server, cookie_file, "before v0.2.5 quit")
         if process.poll() is None:
             quit_app(process)
+        if cookie_file:
+            report_cookie_checkpoint(server, cookie_file, "after v0.2.5 quit")
 
 
 def check_restored_session(server, installed, url, identity, profile_directory):
     before_launch = storage_checkpoint(profile_directory, server.storage_token)
+    cookie_file = profile_directory / "Cookies/Cookies.binarycookies"
+    report_cookie_checkpoint(server, cookie_file, "before restored launch")
     print("Before restored launch:", before_launch, flush=True)
     # No URL is passed. Only the restored tab can request the new challenge.
     try:
         quit_app(launch(server, installed))
     finally:
-        expected = server.last_edit or server.storage_token
-        print("After restore attempt:", storage_checkpoint(profile_directory, expected), flush=True)
+        report_cookie_checkpoint(server, cookie_file, "after restore attempt")
+        if server.last_edit:
+            print("Shutdown edit after restore attempt:", storage_checkpoint(profile_directory, server.last_edit), flush=True)
+        else:
+            print("Original draft after restore attempt:", storage_checkpoint(profile_directory, server.storage_token), flush=True)
     if "value matches" not in before_launch.split(", "):
         raise SystemExit(f"Expected draft was absent before the reader launched: {before_launch}")
     if saved_tab(url) != identity:
