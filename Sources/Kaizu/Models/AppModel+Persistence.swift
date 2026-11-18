@@ -52,8 +52,8 @@ extension AppModel {
         for record in session?.record.windows ?? [WindowRecord()] {
             addWindow(record)
         }
-        if session?.migrated == true {
-            scheduleSave()  // write the upgraded format right away
+        if session?.needsSave == true {
+            scheduleSave()
         }
         loadArchive()
         stores.forEach { $0.selectedTab?.activate() }

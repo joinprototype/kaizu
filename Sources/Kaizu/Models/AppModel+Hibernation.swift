@@ -1,3 +1,4 @@
+import BrowserCore
 import Foundation
 
 /// Keeps memory in check and tabs where you left them: background tabs idle
@@ -9,7 +10,7 @@ extension AppModel {
     private static let hibernationSweep: Duration = .seconds(5 * 60)
 
     private static var tabStatesDirectory: URL {
-        AppPaths.support.appending(path: "TabStates", directoryHint: .isDirectory)
+        SessionFiles(directory: AppPaths.support).tabStates
     }
 
     func startHibernating() {

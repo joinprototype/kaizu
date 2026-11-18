@@ -189,7 +189,7 @@ public struct FolderRecord: Codable, Equatable, Sendable {
     }
 }
 
-public struct TabRecord: Codable, Equatable, Sendable {
+public struct TabRecord: Codable, Hashable, Sendable {
     public var id: UUID
     public var title: String
     public var url: URL?
