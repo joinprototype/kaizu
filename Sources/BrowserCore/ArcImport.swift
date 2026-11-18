@@ -49,51 +49,7 @@ public struct ArcImport: Equatable, Sendable {
         _ sidebar: ArcSidebar, profiles: [ProfileRecord], spaces: [SpaceRecord],
         includesToday: Bool, hues: [Double], symbols: [String], now: Date = Date()
     ) {
-        // Two profiles can each have an "Inbox". Compare saved addresses only when the
-        // name is ambiguous, keeping sidebar order for otherwise indistinguishable matches.
-        func matchingSpace(for arc: ArcSidebar.Space, among candidates: [SpaceRecord]) -> SpaceRecord? {
-            let named = candidates.filter { $0.name.caseInsensitiveCompare(arc.name) == .orderedSame }
-            guard named.count > 1 else { return named.first }
-            let sourceTabs = Set((arc.pinned.tabs + arc.today).map(\.url))
-            let sourceFavorites = Set((sidebar.favorites[arc.profile] ?? []).map(\.url))
-            var best: SpaceRecord?
-            var bestScore = -1
-            for space in named {
-                let tabs = (space.pinned.tabs + space.today).compactMap { $0.pinnedURL ?? $0.url }
-                let favorites = profiles.first { $0.id == space.profileID }?.favorites ?? []
-                let score = sourceTabs.intersection(tabs).count
-                    + sourceFavorites.intersection(favorites.compactMap { $0.pinnedURL ?? $0.url }).count
-                if score > bestScore {
-                    best = space
-                    bestScore = score
-                }
-            }
-            return best
-        }
-
-        var kaizuProfile: [String: UUID] = [:]
-        // Match the default profile first, even if a custom Arc space appears
-        // first in the file. Custom profiles must never claim its destination.
-        let defaultSpaces = sidebar.spaces.filter { $0.profile == ArcSidebar.defaultProfile }
-        if !defaultSpaces.isEmpty {
-            let existing = defaultSpaces.lazy.compactMap { arc in
-                matchingSpace(for: arc, among: spaces)
-            }.first
-            kaizuProfile[ArcSidebar.defaultProfile] = (existing ?? spaces.first)?.profileID
-        }
-        var matches: [Int: SpaceRecord] = [:]
-        var taken: Set<UUID> = []
-        for (index, arc) in sidebar.spaces.enumerated() {
-            let eligible = spaces.filter { space in
-                guard !taken.contains(space.id) else { return false }
-                if let destination = kaizuProfile[arc.profile] { return destination == space.profileID }
-                return !kaizuProfile.values.contains(space.profileID)
-            }
-            guard let match = matchingSpace(for: arc, among: eligible) else { continue }
-            matches[index] = match
-            taken.insert(match.id)
-            kaizuProfile[arc.profile] = match.profileID
-        }
+        var (matches, kaizuProfile) = Self.matchDestinations(sidebar, profiles: profiles, spaces: spaces)
         if matches.isEmpty, spaces.count == 1, let only = spaces.first, only.pinned.isEmpty, only.today.isEmpty,
            let index = sidebar.spaces.firstIndex(where: { $0.profile == ArcSidebar.defaultProfile }) {
             let arc = sidebar.spaces[index]

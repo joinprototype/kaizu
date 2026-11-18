@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-The Arc import preview shows each destination’s profile and sidebar position so you can distinguish spaces with the same name before importing.
+The Arc import preview shows each destination’s profile and sidebar position so you can distinguish spaces with the same name before importing. When both profiles have identical pins in a space, re-import also checks the other space names in the same Arc profile.
 
 Pressing ⌘O in a little window moves the live page into its opening space, even after you switch windows. If that space was deleted, the page can move to another space in the same profile. Deleting the profile closes its little windows.
 
