@@ -1,0 +1,28 @@
+name: Test the updater Restart button
+on:
+  push:
+    branches: [qa/restart-button]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  restart:
+    runs-on: xcode-27
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          name: kaizu-runtime-check
+          run-id: 44354409924
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/package
+      - name: Click Restart and verify the signed replacement reopens the original login
+        env:
+          RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        run: |
+          ditto -x -k "$RUNNER_TEMP/package/Kaizu.zip" "$RUNNER_TEMP/restart"
+          swiftc .github/qa/restart/click.swift -o "$RUNNER_TEMP/click-restart"
+          python3 -u .github/qa/restart/check.py
