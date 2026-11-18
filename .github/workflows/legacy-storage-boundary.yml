@@ -16,7 +16,8 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           github-token: ${{ github.token }}
-          run-id: 44388451163
+          # master at 5907d6a, including session migration and the hardened package.
+          run-id: 44388753876
           name: kaizu-runtime-check
           path: ${{ runner.temp }}/candidate
       - name: Compare first reads with committed values in the original profile
