@@ -13,6 +13,9 @@ public struct SessionRecord: Codable, Equatable, Sendable {
     public var sidebarWidth: Double
     public var profiles: [ProfileRecord]
     public var spaces: [SpaceRecord]
+    /// Stored with the sidebar so moving a tab to or from the archive is atomic.
+    /// Older files omit this and keep their entries in archive.json instead.
+    public var archivedTabs: [ArchivedTabRecord]?
     /// Windows after the first, which the fields above and each space's
     /// `selectedTabID` describe. Optional so files from before multiple
     /// windows still decode without a migration, and older builds can read
@@ -41,7 +44,7 @@ public struct SessionRecord: Codable, Equatable, Sendable {
     }
 
     /// `windows` first one first; there's always at least one.
-    public init(windows: [WindowRecord], profiles: [ProfileRecord], spaces: [SpaceRecord]) {
+    public init(windows: [WindowRecord], profiles: [ProfileRecord], spaces: [SpaceRecord], archivedTabs: [ArchivedTabRecord]? = nil) {
         let first = windows[0]
         self.init(
             activeSpaceID: first.activeSpaceID,
@@ -56,6 +59,7 @@ public struct SessionRecord: Codable, Equatable, Sendable {
             extraWindows: windows.count > 1 ? Array(windows.dropFirst()) : nil,
             frame: first.frame
         )
+        self.archivedTabs = archivedTabs
     }
 
     /// Every window to reopen, first one first.

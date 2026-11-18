@@ -9,10 +9,6 @@ extension AppModel {
     static let hibernateAfter: TimeInterval = 30 * 60
     private static let hibernationSweep: Duration = .seconds(5 * 60)
 
-    private static var tabStatesDirectory: URL {
-        SessionFiles(directory: AppPaths.support).tabStates
-    }
-
     func startHibernating() {
         Task { [weak self] in
             while let self {
@@ -83,32 +79,11 @@ extension AppModel {
 
     // MARK: - Saved tab state
 
-    /// Writes every tab's back/forward state and forgets closed tabs'. The
-    /// periodic sweep writes off the main thread; quitting writes in place.
+    /// Capture WebKit state on the main actor, then hand the snapshot to the file writer.
     func saveTabStates(inBackground: Bool = false) {
-        let states = Set(spaces.flatMap(\.allTabs)).reduce(into: [String: Data]()) { states, tab in
-            states["\(tab.id).state"] = tab.currentState
+        let states = Set(spaces.flatMap(\.allTabs)).reduce(into: [UUID: Data]()) { states, tab in
+            states[tab.id] = tab.currentState
         }
-        let directory = Self.tabStatesDirectory
-        let write: @Sendable () -> Void = {
-            try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            for (name, state) in states {
-                try? state.write(to: directory.appending(path: name), options: .atomic)
-            }
-            // Forget closed and archived tabs.
-            let files = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
-            for file in files where states[file] == nil {
-                try? FileManager.default.removeItem(at: directory.appending(path: file))
-            }
-        }
-        if inBackground {
-            Task.detached(priority: .utility, operation: write)
-        } else {
-            write()
-        }
-    }
-
-    func savedTabState(for id: UUID) -> Data? {
-        try? Data(contentsOf: Self.tabStatesDirectory.appending(path: "\(id).state"))
+        tabStateFiles.save(states, inBackground: inBackground)
     }
 }

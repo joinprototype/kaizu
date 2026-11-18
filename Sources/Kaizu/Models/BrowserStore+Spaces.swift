@@ -224,7 +224,7 @@ extension BrowserStore {
         if deletingProfile {
             removeWebsiteData(of: space.profile)
         }
-        app.saveArchive()
+        app.save()
         scheduleSave()
     }
 

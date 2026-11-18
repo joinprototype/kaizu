@@ -10,6 +10,8 @@ Undoing an Arc import preserves tabs and folders you added afterward, including 
 
 **File → Import from Arc…** now accepts a saved sidebar JSON or the Markdown file from Arc’s Export Data command. Markdown links become pinned tabs inside the exported spaces and folders. The sidebar JSON also preserves profile groups, Favorites and Today tabs.
 
+Pasting an address such as `example.com?view=weekly` or `example.com#notes` now opens the page directly. The address bar also recognizes bracketed IPv6 addresses with ports.
+
 When a site requests the camera and microphone together, Kaizu asks only about devices that still need an answer. Declining the microphone preserves an existing camera permission.
 
 An extension that activates a background tab now selects it in that tab’s own window. The focused window keeps its current space and page. Switching spaces also tells extensions which tab became active.
@@ -19,6 +21,8 @@ Settings → Extensions now shows the errors WebKit reports for each installed e
 Arc imports preserve custom tab names and keep independent Arc profiles separate when existing Kaizu spaces share a profile.
 
 Kaizu can recover a damaged session from its last successfully opened copy and keeps the damaged file for inspection.
+
+Quitting now finishes earlier tab-history saves before writing the final Back and Forward history for open tabs.
 
 Choose **History → Recently Archived Tabs** to browse by day, search by page or space name, and restore a tab to its original space.
 
