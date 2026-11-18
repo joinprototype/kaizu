@@ -24,6 +24,13 @@ extension BrowserStore {
         for space in spaces {
             let items = (plan.pinned[space.id] ?? []).map { app.makeItem($0, profile: space.profile) }
             let today = (plan.today[space.id] ?? []).map { app.makeTab($0, profile: space.profile) }
+            if !plan.folderAdditions.isEmpty {
+                for folder in space.pinned.folders {
+                    if let children = plan.folderAdditions[folder.id] {
+                        folder.children += children.map { app.makeItem($0, profile: space.profile) }
+                    }
+                }
+            }
             space.pinned += items
             space.today += today
         }
