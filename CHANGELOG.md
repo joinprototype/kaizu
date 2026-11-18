@@ -16,6 +16,8 @@ Pasting an address such as `example.com?view=weekly` or `example.com#notes` now 
 
 Split with Recent Tab keeps a full four-pane layout on screen. From a standalone tab, it can start a new split with a previously used pane.
 
+Auto-archive keeps background tabs that are using the camera or microphone, including while capture is muted.
+
 When a site requests the camera and microphone together, Kaizu asks only about devices that still need an answer. Declining the microphone preserves an existing camera permission.
 
 An extension that activates a background tab now selects it in that tab’s own window. The focused window keeps its current space and page. Switching spaces also tells extensions which tab became active.
