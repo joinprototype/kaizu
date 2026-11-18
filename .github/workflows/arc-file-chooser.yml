@@ -1,0 +1,38 @@
+name: Arc export file chooser acceptance
+on:
+  push:
+    branches: [qa/arc-file-chooser]
+permissions:
+  contents: read
+jobs:
+  choose:
+    runs-on: xcode-27
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Import from a saved Arc Markdown export on a fresh Mac
+        env:
+          RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        run: |
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          make app > "$RUNNER_TEMP/build.log" 2>&1 || { tail -30 "$RUNNER_TEMP/build.log"; exit 1; }
+          fixture="$RUNNER_TEMP/Arc Data Export.md"
+          cp 'Tests/BrowserCoreTests/Fixtures/Arc Data Export.md' "$fixture"
+          checksum=$(shasum -a 256 "$fixture")
+          export KAIZU_DEBUG=arcimport KAIZU_ARC="$RUNNER_TEMP/missing-sidebar.json" KAIZU_SUPPORT="$RUNNER_TEMP/kaizu" KAIZU_SHOTS="$RUNNER_TEMP"
+          build/Kaizu.app/Contents/MacOS/Kaizu > "$RUNNER_TEMP/kaizu.log" 2>&1 &
+          sleep 3
+          swift .github/qa/arc-export/chooser.swift "$fixture"
+          osascript -e 'tell application id "com.joinprototype.kaizu" to quit'
+          test "$checksum" = "$(shasum -a 256 "$fixture")"
+          python3 - <<'PY'
+          from pathlib import Path
+          import json, os
+          record=json.loads((Path(os.environ["KAIZU_SUPPORT"])/"session.json").read_text())
+          spaces=[s for s in record["spaces"] if s["pinned"]]
+          assert {s["name"] for s in spaces} == {"Design","Personal"}
+          assert len({s["profileID"] for s in spaces}) == 2
+          print("Both spaces persisted with separate profiles and the source hash was preserved.")
+          PY
