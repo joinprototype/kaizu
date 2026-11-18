@@ -1,0 +1,40 @@
+name: Rule list file picker acceptance
+on:
+  push:
+    branches: [qa/rule-list-picker]
+permissions:
+  contents: read
+jobs:
+  choose:
+    runs-on: xcode-27
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Import through the macOS file picker
+        env:
+          RUNNER_ENVIRONMENT: ${{ runner.environment }}
+          KAIZU_SUPPORT: ${{ runner.temp }}/picker-profile
+          KAIZU_DEBUG: settings
+        run: |
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          make app CONFIG=debug > "$RUNNER_TEMP/build.log" 2>&1 || { tail -30 "$RUNNER_TEMP/build.log"; exit 1; }
+          printf '%s\n' '[{"trigger":{"url-filter":".*"},"action":{"type":"css-display-none","selector":"#picker-banner"}}]' > "$RUNNER_TEMP/Picker rules.json"
+          build/Kaizu.app/Contents/MacOS/Kaizu > "$RUNNER_TEMP/kaizu.log" 2>&1 &
+          pid=$!
+          trap 'kill "$pid" 2>/dev/null || true' EXIT
+          sleep 2
+          swift .github/qa/rule-list/chooser.swift "$RUNNER_TEMP/Picker rules.json"
+          python3 - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          picked = Path(os.environ["RUNNER_TEMP"]) / "Picker rules.json"
+          imported = Path(os.environ["KAIZU_SUPPORT"]) / "ImportedRules"
+          data = picked.read_bytes()
+          identifier = hashlib.sha256(data).hexdigest()
+          assert json.loads((imported / "lists.json").read_text()) == [
+              {"name": picked.name, "id": identifier, "enabled": True}]
+          assert (imported / (identifier + ".json")).read_bytes() == data
+          print("The enabled entry and the exact selected rule file were saved.")
+          PY
