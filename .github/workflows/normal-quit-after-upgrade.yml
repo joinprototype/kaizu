@@ -1,0 +1,56 @@
+name: Verify draft writes in the first session after a v0.2.5 upgrade
+on:
+  push:
+    branches: [qa/normal-quit-after-upgrade]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  compare:
+    runs-on: macos-15
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          github-token: ${{ github.token }}
+          run-id: 44381819920
+          name: quit-comparison
+          path: ${{ runner.temp }}/releases
+      - name: Compare the original shutdown with the corrected shutdown using the same release test
+        env:
+          RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        working-directory: ${{ runner.temp }}
+        run: |
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          curl --fail --location --retry 3 --output published.zip https://github.com/joinprototype/kaizu/releases/download/v0.2.5/Kaizu-0.2.5.zip
+          echo '709b3ecacfd26e73c7b8eb77d958e3ad57317833420b1f0d6d4698f5101ebc08  published.zip' | shasum -a 256 --check
+          session="$HOME/Library/Application Support/Kaizu"
+          test ! -e "$session"
+          for client in original candidate; do
+            ditto -x -k published.zip "$client/installed"
+            ditto -x -k "releases/$client.zip" "$client/new"
+            codesign --verify --deep --strict "$client/installed/Kaizu.app"
+            codesign --verify --deep --strict "$client/new/Kaizu.app"
+            result=0
+            python3 -u "$GITHUB_WORKSPACE/.github/scripts/check-release-launch.py" "$client/new/Kaizu.app" "$client/installed/Kaizu.app" > "$client.log" 2>&1 || result=$?
+            cat "$client.log"
+            grep -Fxq 'Confirmed the source value in the v0.2.5 profile before quit.' "$client.log"
+            grep -Fxq 'Restored the tab in its original space and profile with its login cookie and local storage.' "$client.log"
+            if [[ "$client" == original ]]; then
+              test "$result" != 0
+              grep -Eq 'restored launch: login cookie match, local storage (different|missing); next probe: login cookie match, local storage (different|missing)' "$client.log"
+            else
+              test "$result" = 0
+              grep -Fxq 'The candidate restored its final pagehide edit on the first read after an ordinary quit.' "$client.log"
+            fi
+            osascript -e 'if application id "com.joinprototype.kaizu" is running then tell application id "com.joinprototype.kaizu" to quit'
+            for attempt in {1..60}; do
+              if ! pgrep -x Kaizu >/dev/null; then break; fi
+              sleep .25
+            done
+            if pgrep -x Kaizu >/dev/null; then exit 1; fi
+            mv "$session" "$client/test-session"
+          done
