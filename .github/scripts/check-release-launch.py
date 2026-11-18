@@ -15,6 +15,9 @@ from pathlib import Path
 
 
 class Page(BaseHTTPRequestHandler):
+    # Safari can preconnect without sending a request. Return control to the page deadline.
+    timeout = 3
+
     def do_GET(self):
         server = self.server
         if self.path == "/start":
@@ -114,6 +117,7 @@ def launch(server, app, *urls):
     server.page_failure = None
     server.missing_probes = 0
     server.challenge = secrets.token_hex(12)
+    print("Waiting for the initial page" if urls else "Waiting for the restored page", flush=True)
     process = subprocess.Popen(["open", "-W", "-n", "-a", str(app), *urls])
     deadline = time.monotonic() + 90
     while not server.rendered:
@@ -194,6 +198,7 @@ def install_signed_update(server, app, url):
     subprocess.run(["codesign", "--force", "--sign", "-", str(app)], check=True)
     since = time.strftime("%Y-%m-%d %H:%M:%S")
     process = launch(server, app, url)
+    print("Initial login confirmed. Waiting for verified staging.", flush=True)
     staged = staged_release(process, since)
     info = bundle_info(staged)
     version, build = info["CFBundleShortVersionString"], info["CFBundleVersion"]
