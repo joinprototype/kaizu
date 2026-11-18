@@ -30,8 +30,9 @@ nc -z 127.0.0.1 3478
 fixture="$(dirname "$0")/check-release-launch.py"
 if python3 "$fixture" "$1" --media-call; then exit 0; fi
 
-# Compare software-capable VP8 on the same runner. The original failure still gates the package.
+# A control result helps diagnose a failure but cannot pass the release gate.
 osascript -e 'if application id "com.joinprototype.kaizu" is running then tell application id "com.joinprototype.kaizu" to quit'
-echo "Repeating with VP8 to isolate codec-dependent failures"
-KAIZU_TEST_VIDEO_CODEC=vp8 python3 "$fixture" "$1" --media-call
+echo "Comparing the same relayed call in a plain WebKit window"
+swiftc -parse-as-library "$(dirname "$0")/check-webkit-call.swift" -o "$scratch/webkit-control"
+python3 "$fixture" "$scratch/webkit-control" --webkit-control
 exit 1

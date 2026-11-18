@@ -88,10 +88,15 @@ class Page(BaseHTTPRequestHandler):
 
 
 def launch(server, app, *urls):
+    process = subprocess.Popen(["open", "-W", "-n", "-a", str(app), *urls])
+    wait_for_page(server, process, app)
+    return process
+
+
+def wait_for_page(server, process, app):
     server.rendered = False
     server.page_failure = None
     server.challenge = secrets.token_hex(12)
-    process = subprocess.Popen(["open", "-W", "-n", "-a", str(app), *urls])
     deadline = time.monotonic() + 90
     while not server.rendered:
         if process.poll() is not None:
@@ -101,7 +106,6 @@ def launch(server, app, *urls):
         if time.monotonic() >= deadline:
             raise SystemExit("Timed out waiting for Kaizu to render the page")
         server.handle_request()
-    return process
 
 
 def quit_app(process):
@@ -203,6 +207,7 @@ def main():
     mode.add_argument("--signed-update", action="store_true")
     mode.add_argument("--extension-windows", action="store_true")
     mode.add_argument("--media-call", action="store_true")
+    mode.add_argument("--webkit-control", action="store_true")
     args = parser.parse_args()
     candidate = args.candidate.resolve(strict=True)
     with HTTPServer(("127.0.0.1", 0), Page) as server:
@@ -211,6 +216,15 @@ def main():
         server.cookie = "kaizu_login=" + secrets.token_hex(16)
         server.storage_token = secrets.token_hex(16) if args.previous or args.signed_update else None
         url = f"http://127.0.0.1:{server.server_port}/start"
+        if args.webkit_control:
+            process = subprocess.Popen([candidate, f"http://127.0.0.1:{server.server_port}/media-call"])
+            try:
+                wait_for_page(server, process, candidate)
+                print("The plain WebKit control rendered video, decoded audio and echoed the message.")
+            finally:
+                process.terminate()
+                process.wait(timeout=10)
+            return
         if args.previous is None and not (args.signed_update or args.extension_windows or args.media_call):
             launch(server, candidate, url)
             print("Release app opened the external link and WebKit executed the page with cookies.")

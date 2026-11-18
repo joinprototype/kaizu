@@ -53,7 +53,7 @@ jobs:
       - name: Install the loopback TURN relay
         run: HOMEBREW_NO_AUTO_UPDATE=1 brew install coturn
       - name: Verify a relayed WebRTC call in the packaged release
-        timeout-minutes: 3
+        timeout-minutes: 5
         env:
           RUNNER_ENVIRONMENT: ${{ runner.environment }}
         run: |
