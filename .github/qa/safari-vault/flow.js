@@ -16,8 +16,17 @@ function setValue(el, value) {
     el.dispatchEvent(new Event('input', {bubbles:true}));
     el.dispatchEvent(new Event('blur', {bubbles:true}));
 }
-(await waitFor(() => button('Log in'), 'welcome')).click();
-(await waitFor(() => button('bitwarden.com'), 'region menu')).click();
+await waitFor(() => button('Log in'), 'welcome');
+let lastClick = 0;
+await waitFor(() => {
+    if (button('bitwarden.com')) return true;
+    if (Date.now() - lastClick > 1500) {
+        button('Log in')?.click();
+        lastClick = Date.now();
+    }
+    return false;
+}, 'region menu');
+button('bitwarden.com').click();
 (await waitFor(() => button('self-hosted'), 'self-hosted option')).click();
 const base = await waitFor(() => document.querySelector('#self_hosted_env_settings_form_input_base_url'), 'server URL');
 setValue(base, 'https://localhost:18765');

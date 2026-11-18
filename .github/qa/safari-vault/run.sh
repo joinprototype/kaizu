@@ -20,6 +20,12 @@ make app
 cp .github/qa/safari-vault/flow.js build/Kaizu.app/Contents/Resources/VaultQA.js
 codesign --force --sign - build/Kaizu.app
 export NSUnbufferedIO=YES KAIZU_DEBUG=safari-vault-acceptance KAIZU_SUPPORT="$root/kaizu" KAIZU_EXTENSION="$root/mounted/Bitwarden.app"
+# Only report the extension's requests after the fixture has finished seeding.
+vault_offset=$(wc -l < "$root/vault.log")
+summarize_vault() {
+    tail -n "+$((vault_offset + 1))" "$root/vault.log" | rg -o '(GET|POST) /(identity/(accounts/prelogin|connect/token)|api/(config|sync))|[0-9]{3} (OK|Bad Request|Unauthorized|Forbidden)' || true
+}
+trap summarize_vault EXIT
 python3 - <<'PY'
 import subprocess
 subprocess.run(["build/Kaizu.app/Contents/MacOS/Kaizu"],timeout=170,check=True)
