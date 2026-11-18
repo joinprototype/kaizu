@@ -218,6 +218,8 @@ public struct ArchivedTabRecord: Codable, Equatable, Sendable, Identifiable {
     public var tab: TabRecord
     public var spaceID: UUID
     public var archivedAt: Date
+    /// The snapshot becomes the reopened tab’s state file when the workspace commits.
+    public var navigationStateID: UUID?
 
     public var id: UUID { tab.id }
 

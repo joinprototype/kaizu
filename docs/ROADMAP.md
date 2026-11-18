@@ -35,7 +35,11 @@ The release checks verify that the new browser reads data committed by v0.2.5 in
 
 Kaizu’s advantages to demonstrate are built-in tracking protection, a local sidebar with no account requirement, and mixed row-and-column splits. Performance comparisons require the same pages, hardware and measurement procedure in both browsers. Sync, Boosts, Easels and an AI panel are outside this proposed 1.0 scope. Cross-device sync remains a significant gap for people who use Arc on multiple devices.
 
+At commit `6b699be`, after the fix for Quit from an AppKit action, the upgrade from v0.2.5 and the signed update each recovered the login, local storage and original workspace on macOS 15.8.2 and 27.0.1. On macOS 15 the signed-update test found no cookie file before quit, found both cookies on disk after quit, and received them after installing build 10. Both ordinary-quit checks restored the final draft edit on the first read. The earlier intermittent cookie loss is still unexplained. [Four upgrade results](https://github.com/joinprototype/kaizu/actions/runs/44415780819) · [Cookie investigation](https://github.com/joinprototype/kaizu/issues/57)
+
 ### Archive recovery
+
+In a local three-process WebKit rehearsal, a tab with three visited pages was auto-archived on the middle page. A fresh Kaizu model reopened it in its saved space from disk. A third process read the committed workspace before any quit-time history save, restored the middle page and navigated forward to the third. Archive navigation snapshots are limited to the newest 32 entries at up to 1 MiB each. Older archives remain searchable and reopen at their saved address.
 
 On macOS 27.0.1, an interrupted reopen used to remove a tab from the archive before saving it in its space. The workspace and archive now commit together. With two profiles containing the same URL, the command bar found the renamed tab by its custom title or space. After an abrupt exit it reopened in its original space with the custom title intact, and the other profile kept its archived copy. A separate interrupted auto-archive sweep preserved the stale tab in the archive and excluded a private-window tab. The session reader from v0.2.5 decoded the saved workspace and separate archive. After that reader rewrote the session in its older format, the development build restored it again.
 

@@ -84,6 +84,6 @@ extension AppModel {
         let states = Set(spaces.flatMap(\.allTabs)).reduce(into: [UUID: Data]()) { states, tab in
             states[tab.id] = tab.currentState
         }
-        tabStateFiles.save(states, inBackground: inBackground)
+        tabStateFiles.save(states, retaining: Set(archive.compactMap(\.navigationStateID)), inBackground: inBackground)
     }
 }

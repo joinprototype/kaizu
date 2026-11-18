@@ -259,8 +259,8 @@ extension BrowserStore {
         }
     }
 
-    func reopen(_ record: TabRecord, in space: Space, navigationState: Data? = nil) {
-        let tab = BrowserTab(reopening: record, profile: space.profile, app: app, navigationState: navigationState)
+    func reopen(_ record: TabRecord, in space: Space, id: UUID = UUID(), navigationState: Data? = nil) {
+        let tab = BrowserTab(reopening: record, id: id, profile: space.profile, app: app, navigationState: navigationState)
         insertToday(tab, in: space)
     }
 

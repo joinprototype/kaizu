@@ -82,8 +82,8 @@ final class BrowserTab: NSObject, Identifiable {
         favicon = url?.host().flatMap { FaviconStore.shared.cachedImage(for: $0) }
     }
 
-    convenience init(reopening record: TabRecord, profile: Profile, app: AppModel?, navigationState: Data?) {
-        self.init(profile: profile, app: app, url: record.url, title: record.title)
+    convenience init(reopening record: TabRecord, id: UUID = UUID(), profile: Profile, app: AppModel?, navigationState: Data?) {
+        self.init(id: id, profile: profile, app: app, url: record.url, title: record.title)
         customTitle = record.customTitle
         savedState = navigationState
     }
