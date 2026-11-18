@@ -5,6 +5,10 @@ on:
     branches: [develop, master]
   push:
     branches: [develop, master]
+    paths-ignore:
+      - 'docs/**/*.md'
+      - 'README.md'
+      - 'CHANGELOG.md'
 
 permissions:
   contents: read
@@ -35,12 +39,22 @@ jobs:
           KAIZU_DEBUG: bookmark-import-undo
           KAIZU_SUPPORT: ${{ runner.temp }}/bookmark-undo-profile
         run: build/Kaizu.app/Contents/MacOS/Kaizu
-      - name: Build release app
-        run: make app CONFIG=release
-      - name: Verify app bundle
-        run: codesign --verify --strict build/Kaizu.app
-      - name: Package the verified app for launch testing
-        run: ditto -c -k --keepParent build/Kaizu.app "$RUNNER_TEMP/Kaizu.zip"
+      - name: Package the release and verify its update with a disposable key
+        run: |
+          export KAIZU_UPDATE_KEY="$RUNNER_TEMP/test-update.key"
+          public_key=$(swift scripts/update-sign.swift new "$KAIZU_UPDATE_KEY")
+          version=$(plutil -extract CFBundleShortVersionString raw Resources/Info.plist)
+          scripts/release.sh "$version"
+          swiftc Sources/BrowserCore/SelfUpdate.swift .github/scripts/check-release-package.swift -o "$RUNNER_TEMP/check-package"
+          "$RUNNER_TEMP/check-package" site/version.json "$public_key" "$RUNNER_TEMP/package-check"
+          app="$RUNNER_TEMP/package-check/unpacked/Kaizu.app"
+          codesign -dvv "$app" 2>&1 | grep -q 'flags=[^ ]*runtime'
+          cp "site/updates/Kaizu-$version.zip" "$RUNNER_TEMP/Kaizu.zip"
+      - name: Exercise WebRTC in the packaged release on the build Mac
+        timeout-minutes: 3
+        env:
+          RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        run: python3 .github/scripts/check-release-launch.py "$RUNNER_TEMP/package-check/unpacked/Kaizu.app" --media-call
       - uses: actions/upload-artifact@v7
         with:
           name: kaizu-runtime-check

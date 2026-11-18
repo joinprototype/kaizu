@@ -141,7 +141,8 @@ def install_signed_update(server, app, url):
     # URL and embedded verification key are from the candidate release binary.
     subprocess.run(["plutil", "-replace", "CFBundleVersion", "-string", "0", str(app / "Contents/Info.plist")],
                    check=True)
-    subprocess.run(["codesign", "--force", "--sign", "-", str(app)], check=True)
+    subprocess.run(["codesign", "--force", "--sign", "-", "--preserve-metadata=flags,runtime,entitlements",
+                    str(app)], check=True)
     process = launch(server, app, url)
     staged = staged_release(process)
     info = bundle_info(staged)

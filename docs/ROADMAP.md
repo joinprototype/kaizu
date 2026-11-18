@@ -369,7 +369,8 @@ modes, Quick Keys, inline action parameters.)
 
 ## Phase 6: Ship it
 
-- [ ] Apple Developer Program; Developer ID signing; hardened runtime; notarization (macOS won't show a site's notifications before this) **M**
+- [x] Hardened Runtime on release builds, with camera, audio input and location entitlements for existing site permissions. CI packages the DMG and stages the update ZIP with the browser’s verifier and a disposable key.
+- [ ] Run the [Developer ID packaging workflow](../README.md#release) with Prototype’s certificate and notary credentials. Verify the downloaded DMG on a clean Mac, run an update from v0.2.5 and test a native notification banner. Apple enrollment or certificate issuance is pending. **M**
 - [ ] Request the browser passkey entitlement (Google passkey sign-in) **S** + Apple review time
 - [x] Auto-updates (own signed updater, no Sparkle), DMG **M**
 - [x] Logs, crash reports (MetricKit + macOS .ips, kept locally), Help → Report a Bug (Mail draft with a zip) **S**

@@ -7,6 +7,11 @@ APP := build/$(APP_NAME).app
 SDK := $(shell xcrun --sdk macosx --show-sdk-path)
 SWIFT_FLAGS := -Xswiftc -Xclang-linker -Xswiftc -isysroot -Xswiftc -Xclang-linker -Xswiftc "$(SDK)"
 
+# Exercise the distribution runtime during release builds on CI as well.
+ifeq ($(CONFIG),release)
+SIGN_FLAGS := --options runtime --entitlements Resources/Kaizu.entitlements
+endif
+
 .PHONY: build app run icon clean
 
 build:
@@ -22,7 +27,7 @@ app: build
 	cp Resources/Filters/*.txt $(APP)/Contents/Resources/Filters/
 	cp Resources/Scripts/*.js Resources/Scripts/*.txt $(APP)/Contents/Resources/Scripts/
 	cp Resources/Fonts/* $(APP)/Contents/Resources/Fonts/
-	codesign --force --sign - $(APP)
+	codesign --force $(SIGN_FLAGS) --sign - $(APP)
 
 run: app
 	open $(APP)
