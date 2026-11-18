@@ -59,7 +59,7 @@ class Page(BaseHTTPRequestHandler):
                     }}
                 """
             save_on_exit = ""
-            if server.issue_cookie and getattr(server, "last_edit", None):
+            if getattr(server, "last_edit", None):
                 save_on_exit = f"addEventListener('pagehide', () => localStorage.setItem('upgrade-test', {json.dumps(server.last_edit)}), {{once:true}});"
             blocker_probe = ""
             if server.check_first_page_blocking:
@@ -273,6 +273,44 @@ def storage_checkpoint(profile_directory, marker):
     return ", ".join(results) if results else "no local storage database found"
 
 
+def seed_legacy_session(server, app, url, stores):
+    # v0.2.5 can exit after acknowledging a write but before WebKit commits it.
+    process = launch(server, app, url)
+    state = "waiting for saved tab"
+    try:
+        deadline = time.monotonic() + 30
+        while process.poll() is None and time.monotonic() < deadline:
+            try:
+                profile, _, _ = saved_tab(url)
+            except (FileNotFoundError, SystemExit):
+                pass  # The original app saves its new tab asynchronously.
+            else:
+                state = storage_checkpoint(stores / str(uuid.UUID(profile)), server.storage_token)
+                if "value matches" in state.split(", "):
+                    print("Confirmed the source value in the v0.2.5 profile before quit.", flush=True)
+                    return
+            time.sleep(.05)
+        raise SystemExit(f"v0.2.5 did not commit the acknowledged value: {state}")
+    finally:
+        if process.poll() is None:
+            quit_app(process)
+
+
+def check_restored_session(server, installed, url, identity, profile_directory):
+    before_launch = storage_checkpoint(profile_directory, server.storage_token)
+    print("Before restored launch:", before_launch, flush=True)
+    # No URL is passed. Only the restored tab can request the new challenge.
+    try:
+        quit_app(launch(server, installed))
+    finally:
+        expected = server.last_edit or server.storage_token
+        print("After restore attempt:", storage_checkpoint(profile_directory, expected), flush=True)
+    if "value matches" not in before_launch.split(", "):
+        raise SystemExit(f"Expected draft was absent before the reader launched: {before_launch}")
+    if saved_tab(url) != identity:
+        raise SystemExit("The profile, space or tab identity changed across the restart")
+
+
 def install_signed_update(server, app, url):
     # Only this disposable bundle advertises build zero. The updater, feed
     # URL and embedded verification key are from the candidate release binary.
@@ -386,30 +424,31 @@ def main():
             quit_app(launch(server, candidate, f"http://127.0.0.1:{server.server_port}/extension-test/first"))
             print("The extension activated a background tab in its owning window and preserved the other selection.")
             return
+        stores = Path.home() / "Library/WebKit/com.joinprototype.kaizu/WebsiteDataStore"
         if args.signed_update:
             install_signed_update(server, candidate, url)
             # Only the outgoing page can have saved this edit while quitting.
             server.storage_token = server.last_edit
+            server.last_edit = None
             installed = candidate
         else:
             installed = args.previous.resolve(strict=True)
-            quit_app(launch(server, installed, url))
+            seed_legacy_session(server, installed, url, stores)
             installed.rename(installed.with_name("Retired.app"))
             candidate.rename(installed)
+            # The candidate must both restore the old value and save a distinct edit on its own quit.
+            server.last_edit = secrets.token_hex(16)
 
         before = saved_tab(url)
-        stores = Path.home() / "Library/WebKit/com.joinprototype.kaizu/WebsiteDataStore"
         profile_directory = stores / str(uuid.UUID(before[0]))
-        print("Before restored launch:", storage_checkpoint(profile_directory, server.storage_token), flush=True)
         server.issue_cookie = False
-        # No URL is passed. Only the restored tab can request the new challenge.
-        try:
-            quit_app(launch(server, installed))
-        finally:
-            print("After restore attempt:", storage_checkpoint(profile_directory, server.storage_token), flush=True)
-        if saved_tab(url) != before:
-            raise SystemExit("The profile, space or tab identity changed across the upgrade")
+        check_restored_session(server, installed, url, before, profile_directory)
         print("Restored the tab in its original space and profile with its login cookie and local storage.")
+        if args.previous:
+            server.storage_token = server.last_edit
+            server.last_edit = None
+            check_restored_session(server, installed, url, before, profile_directory)
+            print("The candidate restored its final pagehide edit on the first read after an ordinary quit.")
 
 
 if __name__ == "__main__":
