@@ -18,8 +18,14 @@ def run(*args, stdin):
     subprocess.run(args, input=stdin, stdout=subprocess.DEVNULL, text=True, check=True, timeout=40)
 run(cli, 'db-create', '-p', database, stdin=f'{vault_key}\n{vault_key}\n')
 run(cli, 'add', '-u', user, '-p', database, title, stdin=f'{vault_key}\n{password}\n')
+# Confirm the generated key and entry independently before testing the GUI.
+listing = subprocess.run([cli, 'ls', database], input=vault_key+'\n', capture_output=True,
+                         text=True, check=True, timeout=20)
+if title not in listing.stdout.splitlines():
+    raise SystemExit('The synthetic entry was absent from the unlocked CLI database')
+print('The CLI unlocked the generated vault and found its test entry.', flush=True)
 config = root/'autotype.ini'
-config.write_text('[General]\nGlobalAutoTypeKey=75\nGlobalAutoTypeModifiers=167772160\n[GUI]\nCheckForUpdates=false\n')
+config.write_text('[General]\nUpdateCheckMessageShown=true\nGlobalAutoTypeKey=75\nGlobalAutoTypeModifiers=167772160\n[GUI]\nCheckForUpdates=false\n')
 ready, received = threading.Event(), threading.Event()
 fields = [False, False]
 class Page(BaseHTTPRequestHandler):

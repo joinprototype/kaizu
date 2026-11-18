@@ -43,6 +43,11 @@ if command == "trigger" {
     let entryVisible = labels.contains(title.lowercased())
     print("Vendor windows:", windowTitles, "fixture entry visible:", entryVisible, "front app:", front)
     if command == "vault" {
+        if !entryVisible {
+            let prompts = ["check for updates", "incorrect credentials", "invalid credentials",
+                           "allow access", "unlock database", "quick unlock", "keychain", "screen recording"]
+            print("Recognized setup or unlock labels:", prompts.filter { labels.contains($0) })
+        }
         exit(entryVisible ? 0 : 6)
     }
     if labels.contains("permission required") || labels.contains("screen recording") || labels.contains("accessibility permission") {
