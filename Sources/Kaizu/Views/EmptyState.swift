@@ -35,9 +35,7 @@ struct EmptyState: View {
                 .foregroundStyle(.secondary)
                 if isFresh {
                     HStack {
-                        if FileManager.default.fileExists(atPath: ArcSidebar.fileURL.path) {
-                            Button("Import from Arc…") { UtilityWindows.showArcImport(app: store.app) }
-                        }
+                        Button("Import from Arc…") { UtilityWindows.showArcImport(app: store.app) }
                         Button("Import History and Bookmarks…") { UtilityWindows.showBrowsingDataImport(app: store.app) }
                     }
                 }

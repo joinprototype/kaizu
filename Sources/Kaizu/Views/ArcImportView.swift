@@ -1,10 +1,20 @@
+import AppKit
 import BrowserCore
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// File → Import from Arc…: shows what would come across, then brings it in.
 struct ArcImportView: View {
     @Environment(BrowserStore.self) private var store
-    let source: URL
+    @State private var source: URL
+    @State private var readID = UUID()
+
+    init(source: URL) {
+        _source = State(initialValue: source)
+    }
+
+    private var isMarkdown: Bool { source.pathExtension.lowercased() == "md" }
+
     @State private var sidebar: ArcSidebar?
     @State private var problem: String?
     @State private var includesToday = true
@@ -14,18 +24,21 @@ struct ArcImportView: View {
             if let sidebar {
                 preview(of: sidebar)
             } else if let problem {
-                Text(problem)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(32)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                VStack(spacing: 12) {
+                    Text(problem)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                    Button("Choose File…", action: chooseFile)
+                }
+                .padding(32)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .frame(width: 460, height: 420)
-        .task { await load() }
+        .task(id: readID) { await load() }
     }
 
     private func preview(of sidebar: ArcSidebar) -> some View {
@@ -34,6 +47,7 @@ struct ArcImportView: View {
         return VStack(spacing: 0) {
             Form {
                 Section {
+                    LabeledContent("File", value: source.lastPathComponent)
                     ForEach(Array(plan.summary.enumerated()), id: \.offset) { _, space in
                         LabeledContent(space.name, value: detail(of: space))
                     }
@@ -41,18 +55,27 @@ struct ArcImportView: View {
                         LabeledContent("Favorites", value: "\(plan.tabCount - inSpaces)")
                     }
                 } footer: {
-                    FooterText("Logins and extensions stay in Arc; history comes with File → Import Browsing Data…. Kaizu only reads Arc's sidebar and doesn't change it.")
-                }
-                Section {
-                    Toggle("Bring Today's tabs too", isOn: $includesToday)
-                } footer: {
-                    if sidebar.skipped > 0 {
-                        FooterText("\(sidebar.skipped.counted("item")) Kaizu can't open, like Easels and Notes, will stay behind.")
+                    if isMarkdown {
+                        FooterText("Each space gets a separate profile. Links become pinned tabs under their exported headings. Choose StorableSidebar.json to bring the original profile groups, Favorites and Today tabs.")
+                    } else {
+                        FooterText("To bring history, use File → Import Browsing Data…. Logins and extensions stay in Arc.")
                     }
+                }
+                if !isMarkdown {
+                    Section {
+                        Toggle("Bring Today's tabs too", isOn: $includesToday)
+                    } footer: {
+                        if sidebar.skipped > 0 {
+                            FooterText("\(sidebar.skipped.counted("item")) Kaizu can't open, like Easels and Notes, will stay behind.")
+                        }
+                    }
+                } else if sidebar.skipped > 0 {
+                    FooterText("Skipped \(sidebar.skipped.counted("link")) with an unsupported address.")
                 }
             }
             .formStyle(.grouped)
             HStack {
+                Button("Choose File…", action: chooseFile)
                 Spacer()
                 Button("Cancel") { UtilityWindows.closeArcImport() }
                     .keyboardShortcut(.cancelAction)
@@ -76,17 +99,29 @@ struct ArcImportView: View {
         ].compactMap(\.self).joined(separator: ", ")
     }
 
+    private func chooseFile() {
+        let panel = NSOpenPanel()
+        panel.message = "Choose Arc Data Export.md or a saved StorableSidebar.json."
+        panel.allowedContentTypes = [.json, UTType(filenameExtension: "md") ?? .plainText]
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        sidebar = nil
+        problem = nil
+        source = url
+        readID = UUID()
+    }
+
     private func load() async {
         let source = source
         let result = await Task.detached { Result { try ArcSidebar.load(from: source) } }.value
+        guard !Task.isCancelled else { return }
         switch result {
         case .success(let loaded):
             sidebar = loaded
         case .failure(ArcSidebarError.unreadable):
             Log.session.error("Couldn't make sense of Arc's sidebar file")
-            problem = "Kaizu couldn't read Arc's sidebar. Tell us with Help, then Report a Bug."
+            problem = "Choose Arc Data Export.md or StorableSidebar.json to preview its spaces and tabs."
         case .failure:
-            problem = "Arc's sidebar isn't on this Mac. Open Kaizu on the Mac where you use Arc to import it."
+            problem = "Choose a saved sidebar or the Markdown file from Arc → Settings → Advanced → Export Data."
         }
     }
 }
