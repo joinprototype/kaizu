@@ -11,6 +11,8 @@ final class Profile: Identifiable {
     /// Private windows: in-memory website data, no history, nothing saved.
     let isPrivate: Bool
 
+    var privateID: UUID? { isPrivate ? id : nil }
+
     /// Website data lives under the profile's id, so it must never change.
     @ObservationIgnored private(set) var didOpenWebsiteData = false
     @ObservationIgnored private(set) lazy var dataStore: WKWebsiteDataStore = {

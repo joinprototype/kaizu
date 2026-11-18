@@ -83,6 +83,8 @@ A separate macOS 15 upgrade restored the login cookie, but the page could not re
 
 On macOS 27.0.1, a fresh Kaizu profile fetched and executed a script matching a bundled EasyList rule when the previous three-second startup wait expired. With the navigation fix and an empty rule cache, the first page executed the control script and the local server received no request for the matching script. With blocking disabled in a separate fresh profile, both scripts reached the server and ran. Opening an external link on this Mac took 6.83 seconds with an empty rule cache and 0.57 seconds after relaunch. Both pages ran the control script and kept the matching request off the network. This check covers Kaizu’s built-in blocker. Extension filtering has its own startup behavior.
 
+The development build also keeps per-site blocker changes inside their private window. On macOS 27.0.1, a rendered page in a regular window lost its protection when a second window privately paused the parent domain. With the fix, only that private window showed the fixture’s ad. A separate private window and the regular window kept hiding it. Resuming a subdomain privately also preserved a saved regular pause, and a fresh private window inherited the regular setting after the original one closed.
+
 ### Cookie consent on live sites
 
 On macOS 27.0.1, fresh profiles with content blocking and automatic rejection turned off showed a banner on both sites below. Both providers initially reported that the visitor had made no choice. With Kaizu's default settings, both recorded a response. After quitting and reopening the browser with both protections off, each site still reported the same decision without showing its banner again.
