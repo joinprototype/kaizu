@@ -58,12 +58,16 @@ class Page(BaseHTTPRequestHandler):
                         headers['X-Kaizu-Storage'] = 'unavailable';
                     }}
                 """
+            save_on_exit = ""
+            if server.issue_cookie and getattr(server, "last_edit", None):
+                save_on_exit = f"addEventListener('pagehide', () => localStorage.setItem('upgrade-test', {json.dumps(server.last_edit)}), {{once:true}});"
             blocker_probe = ""
             if server.check_first_page_blocking:
                 blocker_probe = '<script src="/ads/cbr.js"></script><script src="/launch-control.js"></script>'
             self.wfile.write(f"""<!doctype html><title>Kaizu launch test</title><link rel="icon" href="data:,">
                 <body><h1>Ready</h1>{blocker_probe}<script>
                 if ({json.dumps(server.check_first_page_blocking)} && !window.launchControl) throw Error("Control script did not run");
+                {save_on_exit}
                 async function checkLogin() {{
                     for (const delay of [0, 1000, 4000, 10000]) {{
                         if (delay) await new Promise(resolve => setTimeout(resolve, delay));
@@ -323,6 +327,7 @@ def main():
         # The same-site request from the loaded page must carry both.
         server.navigation_cookie = "kaizu_navigation=" + secrets.token_hex(16) if server.storage_token else None
         url = f"http://127.0.0.1:{server.server_port}/start"
+        server.last_edit = secrets.token_hex(16) if args.signed_update else None
         server.check_first_page_blocking = not (args.previous or args.signed_update or args.extension_windows or args.media_call)
         if server.check_first_page_blocking:
             launch(server, candidate, url)
@@ -343,6 +348,9 @@ def main():
             return
         if args.signed_update:
             install_signed_update(server, candidate, url)
+            # Only the outgoing document's pagehide handler can write this second value.
+            server.storage_token = server.last_edit
+            print("Checking the last edit made while quitting for the signed update.", flush=True)
             installed = candidate
         else:
             installed = args.previous.resolve(strict=True)

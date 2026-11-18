@@ -1,0 +1,64 @@
+name: Check the packaged draft fix across upgrades
+on:
+  push:
+    branches: [qa/quit-draft-signed-upgrade]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  upgrade:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, xcode-27]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 12
+    steps:
+      - name: Require a disposable hosted account
+        env:
+          COMPUTE: ${{ runner.environment }}
+        run: |
+          test "$COMPUTE" = github-hosted
+          echo "RUNNER_ENVIRONMENT=$COMPUTE" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          github-token: ${{ github.token }}
+          run-id: 44381819920
+          name: quit-comparison
+          path: ${{ runner.temp }}/packages
+      - name: Validate the release bundles
+        id: bundles
+        working-directory: ${{ runner.temp }}
+        run: |
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          sw_vers
+          ditto -x -k packages/candidate.zip candidate
+          codesign --verify --deep --strict candidate/Kaizu.app
+          curl --fail --location --retry 3 --output previous.zip https://github.com/joinprototype/kaizu/releases/download/v0.2.5/Kaizu-0.2.5.zip
+          echo '709b3ecacfd26e73c7b8eb77d958e3ad57317833420b1f0d6d4698f5101ebc08  previous.zip' | shasum -a 256 --check
+          ditto -x -k previous.zip installed
+          codesign --verify --deep --strict installed/Kaizu.app
+      - name: Restore the released app's tab, login and local storage in the candidate
+        working-directory: ${{ runner.temp }}
+        run: python3 "$GITHUB_WORKSPACE/.github/scripts/check-release-launch.py" candidate/Kaizu.app installed/Kaizu.app
+      - name: Preserve the edit made while quitting to install the signed update
+        if: ${{ !cancelled() && steps.bundles.outcome == 'success' }}
+        working-directory: ${{ runner.temp }}
+        run: |
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          # Use a fresh session and profile for this independent check on the same runner.
+          if pgrep -x Kaizu >/dev/null; then
+            osascript -e 'tell application id "com.joinprototype.kaizu" to quit'
+            for attempt in {1..30}; do
+              if ! pgrep -x Kaizu >/dev/null; then break; fi
+              sleep 1
+            done
+            if pgrep -x Kaizu >/dev/null; then exit 1; fi
+          fi
+          previous_session="$HOME/Library/Application Support/Kaizu"
+          if [ -d "$previous_session" ]; then mv "$previous_session" "$RUNNER_TEMP/migration-session"; fi
+          ditto -x -k packages/candidate.zip updater
+          python3 "$GITHUB_WORKSPACE/.github/scripts/check-release-launch.py" updater/Kaizu.app --signed-update
