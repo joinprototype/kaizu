@@ -11,10 +11,7 @@ struct ArchiveView: View {
     var body: some View {
         let names = Dictionary(uniqueKeysWithValues: store.spaces.map { ($0.id, $0.name) })
         let text = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        let entries = store.archive.filter { entry in
-            text.isEmpty || [entry.tab.customTitle, entry.tab.title, entry.tab.url?.absoluteString, names[entry.spaceID]]
-                .compactMap { $0 }.contains { $0.localizedCaseInsensitiveContains(text) }
-        }
+        let entries = store.matchingArchivedTabs(text)
         let days = Dictionary(grouping: entries) { Calendar.current.startOfDay(for: $0.archivedAt) }
         let selected = entries.first { $0.id == selection }
 

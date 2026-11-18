@@ -31,6 +31,10 @@ The first release should carry an Arc user from importing a sidebar through a we
 
 Kaizu’s advantages to demonstrate are built-in tracking protection, a local sidebar with no account requirement, and mixed row-and-column splits. Performance comparisons require the same pages, hardware and measurement procedure in both browsers. Sync, Boosts, Easels and an AI panel are outside this proposed 1.0 scope. Cross-device sync remains a significant gap for people who use Arc on multiple devices.
 
+### Archive recovery
+
+On macOS 27.0.1, an interrupted reopen used to remove a tab from the archive before saving it in its space. The workspace and archive now commit together. With two profiles containing the same URL, the command bar found the renamed tab by its custom title or space. After an abrupt exit it reopened in its original space with the custom title intact, and the other profile kept its archived copy. A separate interrupted auto-archive sweep preserved the stale tab in the archive and excluded a private-window tab. The session reader from v0.2.5 decoded the saved workspace and separate archive. After that reader rewrote the session in its older format, the development build restored it again.
+
 ### Migration checks
 
 Two publicly available Arc sidebar samples were imported into separate, empty Kaizu sessions. The [linkcache fixture](https://github.com/adlio/linkcache/blob/95d64d3739b3d9afd4b4e3be58f8cd42e33c6062/test_data/StorableSidebar.json) produced 9 tabs in 2 spaces on 1 profile. The [A New Arc Begins fixture](https://github.com/Zarrar09/A-New-Arc-Begins/blob/41f0df8520c4ff13b7f25d387a9046547b927f31/tests/fixtures/sampleStorableSidebar.json) produced 78 tabs in 4 spaces on 2 profiles. After a restart, importing each sidebar again added zero tabs and preserved the saved session. Undo in a fresh run returned each session to one empty space. The source files retained their original hashes.

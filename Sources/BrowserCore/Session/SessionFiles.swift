@@ -1,7 +1,7 @@
 import Foundation
 
 /// Opens a session before any browser services can schedule a save.
-public struct SessionFiles {
+public struct SessionFiles: Sendable {
     public struct Opened {
         public let record: SessionRecord
         public let migrated: Bool
@@ -42,6 +42,29 @@ public struct SessionFiles {
         }
         try saved.write(to: primary, options: .atomic)
         return opened
+    }
+
+    private var legacyArchive: URL { directory.appending(path: "archive.json") }
+
+    public func readLegacyArchive() throws -> [ArchivedTabRecord] {
+        guard let data = try readIfPresent(legacyArchive) else { return [] }
+        return try JSONCoding.decoder.decode([ArchivedTabRecord].self, from: data)
+    }
+
+    /// Keep older releases able to reopen these entries, without overwriting an unreadable original.
+    public func writeLegacyArchive(_ entries: [ArchivedTabRecord]) throws {
+        let encoded = try JSONCoding.encoder.encode(entries)
+        if let data = try readIfPresent(legacyArchive) {
+            guard data != encoded else { return }
+            do {
+                _ = try JSONCoding.decoder.decode([ArchivedTabRecord].self, from: data)
+            } catch is DecodingError {
+                try data.write(to: directory.appending(path: "archive.unreadable-\(UUID().uuidString).json"), options: .atomic)
+            }
+        } else if entries.isEmpty {
+            return
+        }
+        try encoded.write(to: legacyArchive, options: .atomic)
     }
 
     private func decode(_ data: Data, recovered: Bool) throws -> Opened {

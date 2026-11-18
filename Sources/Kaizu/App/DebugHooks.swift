@@ -1760,6 +1760,10 @@ enum DebugHooks {
                 FileHandle.standardError.write(Data("QA notify \(passed ? "ok" : "FAILED"): allowed tab woke at launch, another stayed asleep\n".utf8))
                 NSApp.terminate(nil)
             }
+        case "archive-sweep-interrupt":
+            interruptArchiveSweep(in: store)
+        case "archive-interrupt", "archive-restored":
+            checkArchiveRecovery(in: store, interrupt: ProcessInfo.processInfo.environment["KAIZU_DEBUG"] == "archive-interrupt")
         case "tabsearch":
             qaTabSearch(store)
         case "tabmoves":
