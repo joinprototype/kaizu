@@ -73,7 +73,7 @@ struct BrowsingDataImportView: View {
                         Button("Choose File…", action: chooseFile)
                     }
                 } footer: {
-                    FooterText("In Safari, choose File → Export Browsing Data to File…, then pick the .zip here. Only its history and bookmarks are read, never its passwords or cards.")
+                    FooterText("In Safari, choose File → Export Browsing Data to File… and select only Bookmarks and History. Choose the exported ZIP here.")
                 }
                 if let problem {
                     Section { Text(problem).foregroundStyle(.secondary) }
