@@ -95,10 +95,12 @@ extension BrowserTab: WKUIDelegate {
         type: WKMediaCaptureType,
         decisionHandler: @escaping @MainActor @Sendable (WKPermissionDecision) -> Void
     ) {
-        let devices = switch type {
-        case .camera: ["camera"]
-        case .microphone: ["microphone"]
-        default: ["camera", "microphone"]
+        let devices: [String]
+        switch type {
+        case .camera: devices = ["camera"]
+        case .microphone: devices = ["microphone"]
+        case .cameraAndMicrophone: devices = ["camera", "microphone"]
+        @unknown default: return decisionHandler(.prompt)
         }
         decidePermission(for: origin.host, devices: devices, decisionHandler: decisionHandler)
     }
@@ -123,14 +125,16 @@ extension BrowserTab: WKUIDelegate {
     ) {
         guard let settings = app?.settings else { return decisionHandler(.prompt) }
         let remembers = !profile.isPrivate
-        if remembers {
-            let remembered = devices.map { settings.sitePermissions[host]?[$0] }
-            if remembered.allSatisfy({ $0 == true }) { return decisionHandler(.grant) }
-            if remembered.contains(false) { return decisionHandler(.deny) }
+        let saved = remembers ? settings.sitePermissions[host] ?? [:] : [:]
+        let unanswered: [String]
+        switch SitePermissionDecision.resolve(devices, saved: saved) {
+        case .allow: return decisionHandler(.grant)
+        case .deny: return decisionHandler(.deny)
+        case .ask(let pending): unanswered = pending
         }
 
         let alert = NSAlert()
-        alert.messageText = "Allow “\(host)” to use your \(devices.joined(separator: " and "))?"
+        alert.messageText = "Allow “\(host)” to use your \(unanswered.joined(separator: " and "))?"
         alert.addButton(withTitle: "Allow")
         alert.addButton(withTitle: "Don’t Allow")
         if remembers {
@@ -141,11 +145,12 @@ extension BrowserTab: WKUIDelegate {
         present(alert) { response in
             let allowed = response == .alertFirstButtonReturn
             if remembers, response != .abort, alert.suppressionButton?.state == .on {
-                for device in devices {
+                for device in unanswered where settings.sitePermissions[host]?[device] == nil {
                     settings.setPermission(device, to: allowed, on: host)
                 }
             }
-            decisionHandler(allowed ? .grant : .deny)
+            let nowBlocked = remembers && devices.contains { settings.sitePermissions[host]?[$0] == false }
+            decisionHandler(allowed && !nowBlocked ? .grant : .deny)
         }
     }
 

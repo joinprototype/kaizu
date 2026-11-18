@@ -38,7 +38,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        scenario: [clean-launch, upgrade-from-0.2.5, signed-update, extension-windows]
+        scenario: [clean-launch, upgrade-from-0.2.5, signed-update, extension-windows, media-call]
     steps:
       - uses: actions/checkout@v7
         with:
@@ -66,6 +66,11 @@ jobs:
           ditto -x -k previous.zip installed
           codesign --verify --strict installed/Kaizu.app
           python3 "$GITHUB_WORKSPACE/.github/scripts/check-release-launch.py" launch/Kaizu.app installed/Kaizu.app
+      - name: Verify video and data transfer between WebRTC peers
+        if: matrix.scenario == 'media-call'
+        env:
+          RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        run: python3 .github/scripts/check-release-launch.py "$RUNNER_TEMP/launch/Kaizu.app" --media-call
       - name: Check extension tab selection across two windows
         if: matrix.scenario == 'extension-windows'
         env:

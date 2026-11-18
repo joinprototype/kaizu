@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+When a site requests the camera and microphone together, Kaizu asks only about devices that still need an answer. Declining the microphone preserves an existing camera permission.
+
 An extension that activates a background tab now selects it in that tab’s own window. The focused window keeps its current space and page. Switching spaces also tells extensions which tab became active.
 
 Settings → Extensions now shows the errors WebKit reports for each installed extension. Extension pages opened with this build keep their address and local storage across restarts. Reopen any extension settings tabs saved by an older build from the extension's toolbar menu.
