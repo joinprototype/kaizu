@@ -16,9 +16,12 @@
                 }
                 @MainActor func openPopup(_ tab: BrowserTab) async -> WKWebView? {
                     store.extensions.performAction(for: item, on: tab, anchor: CGRect(x: 40, y: 40, width: 20, height: 20))
-                    for _ in 0..<30 {
+                    for _ in 0..<70 {
                         if let view = store.extensions.action(for: item, on: tab)?.popupPopover?.contentViewController?.view,
-                           let web = webview(view) { return web }
+                           let web = webview(view), web.url?.scheme == "webkit-extension", !web.isLoading,
+                           (try? await web.evaluateJavaScript("document.readyState === 'complete' && !!document.body?.innerText.trim()")) as? Bool == true {
+                            return web
+                        }
                         try? await Task.sleep(for: .milliseconds(200))
                     }
                     return nil
@@ -42,7 +45,12 @@
                         document.querySelector('[name=password]')?.value === 'Kaizu-QA-Field-Only-42!'
                         """)
                     if check as? Bool == true { filled = true; break }
-                    if let failure { print("Bitwarden UI:", failure); break }
+                    if let failure {
+                        print("Bitwarden UI:", failure)
+                        let state = try? await popup.evaluateJavaScript("[document.title, document.body.innerText.slice(0,400)]")
+                        print("Popup after failure:", String(describing:state), item.context.errors.map(\.localizedDescription))
+                        break
+                    }
                     try? await Task.sleep(for: .milliseconds(500))
                 }
                 guard filled else { print("Matching login did not fill."); exit(5) }
