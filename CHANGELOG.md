@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+Clear Today keeps the remaining pinned panes on screen. Undo restores the earlier split when you’ve kept its layout. Older workspaces reopen with cleared panes removed from their saved splits.
+
 Undoing a browsing history import keeps visits you made afterward, including pages you cleared and revisited.
 
 In **File → Import Browsing Data…**, a Safari ZIP containing multiple history or bookmark files now lets you choose the files to import. The destination shows both the space and its profile, so you can bring Work and Personal across separately.

@@ -219,6 +219,7 @@ extension BrowserStore {
         let cleared = space.today
         guard !cleared.isEmpty else { return }
         let ids = Set(cleared.map(\.id))
+        let previousLayout = space.splitLayout
         for tab in cleared {
             closedTabs.remember(tab, in: space.id)
             extensions.didClose(tab)
@@ -226,6 +227,7 @@ extension BrowserStore {
         }
         withAnimation(Motion.snap, completionCriteria: .removed) {
             space.today = []
+            space.splitLayout = space.survivingSplit(previousLayout)
         } completion: {
             // After the rows have gone, so tearing pages down can't drop
             // frames; hibernating keeps their state in case of Undo.
@@ -233,8 +235,9 @@ extension BrowserStore {
                 tab.hibernate()
             }
         }
+        let remainingLayout = space.splitLayout
         for store in app.allStores where store.selectedTabIDs[space.id].map(ids.contains) == true {
-            store.setSelected(nil, in: space)
+            store.selectNeighbor(of: 0, in: space, previousSplit: previousLayout?.panes ?? [])
         }
         scheduleSave()
         showToast("Closed \(cleared.count.counted("tab"))", symbol: "xmark.circle") { [weak self] in
@@ -244,6 +247,9 @@ extension BrowserStore {
             let restoring = cleared.filter { stillClosed.contains($0.id) }
             withAnimation(Motion.pop) {
                 space.today = restoring + space.today
+                if remainingLayout != previousLayout, space.splitLayout == remainingLayout {
+                    space.splitLayout = space.survivingSplit(previousLayout)
+                }
             }
             restoring.forEach { extensions.didOpen($0) }
             closedTabs.removeAll { ids.contains($0.record.id) }

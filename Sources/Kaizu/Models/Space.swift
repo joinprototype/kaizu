@@ -69,6 +69,15 @@ final class Space: Identifiable {
         splitLayout?.keeping(Set(panes.map(\.id))) ?? .pane(panes[0].id)
     }
 
+    /// Keep the layout and divider positions of panes still reachable from this space.
+    func survivingSplit(_ layout: SplitNode?) -> SplitNode? {
+        guard let layout else { return nil }
+        let panes = layout.panes
+        let remaining = panes.filter { tab(id: $0) != nil }
+        guard remaining.count > 1 else { return nil }
+        return remaining.count == panes.count ? layout : layout.keeping(Set(remaining))
+    }
+
     /// A split of one is no split.
     func removeFromSplit(_ id: UUID) {
         splitLayout = splitLayout?.removing(id)

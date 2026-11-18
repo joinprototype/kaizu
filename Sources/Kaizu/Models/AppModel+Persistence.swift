@@ -101,7 +101,8 @@ extension AppModel {
             let space = Space(id: record.id, profile: profile, name: record.name, symbol: record.symbol, hue: record.hue)
             space.pinned = record.pinned.map { makeItem($0, profile: profile) }
             space.today = record.today.map { makeTab($0, profile: profile) }
-            space.splitLayout = SplitNode.restored(layout: record.splitLayout, panes: record.split ?? [], widths: record.splitWidths ?? [])
+            let layout = SplitNode.restored(layout: record.splitLayout, panes: record.split ?? [], widths: record.splitWidths ?? [])
+            space.splitLayout = space.survivingSplit(layout)
             space.appearance = record.appearance.flatMap(Space.Appearance.init) ?? .auto
             return space
         }

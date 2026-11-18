@@ -88,12 +88,39 @@ struct ArcSwitchingTests {
         store.importFromArc(extra)
         store.undoToast()
         #expect(work.pinned.map(\.record) == pins)
+        // Keep imported pages the later repeat-import check expects to find.
+        for tab in work.today { store.move(tab, to: .pinned(folder: nil, before: nil)) }
+        try clearTodayInSplit(store)
+        app.saveTabStates()
+        app.save()
+    }
+
+    private func clearTodayInSplit(_ store: BrowserStore) throws {
+        let work = store.activeSpace
         let left = store.openTab(URL(string: "about:blank#left"))
         let right = store.openTab(URL(string: "about:blank#right"), select: false)
         store.addToSplit(right)
+        store.move(left, to: .pinned(folder: nil, before: nil))
+        store.move(right, to: .pinned(folder: nil, before: nil))
+        let temporary = store.openTab(URL(string: "about:blank#temporary"), select: false)
+        store.addToSplit(temporary)
+        let originalLayout = work.splitLayout
+        try #require(store.selectedTab === temporary)
+        store.clearToday(in: work)
+        #expect(work.split == [left.id, right.id])
         #expect(store.shownTabs == [left, right])
-        app.saveTabStates()
-        app.save()
+        store.undoToast()
+        #expect(work.splitLayout == originalLayout && work.today.contains(temporary))
+        store.select(temporary)
+        store.clearToday(in: work)
+        store.closeSplit()
+        store.undoToast()
+        #expect(work.split.isEmpty && work.today.contains(temporary))
+        store.select(left)
+        store.addToSplit(right)
+        store.addToSplit(temporary)
+        store.clearToday(in: work)
+        #expect(work.record.split == [left.id, right.id])
     }
 
     private func checkRestoredWorkspace(_ sidebar: ArcSidebar, store: BrowserStore, hidden: BrowserStore, secret: BrowserTab) async throws {
