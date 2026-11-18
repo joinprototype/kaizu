@@ -1,0 +1,41 @@
+name: Compare returning-user login restoration
+on:
+  push:
+    branches: [qa/returning-user-login]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  compare:
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 6
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, xcode-27]
+        reader: [published, candidate]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          github-token: ${{ github.token }}
+          run-id: 44405191699
+          name: kaizu-runtime-check
+          path: ${{ runner.temp }}
+      - name: Restore an untouched login and a rotated cookie in the same profile
+        env:
+          READER: ${{ matrix.reader }}
+          RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        working-directory: ${{ runner.temp }}
+        run: |
+          sw_vers
+          curl --fail --location --retry 3 --output previous.zip https://github.com/joinprototype/kaizu/releases/download/v0.2.5/Kaizu-0.2.5.zip
+          echo '709b3ecacfd26e73c7b8eb77d958e3ad57317833420b1f0d6d4698f5101ebc08  previous.zip' | shasum -a 256 --check
+          ditto -x -k previous.zip installed
+          if [[ "$READER" == "published" ]]; then archive=previous.zip; else archive=Kaizu.zip; fi
+          ditto -x -k "$archive" reader
+          codesign --verify --strict installed/Kaizu.app
+          codesign --verify --strict reader/Kaizu.app
+          python3 -u "$GITHUB_WORKSPACE/.github/scripts/check-returning-login.py" installed/Kaizu.app reader/Kaizu.app
