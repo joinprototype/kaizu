@@ -73,12 +73,29 @@ class Page(BaseHTTPRequestHandler):
             self.send_response(204)
             self.end_headers()
             server.rendered = True
-        elif self.path == "/media-call":
+        elif self.path == "/media-call/video-source.js":
+            self.send_response(200)
+            self.send_header("Content-Type", "text/javascript")
+            self.end_headers()
+            self.wfile.write(Path(__file__).with_name("check-video-source.js").read_bytes())
+        elif self.path == "/media-call/ice":
+            config = {"iceServers": []}
+            password = os.environ.get("KAIZU_TEST_TURN_PASSWORD")
+            if password:
+                config = {"iceTransportPolicy": "relay", "iceServers": [{
+                    "urls": "turn:127.0.0.1:3478?transport=tcp", "username": "kaizu-test", "credential": password
+                }]}
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(json.dumps(config).encode())
+        elif self.path.partition("?")[0] == "/media-call":
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.end_headers()
             self.wfile.write(Path(__file__).with_name("check-media-call.html").read_bytes())
-        elif self.path.startswith(("/media-call/failure?", "/extension-test/failure?")):
+        elif self.path.startswith(("/media-call/failure?", "/media-call/canvas-stall?", "/extension-test/failure?")):
             server.page_failure = self.path
             self.send_response(204)
             self.end_headers()
@@ -93,20 +110,27 @@ class Page(BaseHTTPRequestHandler):
 
 
 def launch(server, app, *urls):
+    process = subprocess.Popen(["open", "-W", "-n", "-a", str(app), *urls])
+    wait_for_page(server, process, app)
+    return process
+
+
+def wait_for_page(server, process, app):
     server.rendered = False
     server.page_failure = None
     server.challenge = secrets.token_hex(12)
-    process = subprocess.Popen(["open", "-W", "-n", "-a", str(app), *urls])
     deadline = time.monotonic() + 90
     while not server.rendered:
         if process.poll() is not None:
             raise SystemExit(f"{app} exited before rendering the page")
         if server.page_failure:
+            if server.page_failure.startswith("/media-call/canvas-stall?"):
+                print(server.page_failure, flush=True)
+                raise SystemExit(75)  # The relay wrapper compares this result with plain WebKit.
             raise SystemExit(server.page_failure)
         if time.monotonic() >= deadline:
             raise SystemExit("Timed out waiting for Kaizu to render the page")
         server.handle_request()
-    return process
 
 
 def quit_app(process):
@@ -158,7 +182,8 @@ def install_signed_update(server, app, url):
     # URL and embedded verification key are from the candidate release binary.
     subprocess.run(["plutil", "-replace", "CFBundleVersion", "-string", "0", str(app / "Contents/Info.plist")],
                    check=True)
-    subprocess.run(["codesign", "--force", "--sign", "-", str(app)], check=True)
+    subprocess.run(["codesign", "--force", "--sign", "-", "--preserve-metadata=flags,runtime,entitlements",
+                    str(app)], check=True)
     process = launch(server, app, url)
     staged = staged_release(process)
     info = bundle_info(staged)
@@ -207,6 +232,7 @@ def main():
     mode.add_argument("--signed-update", action="store_true")
     mode.add_argument("--extension-windows", action="store_true")
     mode.add_argument("--media-call", action="store_true")
+    mode.add_argument("--webkit-control", action="store_true")
     args = parser.parse_args()
     candidate = args.candidate.resolve(strict=True)
     with HTTPServer(("127.0.0.1", 0), Page) as server:
@@ -216,7 +242,19 @@ def main():
         server.storage_token = secrets.token_hex(16) if args.previous or args.signed_update else None
         url = f"http://127.0.0.1:{server.server_port}/start"
         server.last_edit = secrets.token_hex(16) if args.signed_update else None
-        server.check_first_page_blocking = not (args.previous or args.signed_update or args.extension_windows or args.media_call)
+        server.check_first_page_blocking = not (args.previous or args.signed_update or args.extension_windows or args.media_call or args.webkit_control)
+        media_url = f"http://127.0.0.1:{server.server_port}/media-call"
+        if os.environ.get("KAIZU_TEST_VIDEO_SOURCE") == "frames":
+            media_url += "?source=frames"
+        if args.webkit_control:
+            process = subprocess.Popen([candidate, media_url])
+            try:
+                wait_for_page(server, process, candidate)
+                print("The plain WebKit control rendered video, decoded audio and echoed the message.")
+            finally:
+                process.terminate()
+                process.wait(timeout=10)
+            return
         if server.check_first_page_blocking:
             launch(server, candidate, url)
             print("On the first external page, WebKit blocked the matching script and ran the control script with cookies.")
@@ -228,7 +266,9 @@ def main():
         settings = json.dumps({"externalLinks": "currentSpace"}).encode().hex()
         subprocess.run(["defaults", "write", "com.joinprototype.kaizu", "settings", "-data", settings], check=True)
         if args.media_call:
-            quit_app(launch(server, candidate, f"http://127.0.0.1:{server.server_port}/media-call"))
+            if os.environ.get("KAIZU_TEST_VIDEO_CODEC") == "vp8":
+                media_url += ("&" if "?" in media_url else "?") + "codec=vp8"
+            quit_app(launch(server, candidate, media_url))
             print("The receiving WebRTC peer decoded non-silent audio, rendered video and echoed a data-channel message.")
             return
         if args.extension_windows:

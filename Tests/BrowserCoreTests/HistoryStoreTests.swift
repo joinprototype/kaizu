@@ -7,8 +7,14 @@ import Testing
     let work = UUID()
     let now = Date(timeIntervalSince1970: 1_790_000_000)
 
+    private let directory: TemporaryTestDirectory
+
+    init() throws {
+        directory = try TemporaryTestDirectory()
+    }
+
     private func makeStore() throws -> HistoryStore {
-        let file = FileManager.default.temporaryDirectory.appendingPathComponent("history-\(UUID()).sqlite")
+        let file = directory.url.appendingPathComponent("history-\(UUID()).sqlite")
         return try HistoryStore(fileURL: file)
     }
 

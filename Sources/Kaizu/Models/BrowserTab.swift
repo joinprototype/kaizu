@@ -493,12 +493,18 @@ final class BrowserTab: NSObject, Identifiable {
         activate()
     }
 
+    /// A muted capture session can resume. Reading this must not wake an unloaded tab.
+    var isCapturingMedia: Bool {
+        guard let _webView else { return false }
+        return _webView.cameraCaptureState != .none || _webView.microphoneCaptureState != .none
+    }
+
     /// Whether the page is playing sound or using the camera/microphone,
     /// so it must not be hibernated.
     var isBusy: Bool {
         get async {
             guard let _webView else { return false }
-            if _webView.cameraCaptureState != .none || _webView.microphoneCaptureState != .none { return true }
+            if isCapturingMedia { return true }
             return await isPlayingSound(in: _webView)
         }
     }

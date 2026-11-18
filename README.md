@@ -62,10 +62,14 @@ copy that can't touch your real browser at all, give its Info.plist another
 
 ## Release
 
+For a notarized Mac release, set `KAIZU_DEVELOPER_ID` to the **Developer ID Application** signing identity and `KAIZU_NOTARY_PROFILE` to a Keychain profile created with `xcrun notarytool store-credentials`. Set `version` to the release number.
+
 ```sh
-scripts/release.sh "$version"  # set version to the release number first
+scripts/release.sh --notarize "$version"
 cd site && npx wrangler deploy
 ```
+
+Before building, the script checks that the selected Ed25519 update signing key matches the public key trusted by Kaizu. It signs the app with Hardened Runtime, waits for Apple to accept it, and staples the ticket. It then signs the update ZIP and signs, notarizes, and staples the DMG. The browser’s updater verifies the finished ZIP before the script replaces the site files. Local packaging and CI use `scripts/release.sh "$version"` with an ad-hoc app signature. [Apple’s notarization workflow](https://developer.apple.com/documentation/security/customizing-the-notarization-workflow)
 
 Add a dated entry to [CHANGELOG.md](CHANGELOG.md) and commit the release metadata. After deploying the site, create a GitHub release tagged `v<version>` at that release commit. Attach the same DMG and update ZIP that went to the site and copy the changelog entry into the release notes.
 

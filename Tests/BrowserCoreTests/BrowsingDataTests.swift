@@ -7,8 +7,14 @@ import Testing
     private static let example = URL(string: "https://example.com/")!
     private static let docs = URL(string: "https://docs.example.com/guide")!
 
+    private let directory: TemporaryTestDirectory
+
+    init() throws {
+        directory = try TemporaryTestDirectory()
+    }
+
     private func folder() throws -> URL {
-        let url = FileManager.default.temporaryDirectory.appending(path: "browsing-data-\(UUID())", directoryHint: .isDirectory)
+        let url = directory.url.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
     }

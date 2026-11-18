@@ -23,12 +23,12 @@ extension AppModel {
         var archived: [ArchivedTabRecord] = []
         let notifying = notifyingTabs
         for space in spaces {
-            // Anything on screen, audible or notifying stays, however long it's been.
+            // Keep visible tabs and ongoing media or notification sessions.
             let selected = Set(stores.compactMap { $0.selectedTabIDs[space.id] })
             let stale = space.today.filter { tab in
                 !selected.contains(tab.id) && !space.split.contains(tab.id) && !tab.isPlayingMedia
                     && (tab.lastActiveAt ?? now) < cutoff
-                    && !notifying.contains(tab)
+                    && !tab.isCapturingMedia && !notifying.contains(tab)
             }
             guard !stale.isEmpty else { continue }
             archived += stale.map { ArchivedTabRecord(tab: $0.record, spaceID: space.id, archivedAt: now) }
