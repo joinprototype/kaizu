@@ -26,17 +26,22 @@ class Page(BaseHTTPRequestHandler):
             return
         profile, route = parts
         server = self.server
-        if route == "edit":
+        if route == "traverse":
+            server.traverse.wait(90)
+            body = ""
+        elif route == "edit":
             if not server.edit.wait(60):
                 self.send_error(504)
                 return
             body = ""
-        elif route in ("seeded", "edited", "match", "missing", "previous", "different", "back", "wrong-entry"):
+        elif route in ("seeded", "edited", "match", "missing", "previous", "different", "back", "wrong-entry", "storage-error"):
             with server.condition:
                 server.events.add((profile, route))
                 server.condition.notify_all()
             body = ""
         elif route in ("start", "draft"):
+            if server.reading:
+                print(f"Reader requested {profile}/{route}", flush=True)
             previous, updated, final = (json.dumps(v) for v in server.values[profile])
             if server.reading:
                 expected = final if profile == "B" else updated
@@ -44,11 +49,15 @@ class Page(BaseHTTPRequestHandler):
                     if (location.pathname.endsWith('/start')) {{
                         fetch('./back');
                     }} else {{
-                        const first = localStorage.getItem('draft');
+                        let first;
+                        try {{ first = localStorage.getItem('draft'); }}
+                        catch {{ await fetch('./storage-error'); return; }}
                         const result = first === {expected} ? 'match' : first === null ? 'missing' :
                             first === {previous} ? 'previous' : 'different';
                         addEventListener('popstate', () => fetch(location.pathname.endsWith('/start') ? './back' : './wrong-entry'));
-                        fetch('./' + result).then(() => history.back());
+                        await fetch('./' + result);
+                        await fetch('./traverse');
+                        history.back();
                     }}
                 """
             else:
@@ -127,6 +136,7 @@ def trial(app, number):
         server.values = {key: [secrets.token_hex(16) for _ in range(3)] for key in ids}
         server.condition = threading.Condition()
         server.edit = threading.Event()
+        server.traverse = threading.Event()
         server.events = set()
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
@@ -138,9 +148,10 @@ def trial(app, number):
                     try:
                         start = time.monotonic()
                         if reading:
-                            states = {"match", "missing", "previous", "different"}
+                            states = {"match", "missing", "previous", "different", "storage-error"}
                             wait_for(server, lambda: all(any((label, state) in server.events for state in states) for label in ids), proc)
                             outcomes = {label: next(s for s in states if (label,s) in server.events) for label in ids}
+                            server.traverse.set()
                             wait_for(server, lambda: all((label,"back") in server.events for label in ids), proc)
                         else:
                             wait_for(server, lambda: all((label,"seeded") in server.events for label in ids), proc)
@@ -155,20 +166,44 @@ def trial(app, number):
                         subprocess.run(["osascript","-e",f'tell application id "{bundle}" to quit'],check=True,timeout=20)
                         if proc.wait(timeout=15) != 0:
                             raise RuntimeError("Browser did not quit cleanly")
+                    except RuntimeError:
+                        if reading and proc.poll() is None:
+                            window_script = Path(__file__).with_name("window-report.swift")
+                            subprocess.run(["swift", str(window_script), str(proc.pid)], timeout=30, check=False)
+                            print("Navigation and renderer logs for this synthetic browser:", flush=True)
+                            subprocess.run(["/usr/bin/log", "show", "--last", "2m", "--style", "compact",
+                                            "--predicate", f'processIdentifier == {proc.pid} AND subsystem == "com.joinprototype.kaizu"'],
+                                           timeout=30, check=False)
+                        raise
                     finally:
                         if proc.poll() is None:
                             proc.terminate()
                             proc.wait(timeout=10)
                 if not reading:
                     record = json.loads((support / "session.json").read_text())
+                    first_space = record.get("activeSpaceID")
+                    second_windows = record.get("extraWindows") or []
+                    print(f"Saved window count after quit: {1 + len(second_windows)}", flush=True)
                     for label,(profile,space,tab) in ids.items():
                         saved = next(s for s in record["spaces"] if s["id"] == space and s["profileID"] == profile)
                         assert any(t["id"] == tab and t["url"] == f"{origin}/{label}/draft" for t in saved["today"]), saved
-                        assert (support / "TabStates" / (tab + ".state")).stat().st_size > 0
+                        state_bytes = (support / "TabStates" / (tab + ".state")).stat().st_size
+                        if first_space == space:
+                            shown = saved.get("selectedTabID") == tab
+                        else:
+                            shown = any(w.get("activeSpaceID") == space and
+                                        (space, tab) in zip(w["selectedTabIDs"][::2], w["selectedTabIDs"][1::2])
+                                        for w in second_windows)
+                        expected = server.values[label][2 if label == "B" else 1]
+                        persistent = stored(origin_store / profile.lower(), expected)
+                        print(f"After writer quit, {label}: selected in restored window={shown}, "
+                              f"history bytes={state_bytes}, latest draft row matches={persistent}", flush=True)
+                        assert shown and state_bytes > 0, f"Lost saved selection or history for {label}"
             print(f"Trial {number}: normal edit={outcomes['A']}, pagehide edit={outcomes['B']}, both tab histories restored",flush=True)
             return all(s == "match" for s in outcomes.values())
         finally:
             server.edit.set()
+            server.traverse.set()
             server.shutdown()
             thread.join()
 
@@ -176,6 +211,6 @@ def trial(app, number):
 if os.environ.get("GITHUB_ACTIONS") != "true" or os.environ.get("RUNNER_ENVIRONMENT") != "github-hosted":
     raise SystemExit("Run only on a fresh GitHub-hosted Mac.")
 app = Path(sys.argv[1]).resolve(strict=True)
-results = [trial(app, n) for n in range(1, 4)]
+results = [trial(app, n) for n in range(1, 7)]
 if not all(results):
-    raise SystemExit(f"{results.count(False)} of three paired-profile restores failed")
+    raise SystemExit(f"{results.count(False)} of six paired-profile restores failed")

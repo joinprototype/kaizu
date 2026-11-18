@@ -1,42 +1,13 @@
-name: Restore drafts and tab histories in packaged Kaizu
+name: Inspect multi-window draft restore on macOS 15
 on:
   push:
-    branches: [qa/packaged-quit-drafts]
+    branches: [qa/restore-window-observation]
 permissions:
   contents: read
+  actions: read
 jobs:
-  build:
-    runs-on: xcode-27
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-      - name: Package current and candidate quit handlers
-        run: |
-          git worktree add --detach "$RUNNER_TEMP/original" fa714b7ae6152304e11293c4990966d3303fef93
-          make -C "$RUNNER_TEMP/original" app CONFIG=release
-          make app CONFIG=release
-          mkdir -p "$RUNNER_TEMP/packages"
-          for variant in original candidate; do
-            app="build/Kaizu.app"
-            if [ "$variant" = original ]; then app="$RUNNER_TEMP/original/build/Kaizu.app"; fi
-            codesign --verify --deep --strict "$app"
-            ditto -c -k --keepParent "$app" "$RUNNER_TEMP/packages/$variant.zip"
-          done
-      - uses: actions/upload-artifact@v7
-        with:
-          name: quit-comparison
-          path: ${{ runner.temp }}/packages/*.zip
-          retention-days: 1
-  compare:
-    needs: build
-    strategy:
-      fail-fast: false
-      matrix:
-        variant: [original, candidate]
-        runner: [macos-15, xcode-27]
-    runs-on: ${{ matrix.runner }}
+  observe:
+    runs-on: macos-15
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v7
@@ -44,13 +15,14 @@ jobs:
           persist-credentials: false
       - uses: actions/download-artifact@v8
         with:
+          github-token: ${{ github.token }}
+          run-id: 44381819920
           name: quit-comparison
           path: ${{ runner.temp }}/packages
-      - name: Compare both profiles' first draft read and Back after Quit
+      - name: Check saved selection, database value, window state and first read
         env:
           RUNNER_ENVIRONMENT: ${{ runner.environment }}
-          VARIANT: ${{ matrix.variant }}
         run: |
-          ditto -x -k "$RUNNER_TEMP/packages/$VARIANT.zip" "$RUNNER_TEMP/install"
+          ditto -x -k "$RUNNER_TEMP/packages/candidate.zip" "$RUNNER_TEMP/install"
           codesign --verify --deep --strict "$RUNNER_TEMP/install/Kaizu.app"
           python3 -u .github/qa/quit-drafts/check.py "$RUNNER_TEMP/install/Kaizu.app"
