@@ -83,6 +83,7 @@ final class BrowserStore {
     /// The tab whose page is being captured (see BrowserStore+Capture).
     var capture: UUID?
     var tabSwitcher: TabSwitcherState?
+    var showingArchive = false
     var spaceDraft: SpaceDraft?
     /// Which way the last space switch went, so the sidebar slides the right way.
     var spaceSwitchForward = true

@@ -7,14 +7,18 @@ final class ActionMenuItem: NSMenuItem {
     /// For toggles: drives the checkmark each time the menu is shown.
     private let isOn: (@MainActor () -> Bool)?
 
+    private let available: @MainActor () -> Bool
+
     init(
         _ title: String,
         key: String = "",
         modifiers: NSEvent.ModifierFlags = .command,
         hidden: Bool = false,
         isOn: (@MainActor () -> Bool)? = nil,
+        available: @escaping @MainActor () -> Bool = { true },
         handler: @escaping @MainActor () -> Void
     ) {
+        self.available = available
         self.handler = handler
         self.isOn = isOn
         super.init(title: title, action: #selector(fire), keyEquivalent: key)
@@ -41,7 +45,7 @@ extension ActionMenuItem: NSMenuItemValidation {
         if let isOn {
             state = isOn() ? .on : .off
         }
-        return true
+        return available()
     }
 }
 
@@ -188,6 +192,12 @@ enum MainMenu {
         menu.addItem(ActionMenuItem("Forward", key: "]") { app.front.commandTab?.goForward() })
         menu.addItem(.separator())
         menu.addItem(ActionMenuItem("Show All History", key: "y") { UtilityWindows.showHistory(app: app) })
+        menu.addItem(ActionMenuItem("Recently Archived Tabs…", available: { !app.front.isPrivate }) {
+            let store = app.front
+            guard !store.isPrivate else { return }
+            store.window?.makeKeyAndOrderFront(nil)
+            store.showingArchive = true
+        })
         menu.addItem(ActionMenuItem("Clear History…") { app.front.clearHistory() })
         return menu
     }
