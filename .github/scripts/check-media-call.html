@@ -1,6 +1,7 @@
 <!doctype html>
 <meta charset="utf-8">
 <title>Kaizu WebRTC call check</title>
+<style>canvas, video { width: 160px; height: 90px; object-fit: contain; vertical-align: top; }</style>
 <canvas width="160" height="90"></canvas>
 <video autoplay muted playsinline></video>
 <script>
@@ -20,6 +21,10 @@ const config = await (await fetch("/media-call/ice")).json();
 const caller = new RTCPeerConnection(config);
 const receiver = new RTCPeerConnection(config);
 const canvas = document.querySelector("canvas");
+if (new URLSearchParams(location.search).get("size") === "640x480") {
+    canvas.width = 640;
+    canvas.height = 480;
+}
 const context = canvas.getContext("2d");
 const video = document.querySelector("video");
 const fromWorker = new URLSearchParams(location.search).get("source") === "frames";

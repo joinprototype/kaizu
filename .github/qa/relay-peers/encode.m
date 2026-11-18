@@ -23,20 +23,20 @@ static NSString *property(VTCompressionSessionRef session, CFStringRef key) {
     return [CFBridgingRelease(value) description];
 }
 
-static OSStatus sendFrame(VTCompressionSessionRef session, int index) {
+static OSStatus sendFrame(VTCompressionSessionRef session, int index, size_t width, size_t height) {
     CVPixelBufferRef buffer = NULL;
     NSDictionary *attributes = @{(__bridge id)kCVPixelBufferIOSurfacePropertiesKey: @{}};
-    OSStatus status = CVPixelBufferCreate(NULL, 160, 90, kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
+    OSStatus status = CVPixelBufferCreate(NULL, width, height, kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
                                          (__bridge CFDictionaryRef)attributes, &buffer);
     if (status) return status;
     status = CVPixelBufferLockBaseAddress(buffer, 0);
     if (!status) {
         const size_t yStride = CVPixelBufferGetBytesPerRowOfPlane(buffer, 0);
         const size_t uvStride = CVPixelBufferGetBytesPerRowOfPlane(buffer, 1);
-        memset(CVPixelBufferGetBaseAddressOfPlane(buffer, 0), index % 2 ? 81 : 41, yStride * 90);
+        memset(CVPixelBufferGetBaseAddressOfPlane(buffer, 0), index % 2 ? 81 : 41, yStride * height);
         uint8_t *chroma = CVPixelBufferGetBaseAddressOfPlane(buffer, 1);
-        for (size_t row = 0; row < 45; row++) {
-            for (size_t x = 0; x < 160; x += 2) {
+        for (size_t row = 0; row < height / 2; row++) {
+            for (size_t x = 0; x < width; x += 2) {
                 chroma[row * uvStride + x] = index % 2 ? 90 : 240;
                 chroma[row * uvStride + x + 1] = index % 2 ? 240 : 110;
             }
@@ -51,14 +51,22 @@ static OSStatus sendFrame(VTCompressionSessionRef session, int index) {
 
 int main(int argc, const char **argv) {
     @autoreleasepool {
-        if (argc != 2 || (strcmp(argv[1], "default") && strcmp(argv[1], "software"))) return 2;
-        NSDictionary *spec = !strcmp(argv[1], "software")
-            ? @{(__bridge id)kVTVideoEncoderSpecification_EnableHardwareAcceleratedVideoEncoder: @NO} : @{};
+        if (argc != 3) return 2;
+        NSString *size = [NSString stringWithUTF8String:argv[2]];
+        if (!([size isEqual:@"160x90"] || [size isEqual:@"640x480"])) return 2;
+        int width = [size isEqual:@"160x90"] ? 160 : 640;
+        int height = [size isEqual:@"160x90"] ? 90 : 480;
+        NSDictionary *spec = @{};
+        if (!strcmp(argv[1], "low-latency")) {
+            spec = @{(__bridge id)kVTVideoEncoderSpecification_EnableLowLatencyRateControl: @YES};
+        } else if (strcmp(argv[1], "default")) {
+            return 2;
+        }
         VTCompressionSessionRef session = NULL;
-        OSStatus status = VTCompressionSessionCreate(NULL, 160, 90, kCMVideoCodecType_H264,
+        OSStatus status = VTCompressionSessionCreate(NULL, width, height, kCMVideoCodecType_H264,
             (__bridge CFDictionaryRef)spec, NULL, NULL, encoded, NULL, &session);
         if (status) {
-            printf("VideoToolbox mode=%s create=%d\n", argv[1], (int)status);
+            printf("VideoToolbox mode=%s size=%s create=%d\n", argv[1], argv[2], (int)status);
             return 1;
         }
         NSDictionary *properties = @{
@@ -75,7 +83,7 @@ int main(int argc, const char **argv) {
         int submitted = 0;
         OSStatus firstError = 0;
         for (int i = 0; i < 15; i++) {
-            OSStatus result = sendFrame(session, i);
+            OSStatus result = sendFrame(session, i, width, height);
             if (result && !firstError) firstError = result;
             if (!result) submitted++;
             usleep(100000);
@@ -83,9 +91,9 @@ int main(int argc, const char **argv) {
         OSStatus flush = VTCompressionSessionCompleteFrames(session, kCMTimeInvalid);
         VTCompressionSessionInvalidate(session);
         CFRelease(session);
-        printf("VideoToolbox mode=%s encoder=%s hardware=%s settings=%d prepare=%d submitted=%d "
+        printf("VideoToolbox mode=%s size=%s encoder=%s hardware=%s settings=%d prepare=%d submitted=%d "
                "firstError=%d flush=%d callbacks=%d callbackError=%d dropped=%d frames=%d bytes=%lu\n",
-               argv[1], identifier.UTF8String, hardware.UTF8String, (int)settings, (int)prepare, submitted,
+               argv[1], argv[2], identifier.UTF8String, hardware.UTF8String, (int)settings, (int)prepare, submitted,
                (int)firstError, (int)flush, atomic_load(&callbacks), atomic_load(&callbackError),
                atomic_load(&dropped), atomic_load(&frames), atomic_load(&bytes));
         return settings || prepare || firstError || flush || atomic_load(&callbackError) || !atomic_load(&frames);

@@ -89,12 +89,12 @@ class PeerPage(BaseHTTPRequestHandler):
         pass
 
 
-def native_probes(label, modes):
+def native_probes(label, modes, resolution):
     results = []
     for mode in modes:
         print(f"Testing native encoder {label}, mode={mode}", flush=True)
         try:
-            process = subprocess.run([os.environ["KAIZU_ENCODER_PROBE"], mode], timeout=15)
+            process = subprocess.run([os.environ["KAIZU_ENCODER_PROBE"], mode, resolution], timeout=15)
             results.append(process.returncode == 0)
         except subprocess.TimeoutExpired:
             print(f"Native encoder {mode} timed out", flush=True)
@@ -102,7 +102,7 @@ def native_probes(label, modes):
     return all(results)
 
 
-def trial(app, webkit, clients, number, timing):
+def trial(app, webkit, clients, number, resolution):
     with ThreadingHTTPServer(("127.0.0.1", 0), PeerPage) as server:
         server.changed = threading.Condition()
         server.messages, server.candidates, server.results = {}, {}, {}
@@ -112,14 +112,14 @@ def trial(app, webkit, clients, number, timing):
         thread.start()
         processes = []
         try:
-            print(f"Starting trial {number} {clients} source={timing}", flush=True)
+            print(f"Starting trial {number} {clients} resolution={resolution}", flush=True)
             for side, client in zip("AB", clients):
                 if side == "B":
                     with server.changed:
                         if not server.changed.wait_for(lambda: "A" in server.loaded, 45):
                             raise RuntimeError("The first browser did not load the page")
                     time.sleep(15)
-                url = f"http://127.0.0.1:{server.server_port}/media-call?side={side}&source=frames&timing={timing}"
+                url = f"http://127.0.0.1:{server.server_port}/media-call?side={side}&source=frames&timing=paired&size={resolution}"
                 cmd = ["open","-W","-n","-a",app,url] if client == "kaizu" else [webkit,url]
                 processes.append((client, subprocess.Popen(cmd)))
             with server.changed:
@@ -130,7 +130,7 @@ def trial(app, webkit, clients, number, timing):
             for side, client in zip("AB", clients):
                 print(f"Trial {number} {side}={client}: {json.dumps(server.results.get(side))}", flush=True)
             native_ok = native_probes(f"after call {number}, both browsers still open",
-                                      ("default", "software") if number % 2 else ("software", "default"))
+                                      ("default", "low-latency") if number % 2 else ("low-latency", "default"), resolution)
             return native_ok and len(server.results) == 2 and all(
                 r["result"] == "pass" and r["sender"]["relay"] and r["receiver"]["relay"]
                 for r in server.results.values()
@@ -158,11 +158,11 @@ if __name__ == "__main__":
     if support.exists(): raise SystemExit("Expected a fresh hosted account")
     settings = json.dumps({"externalLinks":"currentSpace"}).encode().hex()
     subprocess.run(["defaults","write","com.joinprototype.kaizu","settings","-data",settings],check=True)
-    cases = [("webkit", "webkit"), ("webkit", "kaizu"), ("webkit", "kaizu"), ("webkit", "webkit")]
-    baseline = native_probes("before opening browsers", ("default", "software"))
+    sizes = ["160x90", "640x480", "640x480", "160x90"]
     outcomes = []
-    for number, clients in enumerate(cases, 1):
-        outcomes.append(trial(*sys.argv[1:3], clients, number, "paired"))
+    for size in ("160x90", "640x480"):
+        outcomes.append(native_probes("before opening browsers", ("default", "low-latency"), size))
+    for number, size in enumerate(sizes, 1):
+        outcomes.append(trial(*sys.argv[1:3], ("webkit", "kaizu"), number, size))
         if support.exists(): support.rename(Path(os.environ["RUNNER_TEMP"]) / f"peer-session-{number}")
-    if not baseline or not all(outcomes):
-        raise SystemExit(f"Native baseline passed={baseline}; {outcomes.count(False)} of {len(cases)} trials failed")
+    if not all(outcomes): raise SystemExit("One or more native probes or paired calls failed")
