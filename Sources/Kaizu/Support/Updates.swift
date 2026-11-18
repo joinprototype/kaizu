@@ -14,8 +14,7 @@ enum Updates {
     private static let log = Logger(subsystem: "com.joinprototype.kaizu", category: "updates")
     private static var announced: Int?
     /// The update checked and waiting to go in on quit.
-    private static var staged: StagedUpdate?
-    private static var preparing: (build: Int, task: Task<StagedUpdate, Error>)?
+    private static let preparation = UpdatePreparation()
     private static var relaunchAfterQuit = false
 
     private static var currentBuild: Int {
@@ -47,7 +46,7 @@ enum Updates {
         Task {
             try? await Task.sleep(for: firstCheck)
             while !Task.isCancelled {
-                if let release = try? await latest(), release.build > currentBuild, staged?.build != release.build {
+                if let release = try? await latest(), release.build > (preparation.staged?.build ?? currentBuild) {
                     await offer(release, app: app)
                 }
                 try? await Task.sleep(for: between)
@@ -58,7 +57,7 @@ enum Updates {
     private static func offer(_ release: UpdateRelease, app: AppModel) async {
         do {
             let ready = try await prepare(release)
-            guard announced != ready.build else { return }
+            guard ready.build == preparation.staged?.build, announced != ready.build else { return }
             announced = ready.build
             app.front.showToast(
                 "Kaizu \(ready.version) is ready",
@@ -87,8 +86,14 @@ enum Updates {
 
     /// Downloads, verifies and stages a release once, however many callers ask.
     private static func prepare(_ release: UpdateRelease) async throws -> StagedUpdate {
-        if let staged, staged.build == release.build { return staged }
-        if let preparing, preparing.build == release.build { return try await preparing.task.value }
+        let ready = try await preparation.prepare(build: release.build) {
+            try await stage(release)
+        }.value
+        log.notice("Update \(ready.build) staged")
+        return ready
+    }
+
+    private static func stage(_ release: UpdateRelease) async throws -> StagedUpdate {
         guard UpdatePlace.canReplace(app: Bundle.main.bundleURL) else { throw UpdateFailure.cannotReplaceApp }
         guard let archive = release.archive, let signature = release.signature,
               archive.scheme == "https" || feedOverride != nil,
@@ -98,15 +103,9 @@ enum Updates {
         let folder = stagingRoot.appending(path: String(release.build), directoryHint: .isDirectory)
         let stage = UpdateStage(folder: folder, bundleID: bundleID, publicKey: ReleaseUpdateKey.base64)
         let build = release.build
-        let task = Task.detached(priority: .utility) {
+        return try await Task.detached(priority: .utility) {
             try await download(archive, into: folder, then: stage, build: build, signature: signature)
-        }
-        preparing = (build, task)
-        defer { preparing = nil }
-        let ready = try await task.value
-        staged = ready
-        log.notice("Update \(ready.build) staged")
-        return ready
+        }.value
     }
 
     private nonisolated static func download(
@@ -134,7 +133,7 @@ enum Updates {
 
     /// The last thing Kaizu does: leaves the swap running behind it.
     static func installIfReady() {
-        guard let staged else { return }
+        guard let staged = preparation.staged else { return }
         do {
             try UpdateSwap.launch(pid: getpid(), app: Bundle.main.bundleURL, staged: staged.app, relaunch: relaunchAfterQuit)
             log.notice("Installing update \(staged.build) on quit")
@@ -155,7 +154,7 @@ enum Updates {
                     alert.runModal()
                     return
                 }
-                if staged?.build != release.build {
+                if release.build > (preparation.staged?.build ?? currentBuild) {
                     app.front.showToast("Downloading Kaizu \(release.version)…", symbol: "arrow.down.circle")
                 }
                 await answer(release, app: app)
