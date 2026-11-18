@@ -37,12 +37,25 @@ class Page(BaseHTTPRequestHandler):
                         headers['X-Kaizu-Storage'] = 'unavailable';
                     }}
                 """
+            blocker_probe = ""
+            if server.check_first_page_blocking:
+                blocker_probe = '<script src="/ads/cbr.js"></script><script src="/launch-control.js"></script>'
             self.wfile.write(f"""<!doctype html><title>Kaizu launch test</title><link rel="icon" href="data:,">
-                <body><h1>Ready</h1><script>
+                <body><h1>Ready</h1>{blocker_probe}<script>
                 const headers = {{}};
                 {storage_check}
+                if ({json.dumps(server.check_first_page_blocking)} && !window.launchControl) throw Error("Control script did not run");
                 if (document.querySelector('h1').textContent === 'Ready') fetch('/{server.challenge}', {{headers}});
                 </script></body>""".encode())
+        elif self.path == "/ads/cbr.js":
+            # This script path matches a bundled EasyList rule.
+            server.page_failure = "The first page reached a blocked script before the rule lists were installed"
+            self.send_error(403)
+        elif self.path == "/launch-control.js":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/javascript")
+            self.end_headers()
+            self.wfile.write(b"window.launchControl = true;")
         elif self.path == "/" + server.challenge:
             cookie_matches = server.cookie in self.headers.get("Cookie", "").split("; ")
             storage = self.headers.get("X-Kaizu-Storage", "unreported")
@@ -198,9 +211,10 @@ def main():
         server.cookie = "kaizu_login=" + secrets.token_hex(16)
         server.storage_token = secrets.token_hex(16) if args.previous or args.signed_update else None
         url = f"http://127.0.0.1:{server.server_port}/start"
-        if args.previous is None and not (args.signed_update or args.extension_windows or args.media_call):
+        server.check_first_page_blocking = not (args.previous or args.signed_update or args.extension_windows or args.media_call)
+        if server.check_first_page_blocking:
             launch(server, candidate, url)
-            print("Release app opened the external link and WebKit executed the page with cookies.")
+            print("On the first external page, WebKit blocked the matching script and ran the control script with cookies.")
             return
 
         if os.environ.get("RUNNER_ENVIRONMENT") != "github-hosted":

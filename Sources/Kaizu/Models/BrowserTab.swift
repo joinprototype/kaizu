@@ -168,22 +168,11 @@ final class BrowserTab: NSObject, Identifiable {
         _webView = webView
 
         if !isPopupPage {
-            let state = savedState
-            savedState = nil
-            // Hold the first load until content blocking is in place, unless
-            // something else has navigated the tab in the meantime.
-            let start: @MainActor () -> Void = { [weak webView, url] in
-                guard let webView, webView.url == nil, !webView.isLoading else { return }
-                if let state {
-                    webView.interactionState = state
-                } else if let url {
-                    webView.load(URLRequest(url: url))
-                }
-            }
-            if let blocker = app?.contentBlocker {
-                blocker.whenReady(start)
-            } else {
-                start()
+            if let state = savedState {
+                savedState = nil
+                webView.interactionState = state
+            } else if let url {
+                webView.load(URLRequest(url: url))
             }
         }
         return webView
@@ -676,9 +665,6 @@ extension BrowserTab: WKNavigationDelegate {
                 webView.load(URLRequest(url: cleaned))
                 return
             }
-            if let contentController {
-                app?.contentBlocker.prepare(contentController, for: target)
-            }
         }
 
         // ⌘-click / middle-click opens in a background tab.
@@ -689,6 +675,13 @@ extension BrowserTab: WKNavigationDelegate {
             return decisionHandler(.cancel)
         }
 
+        if navigationAction.targetFrame?.isMainFrame == true, let contentController, let blocker = app?.contentBlocker {
+            blocker.whenReady(for: target) {
+                blocker.prepare(contentController, for: target)
+                decisionHandler(.allow)
+            }
+            return
+        }
         decisionHandler(.allow)
     }
 

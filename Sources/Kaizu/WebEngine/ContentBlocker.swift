@@ -26,8 +26,6 @@ final class ContentBlocker {
     /// Compiled separately: WebKit caps a list at 150k rules, and an
     /// `ignore-previous-rules` exception only affects its own list.
     static let listNames = ["easylist", "easyprivacy", "cookies", "kaizu"]
-    /// How long a tab's first load waits for blocking before going ahead without it.
-    static let readyTimeout: Duration = .seconds(3)
     private static let enabledKey = "contentBlockingEnabled"
     private static let cookieRejectionKey = "cookiePopupRejectionEnabled"
     private static let pausedSitesKey = "blockingPausedSites"
@@ -45,12 +43,10 @@ final class ContentBlocker {
     @ObservationIgnored private let controllers = NSHashTable<WKUserContentController>.weakObjects()
     @ObservationIgnored private var installed: [ObjectIdentifier: Setup] = [:]
     @ObservationIgnored private var currentSite: [ObjectIdentifier: String] = [:]
-    @ObservationIgnored private var readyHandlers: [@MainActor () -> Void] = []
+    @ObservationIgnored private var waitingNavigations: [(url: URL, proceed: @MainActor () -> Void)] = []
     /// Scripts every page gets whatever the blocking settings; reinstalls
     /// (which clear a controller's scripts) put them back.
     @ObservationIgnored var standardScripts: [WKUserScript] = []
-    /// Set once the ready timeout passes: later tabs stop waiting too.
-    @ObservationIgnored private var hasTimedOut = false
     @ObservationIgnored private let log = Logger(subsystem: Log.subsystem, category: "ContentBlocker")
 
     init() {
@@ -70,11 +66,6 @@ final class ContentBlocker {
                 try? await Task.sleep(for: FilterListUpdater.checkEvery)
             }
         }
-        Task { [weak self] in
-            try? await Task.sleep(for: Self.readyTimeout)
-            self?.hasTimedOut = true
-            self?.runReadyHandlers()
-        }
     }
 
     /// Fetches newer lists if they're due. Open pages keep the rules they
@@ -85,14 +76,18 @@ final class ContentBlocker {
         }
     }
 
-    /// Runs `handler` once blocking is in place (or the timeout passes), so
-    /// a tab's first load isn't unprotected.
-    func whenReady(_ handler: @escaping @MainActor () -> Void) {
-        if state == .ready || hasTimedOut || !isEnabled {
-            handler()
+    /// Hold network navigation while WebKit prepares the bundled rules on first launch.
+    /// Local pages and sites the user has exempted can open immediately.
+    func whenReady(for url: URL, proceed: @escaping @MainActor () -> Void) {
+        if needsRules(for: url) {
+            waitingNavigations.append((url, proceed))
         } else {
-            readyHandlers.append(handler)
+            proceed()
         }
+    }
+
+    private func needsRules(for url: URL) -> Bool {
+        state != .ready && isEnabled && (url.scheme == "https" || url.scheme == "http") && !isPaused(on: url)
     }
 
     // MARK: - Settings
@@ -212,6 +207,7 @@ final class ContentBlocker {
         installed = installed.filter { liveKeys.contains($0.key) }
         currentSite = currentSite.filter { liveKeys.contains($0.key) }
         live.forEach(install(on:))
+        resumeReadyNavigations()
     }
 
     // MARK: - Compilation
@@ -219,7 +215,7 @@ final class ContentBlocker {
     private func loadLists() async {
         guard let store = WKContentRuleListStore.default() else {
             state = .ready
-            return runReadyHandlers()
+            return resumeReadyNavigations()
         }
         let available = Set(await store.availableIdentifiers() ?? [])
         // Lists that were retired or renamed would stay compiled forever.
@@ -236,7 +232,6 @@ final class ContentBlocker {
         listGeneration += 1
         state = .ready
         installEverywhere()
-        runReadyHandlers()
     }
 
     private func ruleList(named name: String, store: WKContentRuleListStore, available: Set<String>) async -> WKContentRuleList? {
@@ -280,10 +275,12 @@ final class ContentBlocker {
         return await fallingBack()
     }
 
-    private func runReadyHandlers() {
-        let handlers = readyHandlers
-        readyHandlers = []
-        handlers.forEach { $0() }
+    private func resumeReadyNavigations() {
+        let pending = waitingNavigations
+        waitingNavigations = []
+        for (url, proceed) in pending {
+            whenReady(for: url, proceed: proceed)
+        }
     }
 
     private static let youTubeScript = pageScript(named: "youtube-ads")
