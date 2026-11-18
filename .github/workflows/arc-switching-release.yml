@@ -1,0 +1,36 @@
+name: Compare native Arc import previews across a restart
+on:
+  push:
+    branches: [qa/arc-switching-release]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  switching:
+    runs-on: xcode-27
+    timeout-minutes: 6
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {reader: before, run: 44408856766}
+          - {reader: fixed, run: 44411084674}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ matrix.run }}
+          name: kaizu-runtime-check
+          path: ${{ runner.temp }}
+      - name: Choose the reordered Arc export in the packaged browser
+        env:
+          READER: ${{ matrix.reader }}
+          RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        run: |
+          ditto -x -k "$RUNNER_TEMP/Kaizu.zip" "$RUNNER_TEMP/launch"
+          codesign --verify --strict "$RUNNER_TEMP/launch/Kaizu.app"
+          swiftc .github/qa/arc-export/chooser.swift -o "$RUNNER_TEMP/chooser"
+          python3 -u .github/qa/arc-export/compare.py "$RUNNER_TEMP/launch/Kaizu.app" "$RUNNER_TEMP/chooser" "$RUNNER_TEMP"
