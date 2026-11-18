@@ -62,7 +62,9 @@ extension ArcSidebar {
     private typealias JSON = [String: Any]
 
     public static func load(from url: URL = fileURL) throws -> ArcSidebar {
-        try parse(Data(contentsOf: url))
+        let data = try Data(contentsOf: url)
+        if url.pathExtension.lowercased() == "md" { return try parseMarkdownExport(data) }
+        return try parse(data)
     }
 
     public static func parse(_ data: Data) throws -> ArcSidebar {

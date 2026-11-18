@@ -25,7 +25,7 @@
 
 ## At home in Kaizu
 
-- **Bring your Arc setup.** Preview your spaces, folders, favorites and tabs before importing them. Your original Arc sidebar stays intact. You can also import bookmarks and history from Chromium browsers or a Safari export.
+- **Bring your Arc setup.** Preview your spaces, folders, favorites and tabs before importing them. If you moved Macs, choose a saved sidebar JSON or Arc’s Markdown export in **File → Import from Arc…**. You can also import bookmarks and history from Chromium browsers or a Safari export.
 - **Give each project a space.** Pin the pages you keep coming back to and let Today tabs archive themselves. Use separate profiles when you want separate logins and cookies.
 - **Stay on the keyboard.** Press ⌘T to jump to an open tab, find an archived page, run a menu command or convert a measurement. Press ⌘/ to see the shortcuts.
 - **Keep your place.** Peek at a link, open it beside the page you’re reading, or split a window into up to four panes. Idle tabs can go to sleep and wake when you return.

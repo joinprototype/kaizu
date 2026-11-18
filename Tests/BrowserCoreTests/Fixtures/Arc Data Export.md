@@ -1,0 +1,15 @@
+# Design
+## Favorites
+- https://mail.example.test/
+- https://news.example.test/
+## Research
+- https://docs.example.test/overview
+### Type
+- https://type.example.test/specimen?size=24#sample
+## Planning
+- https://plans.example.test/
+# Personal
+- https://calendar.example.test/
+## Favorites
+- https://mail.example.test/
+- arc://settings
