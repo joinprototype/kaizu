@@ -1,10 +1,12 @@
 """Exercise the actual app bundles in a disposable macOS account."""
 
+import argparse
+import hashlib
 import json
 import os
+import plistlib
 import secrets
 import subprocess
-import sys
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
@@ -71,15 +73,80 @@ def saved_tab(url):
     return matches[0]
 
 
+def bundle_info(app):
+    with (app / "Contents/Info.plist").open("rb") as info:
+        return plistlib.load(info)
+
+
+def staged_release(process):
+    cache = Path.home() / "Library/Caches/com.joinprototype.kaizu/Updates"
+    predicate = 'subsystem == "com.joinprototype.kaizu" AND category == "updates"'
+    deadline = time.monotonic() + 120
+    while time.monotonic() < deadline and process.poll() is None:
+        for staged in cache.glob("*/unpacked/Kaizu.app"):
+            # Extraction starts before validation finishes. Wait for the updater
+            # to confirm the signature, bundle and build and enable install-on-quit.
+            build = staged.parent.parent.name
+            if not build.isdecimal():
+                continue
+            ready = f' AND eventMessage == "Update {build} staged"'
+            logs = subprocess.check_output(["/usr/bin/log", "show", "--last", "5m", "--style", "compact",
+                                            "--predicate", predicate + ready], text=True, timeout=20)
+            if any(line.endswith(f" Update {build} staged") for line in logs.splitlines()):
+                return staged
+        time.sleep(1)
+    subprocess.run(["/usr/bin/log", "show", "--last", "5m", "--style", "compact", "--predicate", predicate],
+                   timeout=20)
+    raise SystemExit("The app did not stage a signed release from the production feed")
+
+
+def install_signed_update(server, app, url):
+    # Only this disposable bundle advertises build zero. The updater, feed
+    # URL and embedded verification key are from the candidate release binary.
+    subprocess.run(["plutil", "-replace", "CFBundleVersion", "-string", "0", str(app / "Contents/Info.plist")],
+                   check=True)
+    subprocess.run(["codesign", "--force", "--sign", "-", str(app)], check=True)
+    process = launch(server, app, url)
+    staged = staged_release(process)
+    info = bundle_info(staged)
+    version, build = info["CFBundleShortVersionString"], info["CFBundleVersion"]
+    executable = Path("Contents/MacOS/Kaizu")
+    digest = hashlib.sha256((staged / executable).read_bytes()).digest()
+    if int(build) <= 0 or info["CFBundleIdentifier"] != "com.joinprototype.kaizu":
+        raise SystemExit("The app staged an unexpected release")
+    quit_app(process)
+
+    # The detached install helper replaces the bundle after the original PID exits.
+    deadline = time.monotonic() + 30
+    while time.monotonic() < deadline:
+        try:
+            if bundle_info(app)["CFBundleVersion"] == build:
+                break
+        except FileNotFoundError:
+            pass
+        time.sleep(0.25)
+    else:
+        raise SystemExit("Quitting did not install the staged release")
+    subprocess.run(["codesign", "--verify", "--strict", str(app)], check=True)
+    if hashlib.sha256((app / executable).read_bytes()).digest() != digest:
+        raise SystemExit("The installed executable differs from the verified staged release")
+    print(f"The candidate's updater installed signed release {version} (build {build}) on quit.")
+
+
 def main():
-    candidate = Path(sys.argv[1]).resolve(strict=True)
-    previous = Path(sys.argv[2]).resolve(strict=True) if len(sys.argv) == 3 else None
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("candidate", type=Path)
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("previous", type=Path, nargs="?")
+    mode.add_argument("--signed-update", action="store_true")
+    args = parser.parse_args()
+    candidate = args.candidate.resolve(strict=True)
     with HTTPServer(("127.0.0.1", 0), Page) as server:
         server.timeout = 1
         server.issue_cookie = True
         server.cookie = "kaizu_login=" + secrets.token_hex(16)
         url = f"http://127.0.0.1:{server.server_port}/start"
-        if previous is None:
+        if args.previous is None and not args.signed_update:
             launch(server, candidate, url)
             print("Release app opened the external link and WebKit executed the page with cookies.")
             return
@@ -89,17 +156,22 @@ def main():
         # Open the test link as a saved tab using the app's current-space setting.
         settings = json.dumps({"externalLinks": "currentSpace"}).encode().hex()
         subprocess.run(["defaults", "write", "com.joinprototype.kaizu", "settings", "-data", settings], check=True)
-        quit_app(launch(server, previous, url))
-        before = saved_tab(url)
+        if args.signed_update:
+            install_signed_update(server, candidate, url)
+            installed = candidate
+        else:
+            installed = args.previous.resolve(strict=True)
+            quit_app(launch(server, installed, url))
+            installed.rename(installed.with_name("Retired.app"))
+            candidate.rename(installed)
 
-        previous.rename(previous.with_name("Retired.app"))
-        candidate.rename(previous)
+        before = saved_tab(url)
         server.issue_cookie = False
         # No URL is passed. Only the restored tab can request the new challenge.
-        quit_app(launch(server, previous))
+        quit_app(launch(server, installed))
         if saved_tab(url) != before:
             raise SystemExit("The profile, space or tab identity changed across the upgrade")
-        print("Restored the v0.2.5 tab in its original space and profile with its login cookie.")
+        print("Restored the tab in its original space and profile with its login cookie.")
 
 
 if __name__ == "__main__":
