@@ -194,7 +194,12 @@ final class BrowserStore {
         set { app.spaces = newValue }
     }
 
-    var archive: [ArchivedTabRecord] { isPrivate ? [] : app.archive }
+    var archive: [ArchivedTabRecord] {
+        guard !isPrivate else { return [] }
+        let profile = activeSpace.profile
+        let spaceIDs = Set(spaces.filter { $0.profile === profile }.map(\.id))
+        return app.archive.filter { spaceIDs.contains($0.spaceID) }
+    }
 
     var closedTabs: [ClosedTab] {
         get { isPrivate ? privateClosedTabs : app.closedTabs }
@@ -331,8 +336,10 @@ final class BrowserStore {
             }
         case .command(let command):
             command.perform()
-        case .tab(let tab):
-            select(tab)
+        case .tab(let tab, let space):
+            guard space.profile === activeSpace.profile, spaces.contains(where: { $0 === space }),
+                  space.tab(id: tab.id) === tab else { return }
+            select(tab, in: space)
         case .archived(let archived):
             reopen(archived)
         case .history(let entry):

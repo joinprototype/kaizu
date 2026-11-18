@@ -63,7 +63,7 @@ extension Suggestion {
         case .history(let entry): "url:\(entry.url.absoluteString)"
         case .search(let query): "search:\(query.lowercased())"
         case .command(let command): "command:\(command.id)"
-        case .tab(let tab): "tab:\(tab.id)"
+        case .tab(let tab, _): "tab:\(tab.id)"
         case .archived(let archived): "archived:\(archived.id)"
         }
     }
