@@ -32,7 +32,7 @@ Arc imports preserve custom tab names and keep independent Arc profiles separate
 
 Kaizu can recover a damaged session from its last successfully opened copy and keeps the damaged file for inspection.
 
-Quitting now finishes earlier tab-history saves before writing the final Back and Forward history for open tabs.
+Quitting now finishes earlier tab-history saves before writing the final Back and Forward history for open tabs. Open web pages also get time to save their last draft edit when you quit or restart for an update.
 
 If two update checks overlap, quitting Kaizu installs the newest build it has verified. Once an update is ready, Kaizu removes its downloaded ZIP and any older verified build from the update cache.
 
