@@ -1,6 +1,7 @@
 name: Mac build and tests
 
 on:
+  workflow_dispatch:
   pull_request:
     branches: [develop, master]
   push:
@@ -11,7 +12,7 @@ on:
       - 'CHANGELOG.md'
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -111,16 +112,23 @@ jobs:
           sw_vers
           .github/scripts/check-relayed-call.sh "$RUNNER_TEMP/package-check/unpacked/Kaizu.app"
 
-  launch-on-macos-15:
+  runtime:
+    name: launch-on-${{ matrix.runner == 'xcode-27' && 'macos-27' || matrix.runner }} (${{ matrix.scenario }})
     needs: verify
     # The relay call has its own result. These checks require the verified bundle.
     if: ${{ !cancelled() && needs.verify.result != 'cancelled' && needs.verify.outputs.runtime_bundle_ready == 'true' }}
-    runs-on: macos-15
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 7
     strategy:
       fail-fast: false
       matrix:
+        runner: [macos-15]
         scenario: [clean-launch, upgrade-from-0.2.5, signed-update, extension-windows, media-call]
+        # A release rehearsal repeats both installation paths on the current Mac.
+        include: >-
+          ${{ fromJSON(github.event_name == 'workflow_dispatch' &&
+          '[{"runner":"xcode-27","scenario":"upgrade-from-0.2.5"},{"runner":"xcode-27","scenario":"signed-update"}]'
+          || '[]') }}
     steps:
       - uses: actions/checkout@v7
         with:
