@@ -1,0 +1,29 @@
+name: Safari password-manager compatibility
+on:
+  push:
+    branches: [qa/bitwarden-safari-https]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  safari-vault:
+    runs-on: xcode-27
+    timeout-minutes: 40
+    env:
+      RUNNER_ENVIRONMENT: ${{ runner.environment }}
+      NIXPKGS: github:NixOS/nixpkgs/e21fec321d73511849707a7585e4ea155ee4bf40
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: cachix/install-nix-action@3dc140bfc76c49fbd4dd958429132e3746bcb086
+      - name: Prepare loopback vault and test website
+        run: bash .github/qa/safari-vault/prepare.sh
+      - name: Seed synthetic vault
+        run: |
+          npm install --prefix "$RUNNER_TEMP/vault-node" --no-fund --no-audit playwright-core@1.65.1
+          NODE_PATH="$RUNNER_TEMP/vault-node/node_modules" node .github/qa/safari-vault/seed.cjs
+      - name: Run Kaizu with the official Safari extension
+        run: bash .github/qa/safari-vault/run.sh
