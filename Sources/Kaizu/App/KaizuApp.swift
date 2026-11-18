@@ -5,6 +5,13 @@ import BrowserCore
 @MainActor
 enum KaizuApp {
     static func main() {
+        #if !DEBUG
+        // A QA launch that requested an isolated session must never fall back to the normal profile.
+        if ProcessInfo.processInfo.environment["KAIZU_SUPPORT"] != nil {
+            FileHandle.standardError.write(Data("KAIZU_SUPPORT requires a debug build. Release launch stopped.\n".utf8))
+            exit(EX_CONFIG)
+        }
+        #endif
         if let list = RuleListCompiler.requestedList {
             RuleListCompiler.runAndExit(list: list)
         }

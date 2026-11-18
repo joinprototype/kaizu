@@ -75,6 +75,25 @@ jobs:
           sw_vers
           ditto -x -k "$RUNNER_TEMP/Kaizu.zip" "$RUNNER_TEMP/launch"
           codesign --verify --strict "$RUNNER_TEMP/launch/Kaizu.app"
+      - name: Reject a debug profile override before opening the release session
+        if: matrix.scenario == 'clean-launch'
+        run: |
+          python3 - <<'PYTHON'
+          import os
+          import subprocess
+          from pathlib import Path
+
+          root = Path(os.environ["RUNNER_TEMP"])
+          executable = root / "launch/Kaizu.app/Contents/MacOS/Kaizu"
+          scratch = root / "rejected-profile"
+          for override in (str(scratch), ""):
+              result = subprocess.run([executable], env=dict(os.environ, KAIZU_SUPPORT=override),
+                                      capture_output=True, text=True, timeout=10)
+              if result.returncode != os.EX_CONFIG or "KAIZU_SUPPORT requires a debug build" not in result.stderr:
+                  raise SystemExit(f"Expected a rejected release launch, got {result.returncode}: {result.stderr}")
+          if scratch.exists():
+              raise SystemExit("Rejected release launch created a profile")
+          PYTHON
       - name: Launch release and verify WebKit navigation
         if: matrix.scenario == 'clean-launch'
         run: python3 .github/scripts/check-release-launch.py "$RUNNER_TEMP/launch/Kaizu.app"
