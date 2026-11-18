@@ -83,6 +83,7 @@ final class BrowserStore {
     /// The tab whose page is being captured (see BrowserStore+Capture).
     var capture: UUID?
     var tabSwitcher: TabSwitcherState?
+    var showingArchive = false
     var spaceDraft: SpaceDraft?
     /// Which way the last space switch went, so the sidebar slides the right way.
     var spaceSwitchForward = true
@@ -194,7 +195,12 @@ final class BrowserStore {
         set { app.spaces = newValue }
     }
 
-    var archive: [ArchivedTabRecord] { isPrivate ? [] : app.archive }
+    var archive: [ArchivedTabRecord] {
+        guard !isPrivate else { return [] }
+        let profile = activeSpace.profile
+        let spaceIDs = Set(spaces.filter { $0.profile === profile }.map(\.id))
+        return app.archive.filter { spaceIDs.contains($0.spaceID) }
+    }
 
     var closedTabs: [ClosedTab] {
         get { isPrivate ? privateClosedTabs : app.closedTabs }
@@ -331,8 +337,10 @@ final class BrowserStore {
             }
         case .command(let command):
             command.perform()
-        case .tab(let tab):
-            select(tab)
+        case .tab(let tab, let space):
+            guard space.profile === activeSpace.profile, spaces.contains(where: { $0 === space }),
+                  space.tab(id: tab.id) === tab else { return }
+            select(tab, in: space)
         case .archived(let archived):
             reopen(archived)
         case .history(let entry):

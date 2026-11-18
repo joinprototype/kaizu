@@ -63,8 +63,11 @@ extension AppModel {
 
 extension BrowserStore {
     func reopen(_ archived: ArchivedTabRecord) {
-        app.archive.removeAll { $0.id == archived.id }
-        let space = spaces.first { $0.id == archived.spaceID } ?? activeSpace
+        guard !isPrivate,
+              let space = spaces.first(where: { $0.id == archived.spaceID && $0.profile === activeSpace.profile }),
+              let index = app.archive.firstIndex(where: { $0.id == archived.id && $0.spaceID == space.id })
+        else { return }
+        app.archive.remove(at: index)
         reopen(archived.tab, in: space)
         app.saveArchive()
     }

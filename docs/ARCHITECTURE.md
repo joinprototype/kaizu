@@ -3,7 +3,13 @@
 How the code is organized today, where it's going, and the rules that keep it
 clean as features pile up. Read this before adding a feature.
 
-## Principles
+## Boundaries in the current build
+
+SwiftPM builds the `Kaizu` executable, the `BrowserCore` library and its test target. Session formats and migrations, Arc import planning, history, split layout calculations and filter conversion live in BrowserCore. They can be exercised without opening a browser window.
+
+The executable contains the UI, app and window models, and WebKit integration. Its folders organize responsibilities within one target. `AppModel` owns shared spaces and profiles. Each `BrowserStore` owns one window’s selection and overlays. `BrowserTab` currently owns page state, creates its web view, observes navigation and handles media. Several views and models import WebKit directly.
+
+## Design goals
 
 1. **Engine stays behind a wall.** Only the `WebEngine` module imports WebKit.
    UI and models talk to a tab through our own types, never `WKWebView`.
@@ -66,7 +72,7 @@ KaizuApp ──▶ BrowserUI ──▶ DesignSystem
 `BrowserUI` never imports `WebEngine` directly; it gets a page's `NSView` through
 a small protocol (`PageViewProviding`) that `KaizuApp` wires up.
 
-## State model
+## Target state model
 
 ```
 AppModel (one per app, @MainActor @Observable)
@@ -84,8 +90,7 @@ WindowModel (one per window; today's `BrowserStore`)
 ├── commandBar, toast, find bar, peek
 ```
 
-- **Profile ≠ Space** (Arc's model). Today they're merged in `Profile`; the
-  session v2 migration splits each into one Profile + one Space.
+- A profile owns website data and shared favorites. Each space uses one profile. Session v2 migrated the earlier combined records into separate profiles and spaces.
 - **Tab ≠ PageController.** `Tab` is the persisted/observable record (URL,
   title, pinned URL, last active). `PageController` (WebEngine) is created lazily
   when a tab is shown, owns the `WKWebView`, and pushes title/URL/progress into
@@ -120,7 +125,7 @@ WindowModel (one per window; today's `BrowserStore`)
   `stores` (session, history sweeps, Spotlight, extensions) never sees it.
   Links from other apps, Spotlight and Settings use `regularFront`.
 
-## Commands
+## Proposed command registry
 
 ```swift
 struct Command: Identifiable {
@@ -137,12 +142,9 @@ struct Command: Identifiable {
 
 ## Persistence
 
-- `session.json` gets a `schemaVersion`; `SessionMigrator` upgrades old files
-  step by step (v1 → v2 …) with a test per migration using fixture files.
-- Writes are debounced + atomic; keep `session.backup.json` from the last
-  successful launch for corruption recovery.
-- History and archive go in SQLite with FTS5 (likely GRDB, our first justified
-  dependency), written from an actor off the main thread.
+- The session records carry a schema version. `SessionRecord.decode` reads the current format or migrates a v1 file. On migration the app attempts to preserve the old bytes before writing the new format.
+- The app throttles session saves and performs atomic writes on a serial queue. Before starting browser services, `SessionFiles` backs up the successfully decoded session. If the primary is malformed, it preserves the damaged bytes under a unique name and restores a decodable backup. A newer schema or an unrecoverable error stops startup before a save can replace the session.
+- History uses SQLite with FTS5 behind an actor. The archive is a separate JSON file with a limit of 500 tabs.
 - Locations: `~/Library/Application Support/Kaizu/` (ours),
   `~/Library/WebKit/com.joinprototype.kaizu/WebsiteDataStore/<profile-uuid>/` (WebKit's).
 
@@ -187,7 +189,7 @@ struct Command: Identifiable {
   tab/space operations).
 - Visual checks: debug builds read `KAIZU_DEBUG=<state>` to boot into a UI
   state; `scripts/snapshot.sh` screenshots the window for review.
-- CI (GitHub Actions, macOS runner): build, test, `swift format lint`.
+- GitHub Actions runs the Swift tests, builds the release app and verifies its code signature on the Xcode 27 runner.
 - Logging with `os.Logger`, one subsystem per module.
 
 ## Where things live today
@@ -216,8 +218,7 @@ reinstalls, which clear a controller's scripts.
 
 ## Migration from today's layout
 
-Today: one target, folders `App/ Models/ Views/ Support/ DesignSystem/`, with
-`BrowserStore` doing everything. Do it in small, always-working steps:
+The core library and per-window model are in place. Remaining work can be split into independently tested changes:
 
 1. ~~Add `Tests/`~~ (done: `BrowserCore` + Swift Testing); `swift format` config; tests for store ops.
 2. Extract `DesignSystem` target (no deps, easy win).

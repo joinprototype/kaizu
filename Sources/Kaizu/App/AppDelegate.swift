@@ -1,9 +1,17 @@
 import AppKit
+import BrowserCore
 import CoreSpotlight
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    let app = AppModel()
+    let app: AppModel
+    private let recoveredSession: Bool
+
+    init(session: SessionFiles.Opened?) {
+        app = AppModel(session: session)
+        recoveredSession = session?.recovered == true
+        super.init()
+    }
     private lazy var notificationClicks = NotificationClicks(app: app)
 
     func applicationWillFinishLaunching(_ notification: Notification) {
@@ -22,6 +30,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Diagnostics.shared.start()
         NSApp.mainMenu = MainMenu.make(app: app)
         app.showFront()
+        if recoveredSession {
+            app.front.showToast("Recovered tabs from the last session backup")
+        }
         NSApp.activate()
         app.applyQuickBarKey()
         Updates.start(app: app)
