@@ -18,14 +18,20 @@ class Page(BaseHTTPRequestHandler):
     def do_GET(self):
         server = self.server
         if self.path == "/start":
-            if not server.issue_cookie and getattr(server, "storage_token", None):
-                received = server.cookie in self.headers.get("Cookie", "").split("; ")
-                print(f"Restored document request included the test cookie: {received}", flush=True)
+            if not server.issue_cookie and server.navigation_cookie:
+                cookies = self.headers.get("Cookie", "").split("; ")
+                strict = server.cookie in cookies
+                lax = server.navigation_cookie in cookies
+                print(f"Restored document cookies: Lax={lax}, Strict={strict}", flush=True)
+                if not lax:
+                    server.document_missing_lax = True
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Cache-Control", "no-store")
             if server.issue_cookie:
                 self.send_header("Set-Cookie", server.cookie + "; Max-Age=3600; Path=/; HttpOnly; SameSite=Strict")
+                if server.navigation_cookie:
+                    self.send_header("Set-Cookie", server.navigation_cookie + "; Max-Age=3600; Path=/; HttpOnly; SameSite=Lax")
             self.end_headers()
             storage_check = ""
             if getattr(server, "storage_token", None):
@@ -67,9 +73,17 @@ class Page(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(b"window.launchControl = true;")
         elif self.path == "/" + server.challenge:
-            cookie_matches = server.cookie in self.headers.get("Cookie", "").split("; ")
+            cookies = self.headers.get("Cookie", "").split("; ")
+            cookie_matches = server.cookie in cookies
             storage = self.headers.get("X-Kaizu-Storage", "unreported")
             check_storage = bool(getattr(server, "storage_token", None))
+            if server.navigation_cookie and (server.document_missing_lax or server.navigation_cookie not in cookies):
+                phase = "restored" if not server.issue_cookie else "initial"
+                server.page_failure = (f"{phase} login: first document missing Lax={server.document_missing_lax}, "
+                                       f"page Lax={server.navigation_cookie in cookies}, page Strict={cookie_matches}, "
+                                       f"local storage {storage}")
+                self.send_error(403)
+                return
             if not server.issue_cookie and not cookie_matches and storage == "match" and server.missing_probes < 3:
                 server.missing_probes += 1
                 print(f"Restored login cookie missing on probe {server.missing_probes}, local storage matched", flush=True)
@@ -113,6 +127,7 @@ def launch(server, app, *urls):
     server.rendered = False
     server.page_failure = None
     server.missing_probes = 0
+    server.document_missing_lax = False
     server.challenge = secrets.token_hex(12)
     process = subprocess.Popen(["open", "-W", "-n", "-a", str(app), *urls])
     deadline = time.monotonic() + 90
@@ -258,6 +273,9 @@ def main():
         server.issue_cookie = True
         server.cookie = "kaizu_login=" + secrets.token_hex(16)
         server.storage_token = secrets.token_hex(16) if args.previous or args.signed_update else None
+        # A top-level GET can carry Lax even when navigation withholds Strict.
+        # The same-site request from the loaded page must carry both.
+        server.navigation_cookie = "kaizu_navigation=" + secrets.token_hex(16) if server.storage_token else None
         url = f"http://127.0.0.1:{server.server_port}/start"
         server.check_first_page_blocking = not (args.previous or args.signed_update or args.extension_windows or args.media_call)
         if server.check_first_page_blocking:
