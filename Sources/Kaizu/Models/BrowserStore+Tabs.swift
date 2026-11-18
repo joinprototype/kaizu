@@ -48,6 +48,7 @@ extension BrowserStore {
 
     private func show(_ tab: BrowserTab, in space: Space) {
         let now = Date()
+        let previousActiveTab = selectedTab
         let previous = selectedTab(in: space)
         previous?.captureThumbnail()
         if let previous, previous !== tab, previous.isPlayingMedia, settings.autoPictureInPicture,
@@ -73,8 +74,8 @@ extension BrowserStore {
         activeSpaceID = space.id
         setSelected(tab, in: space)
         tab.activate()
+        extensions.didActivate(tab, previous: previousActiveTab)
         if previous !== tab {
-            extensions.didActivate(tab, previous: previous)
             tab.exitPictureInPicture()
             // Catches players that make no DOM events, as they go to the background.
             Task { await previous?.refreshMediaState() }
