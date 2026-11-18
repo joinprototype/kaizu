@@ -7,11 +7,15 @@ import SwiftUI
 final class LittleWindowController: NSWindowController, NSWindowDelegate {
     let tab: BrowserTab
     private unowned let app: AppModel
+    private weak var openingWindow: BrowserStore?
+    private let openingSpaceID: UUID
     private var isPromoted = false
 
-    init(tab: BrowserTab, app: AppModel) {
+    init(tab: BrowserTab, openedFrom store: BrowserStore) {
         self.tab = tab
-        self.app = app
+        app = store.app
+        openingWindow = store
+        openingSpaceID = store.activeSpace.id
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 960, height: 680),
             styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
@@ -40,8 +44,15 @@ final class LittleWindowController: NSWindowController, NSWindowDelegate {
     }
 
     func promote() {
+        guard !isPromoted, app.littleWindows.contains(where: { $0 === self }) else { return }
+        let from = app.stores.first { $0 === openingWindow } ?? app.regularFront
+        guard let space = app.spaces.first(where: { $0.id == openingSpaceID }) ?? from.space(on: tab.profile),
+              space.profile === tab.profile else {
+            close()
+            return
+        }
         isPromoted = true
-        app.regularFront.adopt(tab)
+        from.windowForOpening(in: space).adopt(tab, in: space)
         close()
     }
 

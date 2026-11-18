@@ -224,11 +224,14 @@ extension BrowserStore {
         if deletingProfile {
             removeWebsiteData(of: space.profile)
         }
-        app.saveArchive()
+        app.save()
         scheduleSave()
     }
 
     private func removeWebsiteData(of profile: Profile) {
+        for little in app.littleWindows where little.tab.profile === profile {
+            little.close()
+        }
         profiles.removeAll { $0 === profile }
         let id = profile.id
         Task { await history?.removeAll(profile: id) }

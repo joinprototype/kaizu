@@ -2,7 +2,13 @@
 
 ## Unreleased
 
+Pressing ⌘O in a little window moves the live page into its opening space, even after you switch windows. If that space was deleted, the page can move to another space in the same profile. Deleting the profile closes its little windows.
+
+In **Settings → Privacy → Import Rule List…**, add a WebKit content-blocker JSON file. You can turn individual lists off or remove them. Imported rules follow the shield’s per-site pause setting.
+
 Undoing a bookmark import keeps a single copy of each pre-existing tab and removes imported tabs that moved to Today or Favorites.
+
+Opening a workspace saved by an older build repairs duplicate Today rows left by bookmark Undo. If you edited the copies separately, Kaizu keeps both. When two copies point to different pages, each reopens its own URL and Kaizu backs up the shared navigation history.
 
 Undoing an Arc import preserves tabs and folders you added afterward, including changes made in another window. A newly imported profile also survives Undo once you have used its website data.
 
@@ -11,6 +17,12 @@ Undoing an Arc import preserves tabs and folders you added afterward, including 
 Pausing or resuming blocking in a private window now affects only that window. Regular windows keep their saved site preferences.
 
 Pasting an address such as `example.com?view=weekly` or `example.com#notes` now opens the page directly. The address bar also recognizes bracketed IPv6 addresses with ports.
+
+Split with Recent Tab keeps a full four-pane layout on screen. From a standalone tab, it can start a new split with a previously used pane.
+
+Closing the focused pane or undoing an import that supplied it keeps the remaining split panes on screen.
+
+Auto-archive keeps background tabs that are using the camera or microphone, including while capture is muted.
 
 When a site requests the camera and microphone together, Kaizu asks only about devices that still need an answer. Declining the microphone preserves an existing camera permission.
 
@@ -21,6 +33,10 @@ Settings → Extensions now shows the errors WebKit reports for each installed e
 Arc imports preserve custom tab names and keep independent Arc profiles separate when existing Kaizu spaces share a profile.
 
 Kaizu can recover a damaged session from its last successfully opened copy and keeps the damaged file for inspection.
+
+Quitting now finishes earlier tab-history saves before writing the final Back and Forward history for open tabs.
+
+If two update checks overlap, quitting Kaizu installs the newest build it has verified. Once an update is ready, Kaizu removes its downloaded ZIP and any older verified build from the update cache.
 
 Choose **History → Recently Archived Tabs** to browse by day, search by page or space name, and restore a tab to its original space.
 

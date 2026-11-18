@@ -96,7 +96,7 @@ struct CommandBar: View {
         results += matches.map { .tab($0.tab, in: $0.space) }
         let openURLs = Set(tabs.compactMap(\.url) + matches.compactMap { $0.tab.url })
         results += historyMatches.filter { !openURLs.contains($0.url) }.prefix(4).map(Suggestion.history)
-        let archived = store.archive.filter { matchesPage(query, title: $0.tab.title, url: $0.tab.url) }
+        let archived = store.matchingArchivedTabs(query)
         results += archived.prefix(3).map(Suggestion.archived)
         // What you usually pick for this leads (after an instant answer).
         if let top = store.app.topChoice(for: query, among: results, in: store.activeSpace.profile), let index = results.firstIndex(where: { $0.id == top.id }) {
@@ -332,7 +332,7 @@ extension Suggestion {
         case .archived(let archived):
             .init(
                 icon: .symbol("archivebox"),
-                title: archived.tab.title.isEmpty ? archived.tab.url?.displayHost ?? "Archived tab" : archived.tab.title,
+                title: archived.tab.customTitle ?? (archived.tab.title.isEmpty ? archived.tab.url?.displayHost ?? "Archived tab" : archived.tab.title),
                 subtitle: archived.tab.url?.displayHost,
                 action: "Reopen"
             )

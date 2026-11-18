@@ -69,9 +69,6 @@ extension BrowserStore {
                 PaletteCommand(id: "tab.pin", title: isPinned ? "Unpin Tab" : "Pin Tab", symbol: isPinned ? "pin.slash" : "pin", shortcut: "⌘D") {
                     self.togglePin(tab)
                 },
-                PaletteCommand(id: "tab.split", title: "Split with Recent Tab", symbol: "rectangle.split.2x1", keywords: ["side by side"], shortcut: "⌃⇧=") {
-                    self.splitWithRecentTab()
-                },
                 PaletteCommand(id: "tab.mute", title: tab.isMuted ? "Unmute Tab" : "Mute Tab", symbol: tab.isMuted ? "speaker.wave.2" : "speaker.slash", keywords: ["sound", "audio", "silence"]) {
                     tab.toggleMute()
                 },
@@ -101,6 +98,12 @@ extension BrowserStore {
                     self.toggleBlockingOnCurrentSite()
                 },
             ]
+            if recentSplitPartner != nil {
+                commands.append(PaletteCommand(id: "tab.split", title: "Split with Recent Tab", symbol: "rectangle.split.2x1",
+                                               keywords: ["side by side"], shortcut: "⌃⇧=") {
+                    self.splitWithRecentTab()
+                })
+            }
         }
         if isPrivate {
             commands.removeAll { ["folder.new", "tab.pin"].contains($0.id) }

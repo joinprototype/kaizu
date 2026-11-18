@@ -3,8 +3,8 @@ import Foundation
 
 /// Session save/restore (`~/Library/Application Support/Kaizu/session.json`).
 extension AppModel {
-    private static var sessionURL: URL {
-        SessionFiles(directory: AppPaths.support).primary
+    private static var sessionFiles: SessionFiles {
+        SessionFiles(directory: AppPaths.support)
     }
 
     /// One write at a time, in order, so a late one can't undo a newer one.
@@ -24,13 +24,18 @@ extension AppModel {
     }
 
     /// Pages retitle themselves all the time, so the regular saves leave the
-    /// main thread. Quitting writes in place, after any that's still going.
+    /// main thread. Archiving, reopening and quitting commit both the workspace
+    /// and the compatibility archive after all earlier writes.
     func save(inBackground: Bool = false) {
-        let record = SessionRecord(windows: stores.map(\.record), profiles: profiles.map(\.record), spaces: spaces.map(\.record))
-        let url = Self.sessionURL
+        let entries = archive
+        let record = SessionRecord(windows: stores.map(\.record), profiles: profiles.map(\.record),
+                                   spaces: spaces.map(\.record), archivedTabs: entries)
+        let files = Self.sessionFiles
         let write: @Sendable () -> Void = {
             do {
-                try record.encoded().write(to: url, options: .atomic)
+                try record.encoded().write(to: files.primary, options: .atomic)
+                // v0.2.5 reads only the separate archive. Update its copy after the session commits.
+                if !inBackground { try files.writeLegacyArchive(entries) }
             } catch {
                 Log.session.error("Couldn't save the session: \(error.localizedDescription, privacy: .public)")
             }
@@ -52,10 +57,14 @@ extension AppModel {
         for record in session?.record.windows ?? [WindowRecord()] {
             addWindow(record)
         }
-        if session?.migrated == true {
-            scheduleSave()  // write the upgraded format right away
+        if session?.needsSave == true {
+            scheduleSave()
         }
-        loadArchive()
+        do {
+            archive = try session?.record.archivedTabs ?? Self.sessionFiles.readLegacyArchive()
+        } catch {
+            Log.session.error("Couldn't read the legacy archive: \(error.localizedDescription, privacy: .public)")
+        }
         stores.forEach { $0.selectedTab?.activate() }
     }
 
@@ -64,7 +73,7 @@ extension AppModel {
             id: record.id, profile: profile, app: self, url: record.url, title: record.title,
             pinnedURL: record.pinnedURL, lastActiveAt: record.lastActiveAt
         )
-        tab.savedState = savedTabState(for: record.id)
+        tab.savedState = tabStateFiles.read(record.id)
         tab.customTitle = record.customTitle
         return tab
     }

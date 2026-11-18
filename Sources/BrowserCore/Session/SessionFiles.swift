@@ -1,15 +1,18 @@
 import Foundation
 
 /// Opens a session before any browser services can schedule a save.
-public struct SessionFiles {
+public struct SessionFiles: Sendable {
     public struct Opened {
         public let record: SessionRecord
         public let migrated: Bool
         public let recovered: Bool
+        /// The in-memory session contains a schema upgrade or a repair to persist.
+        public let needsSave: Bool
     }
 
     public let directory: URL
     public var primary: URL { directory.appending(path: "session.json") }
+    public var tabStates: URL { directory.appending(path: "TabStates", directoryHint: .isDirectory) }
     private var backup: URL { directory.appending(path: "session.backup.json") }
 
     public init(directory: URL) {
@@ -44,13 +47,47 @@ public struct SessionFiles {
         return opened
     }
 
+    private var legacyArchive: URL { directory.appending(path: "archive.json") }
+
+    public func readLegacyArchive() throws -> [ArchivedTabRecord] {
+        guard let data = try readIfPresent(legacyArchive) else { return [] }
+        return try JSONCoding.decoder.decode([ArchivedTabRecord].self, from: data)
+    }
+
+    /// Keep older releases able to reopen these entries, without overwriting an unreadable original.
+    public func writeLegacyArchive(_ entries: [ArchivedTabRecord]) throws {
+        let encoded = try JSONCoding.encoder.encode(entries)
+        if let data = try readIfPresent(legacyArchive) {
+            guard data != encoded else { return }
+            do {
+                _ = try JSONCoding.decoder.decode([ArchivedTabRecord].self, from: data)
+            } catch is DecodingError {
+                try data.write(to: directory.appending(path: "archive.unreadable-\(UUID().uuidString).json"), options: .atomic)
+            }
+        } else if entries.isEmpty {
+            return
+        }
+        try encoded.write(to: legacyArchive, options: .atomic)
+    }
+
     private func decode(_ data: Data, recovered: Bool) throws -> Opened {
-        let (record, version) = try SessionRecord.decode(data)
+        let (saved, version) = try SessionRecord.decode(data)
         let migrated = version < SessionRecord.currentVersion
         if migrated {
             try data.write(to: directory.appending(path: "session.v\(version).backup.json"), options: .atomic)
         }
-        return Opened(record: record, migrated: migrated, recovered: recovered)
+        var record = saved
+        let repair = record.repairDuplicateTodayTabs()
+        for id in repair.ambiguousStateIDs {
+            // One WebKit history file served two different URLs. Keep its bytes, and
+            // let each tab load its own recorded page instead of restoring the wrong one.
+            let state = tabStates.appending(path: "\(id).state")
+            if FileManager.default.fileExists(atPath: state.path) {
+                let preserved = directory.appending(path: "tabstate-\(id)-\(UUID()).backup")
+                try FileManager.default.moveItem(at: state, to: preserved)
+            }
+        }
+        return Opened(record: record, migrated: migrated, recovered: recovered, needsSave: migrated || repair.changed)
     }
 
     private func readIfPresent(_ url: URL) throws -> Data? {
@@ -59,5 +96,33 @@ public struct SessionFiles {
         } catch let error as CocoaError where error.code == .fileReadNoSuchFile {
             return nil
         }
+    }
+}
+
+private extension SessionRecord {
+    /// Older bookmark imports could save the same Today tab twice after Undo.
+    /// Keep the first identity for window selections and splits. Preserve independently edited copies.
+    mutating func repairDuplicateTodayTabs() -> (changed: Bool, ambiguousStateIDs: Set<UUID>) {
+        var changed = false
+        var ambiguousStateIDs = Set<UUID>()
+        for index in spaces.indices {
+            let today = spaces[index].today
+            guard today.count > 1, Set(today.lazy.map(\.id)).count < today.count else { continue }
+            var records = Set<TabRecord>()
+            var firstByID: [UUID: TabRecord] = [:]
+            spaces[index].today = today.compactMap { original in
+                guard records.insert(original).inserted else { return nil }
+                if let first = firstByID[original.id] {
+                    if first.url != original.url { ambiguousStateIDs.insert(original.id) }
+                    var edited = original
+                    edited.id = UUID()
+                    return edited
+                }
+                firstByID[original.id] = original
+                return original
+            }
+            changed = true
+        }
+        return (changed, ambiguousStateIDs)
     }
 }

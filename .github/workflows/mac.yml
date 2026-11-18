@@ -5,6 +5,14 @@ on:
     branches: [develop, master]
   push:
     branches: [develop, master]
+    paths-ignore:
+      - 'docs/**/*.md'
+      - 'README.md'
+      - 'CHANGELOG.md'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -29,6 +37,24 @@ jobs:
           export KAIZU_ARC="$GITHUB_WORKSPACE/Tests/BrowserCoreTests/Fixtures/Arc Data Export.md"
           build/Kaizu.app/Contents/MacOS/Kaizu
           KAIZU_DEBUG=arcimport-undo-restored build/Kaizu.app/Contents/MacOS/Kaizu
+      - name: Promote little windows in their original space and profile
+        timeout-minutes: 2
+        env:
+          KAIZU_SUPPORT: ${{ runner.temp }}/little-window-profile
+        run: |
+          log="$RUNNER_TEMP/little-window.log"
+          open -n -W --env KAIZU_DEBUG=little-window-promotion --env "KAIZU_SUPPORT=$KAIZU_SUPPORT" --stderr "$log" -a "$GITHUB_WORKSPACE/build/Kaizu.app"
+          cat "$log"
+          grep -Fxq 'Little-window promotion preserved the live page and its profile.' "$log"
+      - name: Keep all four split panes when an extra pane is requested
+        timeout-minutes: 2
+        env:
+          KAIZU_SUPPORT: ${{ runner.temp }}/split-capacity
+          KAIZU_DEBUG: split-capacity
+        run: build/Kaizu.app/Contents/MacOS/Kaizu
+      - name: Recover an archive move after an interrupted session
+        timeout-minutes: 3
+        run: python3 .github/scripts/check-archive-recovery.py build/Kaizu.app/Contents/MacOS/Kaizu
       - name: Undo a bookmark import after deleting the folder in a second window
         timeout-minutes: 2
         env:
@@ -49,11 +75,38 @@ jobs:
           KAIZU_DEBUG=notification-routing build/Kaizu.app/Contents/MacOS/Kaizu
           KAIZU_DEBUG=notification-routing-restored build/Kaizu.app/Contents/MacOS/Kaizu
       - name: Build release app
-        run: make app CONFIG=release
-      - name: Verify app bundle
-        run: codesign --verify --strict build/Kaizu.app
-      - name: Package the verified app for launch testing
-        run: ditto -c -k --keepParent build/Kaizu.app "$RUNNER_TEMP/Kaizu.zip"
+        run: |
+          export KAIZU_UPDATE_KEY="$RUNNER_TEMP/test-update.key"
+          public_key=$(swift scripts/update-sign.swift new "$KAIZU_UPDATE_KEY")
+          version=$(plutil -extract CFBundleShortVersionString raw Resources/Info.plist)
+          # The disposable signer belongs only to the rehearsal source tree.
+          rehearsal="$RUNNER_TEMP/package-rehearsal"
+          mkdir -p "$rehearsal"
+          git archive HEAD | tar -x -C "$rehearsal"
+          if "$rehearsal/scripts/release.sh" "$version" >"$RUNNER_TEMP/wrong-key.log" 2>&1; then
+            echo "A foreign private key passed the release check" >&2
+            exit 1
+          fi
+          grep -Fq 'does not match Kaizu' "$RUNNER_TEMP/wrong-key.log"
+          printf 'public enum ReleaseUpdateKey { public static let base64 = "%s" }\n' "$public_key" > "$rehearsal/Sources/BrowserCore/ReleaseUpdateKey.swift"
+          "$rehearsal/scripts/release.sh" "$version"
+
+          # The bundle used by the production-feed and runtime checks retains the shipped verification key.
+          make app CONFIG=release
+          codesign --verify --strict build/Kaizu.app
+          codesign -dvv build/Kaizu.app 2>&1 | grep -q 'flags=[^ ]*runtime'
+          ditto -c -k --keepParent build/Kaizu.app "$RUNNER_TEMP/Kaizu.zip"
+          mkdir -p "$RUNNER_TEMP/package-check/unpacked"
+          ditto -x -k "$rehearsal/site/updates/Kaizu-$version.zip" "$RUNNER_TEMP/package-check/unpacked"
+      - name: Install the loopback TURN relay
+        run: HOMEBREW_NO_AUTO_UPDATE=1 brew install coturn
+      - name: Verify a relayed WebRTC call in the packaged release
+        timeout-minutes: 5
+        env:
+          RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        run: |
+          sw_vers
+          .github/scripts/check-relayed-call.sh "$RUNNER_TEMP/package-check/unpacked/Kaizu.app"
       - uses: actions/upload-artifact@v7
         with:
           name: kaizu-runtime-check
@@ -81,8 +134,29 @@ jobs:
           sw_vers
           ditto -x -k "$RUNNER_TEMP/Kaizu.zip" "$RUNNER_TEMP/launch"
           codesign --verify --strict "$RUNNER_TEMP/launch/Kaizu.app"
+      - name: Reject a debug profile override before opening the release session
+        if: matrix.scenario == 'clean-launch'
+        run: |
+          python3 - <<'PYTHON'
+          import os
+          import subprocess
+          from pathlib import Path
+
+          root = Path(os.environ["RUNNER_TEMP"])
+          executable = root / "launch/Kaizu.app/Contents/MacOS/Kaizu"
+          scratch = root / "rejected-profile"
+          for override in (str(scratch), ""):
+              result = subprocess.run([executable], env=dict(os.environ, KAIZU_SUPPORT=override),
+                                      capture_output=True, text=True, timeout=10)
+              if result.returncode != os.EX_CONFIG or "KAIZU_SUPPORT requires a debug build" not in result.stderr:
+                  raise SystemExit(f"Expected a rejected release launch, got {result.returncode}: {result.stderr}")
+          if scratch.exists():
+              raise SystemExit("Rejected release launch created a profile")
+          PYTHON
       - name: Launch release and verify WebKit navigation
         if: matrix.scenario == 'clean-launch'
+        env:
+          RUNNER_ENVIRONMENT: ${{ runner.environment }}
         run: python3 .github/scripts/check-release-launch.py "$RUNNER_TEMP/launch/Kaizu.app"
       - name: Upgrade the published app with a saved tab and login cookie
         if: matrix.scenario == 'upgrade-from-0.2.5'

@@ -30,6 +30,7 @@ final class ContentBlocker {
     private static let cookieRejectionKey = "cookiePopupRejectionEnabled"
     private static let pausedSitesKey = "blockingPausedSites"
 
+    let importedLists = ImportedRuleLists(directory: AppPaths.support.appending(path: "ImportedRules", directoryHint: .isDirectory))
     private(set) var state: State = .idle
     private(set) var isEnabled: Bool
     private(set) var isCookieRejectionEnabled: Bool
@@ -63,7 +64,9 @@ final class ContentBlocker {
     func start() {
         guard state == .idle else { return }
         state = .preparing
+        importedLists.didChange = { [weak self] in self?.rulesDidChange() }
         Task {
+            await importedLists.restore()
             await loadLists()
             while true {
                 await refreshLists()
@@ -207,6 +210,7 @@ final class ContentBlocker {
             for (name, list) in ruleLists where !(name == "cookies" && wanted.cookieRejection) {
                 controller.add(list)
             }
+            importedLists.install(on: controller)
             if let script = Self.youTubeScript {
                 controller.addUserScript(script)
             }
@@ -214,6 +218,11 @@ final class ContentBlocker {
         if wanted.cookieRejection, let script = Self.autoconsentScript {
             controller.addUserScript(script)
         }
+    }
+
+    private func rulesDidChange() {
+        listGeneration += 1
+        installEverywhere()
     }
 
     private func installEverywhere() {
@@ -230,7 +239,7 @@ final class ContentBlocker {
     private func loadLists() async {
         guard let store = WKContentRuleListStore.default() else {
             state = .ready
-            return resumeReadyNavigations()
+            return rulesDidChange()
         }
         let available = Set(await store.availableIdentifiers() ?? [])
         // Lists that were retired or renamed would stay compiled forever.
@@ -244,9 +253,8 @@ final class ContentBlocker {
             }
         }
         ruleLists = lists
-        listGeneration += 1
         state = .ready
-        installEverywhere()
+        rulesDidChange()
     }
 
     private func ruleList(named name: String, store: WKContentRuleListStore, available: Set<String>) async -> WKContentRuleList? {

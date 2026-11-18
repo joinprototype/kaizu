@@ -9,6 +9,7 @@ extension AppModel {
             profile.favorites.removeAll { ids.contains($0.id) }
         }
         for space in spaces {
+            let previousSplit = space.split
             let removed = (space.pinned.tabs + space.today).filter { ids.contains($0.id) }
             space.pinned.removeImported(ids)
             if let bookmarkFolderID, let item = space.pinned.remove(id: bookmarkFolderID) {
@@ -21,7 +22,7 @@ extension AppModel {
             for id in space.split where ids.contains(id) { space.removeFromSplit(id) }
             for window in stores {
                 if let selection = window.selectedTabIDs[space.id], ids.contains(selection) {
-                    window.selectNeighbor(of: 0, in: space)
+                    window.selectNeighbor(of: 0, in: space, previousSplit: previousSplit)
                 }
             }
             discard(removed)
@@ -29,7 +30,7 @@ extension AppModel {
         closedTabs.removeAll { ids.contains($0.record.id) }
         let archiveCount = archive.count
         archive.removeAll { ids.contains($0.tab.id) }
-        if archive.count != archiveCount { saveArchive() }
+        if archive.count != archiveCount { save() }
     }
 }
 

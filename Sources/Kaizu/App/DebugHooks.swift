@@ -1719,6 +1719,8 @@ enum DebugHooks {
                 try? await Task.sleep(for: .seconds(1))
                 logPageCount(store, "closed")
             }
+        case "split-capacity":
+            checkSplitCapacity(store)
         case "splitdrop":
             qaSplitDrop(store)
         case "capture":
@@ -1762,6 +1764,12 @@ enum DebugHooks {
                 FileHandle.standardError.write(Data("QA notify \(passed ? "ok" : "FAILED"): allowed tab woke at launch, another stayed asleep\n".utf8))
                 NSApp.terminate(nil)
             }
+        case "little-window-promotion":
+            Task { await checkLittleWindowPromotion(in: store) }
+        case "archive-sweep-interrupt":
+            interruptArchiveSweep(in: store)
+        case "archive-interrupt", "archive-restored":
+            checkArchiveRecovery(in: store, interrupt: ProcessInfo.processInfo.environment["KAIZU_DEBUG"] == "archive-interrupt")
         case "tabsearch":
             qaTabSearch(store)
         case "tabmoves":

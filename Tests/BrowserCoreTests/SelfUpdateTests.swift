@@ -7,11 +7,11 @@ import Testing
 struct SelfUpdateTests {
     private let key = Curve25519.Signing.PrivateKey()
     private let bundleID = "com.example.kaizu"
-    private let root: URL
+    private let directory: TemporaryTestDirectory
+    private var root: URL { directory.url }
 
     init() throws {
-        root = FileManager.default.temporaryDirectory.appending(path: "kaizu-update-\(UUID().uuidString)", directoryHint: .isDirectory)
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        directory = try TemporaryTestDirectory()
     }
 
     private var publicKey: String { key.publicKey.rawRepresentation.base64EncodedString() }

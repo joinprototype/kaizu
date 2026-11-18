@@ -18,6 +18,12 @@ final class ExtensionHost: NSObject {
         var icon: NSImage? { context.webExtension.icon(for: CGSize(width: 32, height: 32)) }
     }
 
+    struct Unavailable: Identifiable {
+        let id: UUID
+        let name: String
+        let detail: String
+    }
+
     /// Where an installed extension's files live (persisted).
     private struct Record: Codable {
         enum Kind: String, Codable { case folder, safariApp }
@@ -26,14 +32,15 @@ final class ExtensionHost: NSObject {
         var path: String
         /// The store listing it came from (`ExtensionGallery.Listing.source`).
         var source: String?
+        var displayName: String?
         /// Additional sites the user approved from the extension's toolbar menu.
         var additionalSites: [String]?
 
         /// Where it is now. Copied extensions are found by their folder's
         /// name, so moving the data folder (a rename of the app) keeps them.
-        var location: URL {
+        func location(in directory: URL) -> URL {
             switch kind {
-            case .folder: ExtensionHost.directory.appending(path: URL(fileURLWithPath: path).lastPathComponent, directoryHint: .isDirectory)
+            case .folder: directory.appending(path: URL(fileURLWithPath: path).lastPathComponent, directoryHint: .isDirectory)
             case .safariApp: URL(fileURLWithPath: path)
             }
         }
@@ -50,17 +57,35 @@ final class ExtensionHost: NSObject {
     /// Bumped when an extension updates its toolbar action (badge, icon), so views refresh.
     private(set) var actionRevision = 0
 
-    private var records: [Record] = []
+    private var pendingSafariPaths: Set<String> = []
+    private var records: [Record]
+    private var failures: [UUID: String] = [:]
+    private(set) var loading: Set<UUID> = []
+    private let defaults: UserDefaults
+    private let directory: URL
+
+    var unavailable: [Unavailable] {
+        records.compactMap { record in
+            guard let detail = failures[record.id] else { return nil }
+            let url = record.location(in: directory)
+            let fallback = record.kind == .safariApp ? url.deletingPathExtension().lastPathComponent : "Extension"
+            return Unavailable(id: record.id, name: record.displayName ?? fallback, detail: detail)
+        }
+    }
+
+    var hasRegistrations: Bool { !records.isEmpty }
+
     @ObservationIgnored private let log = Logger(subsystem: Log.subsystem, category: "Extensions")
     private static let recordsKey = "installedExtensions"
     nonisolated private static let safariExtensionPoint = "com.apple.Safari.web-extension"
 
-    nonisolated static var directory: URL {
-        AppPaths.support.appending(path: "Extensions", directoryHint: .isDirectory)
-    }
-
-    override init() {
-        let configuration = WKWebExtensionController.Configuration.default()
+    init(defaults: UserDefaults = .standard,
+         directory: URL = AppPaths.support.appending(path: "Extensions", directoryHint: .isDirectory),
+         configuration: WKWebExtensionController.Configuration = .default()) {
+        self.defaults = defaults
+        self.directory = directory
+        let data = defaults.data(forKey: Self.recordsKey)
+        records = data.flatMap { try? JSONDecoder().decode([Record].self, from: $0) } ?? []
         let webViewConfiguration = configuration.webViewConfiguration ?? WKWebViewConfiguration()
         webViewConfiguration.applicationNameForUserAgent = UserAgent.safariSuffix
         configuration.webViewConfiguration = webViewConfiguration
@@ -73,20 +98,31 @@ final class ExtensionHost: NSObject {
 
     /// Re-loads extensions installed in earlier sessions.
     func loadInstalled() async {
-        let data = UserDefaults.standard.data(forKey: Self.recordsKey)
-        let saved = data.flatMap { try? JSONDecoder().decode([Record].self, from: $0) } ?? []
-        for record in saved where !records.contains(where: { $0.id == record.id }) {
-            do {
-                let webExtension = try await Self.makeExtension(record)
-                try activate(webExtension, record: record)
-            } catch {
-                log.error("Couldn't load extension at \(record.location.path, privacy: .public): \(error.localizedDescription, privacy: .public)")
-            }
+        for id in records.map(\.id) {
+            await load(id)
+        }
+    }
+
+    func load(_ id: UUID) async {
+        guard let record = records.first(where: { $0.id == id }),
+              !installed.contains(where: { $0.id == id }),
+              loading.insert(id).inserted else { return }
+        defer { loading.remove(id) }
+        let url = record.location(in: directory)
+        do {
+            let webExtension = try await Self.makeExtension(at: url, kind: record.kind)
+            guard records.contains(where: { $0.id == id }) else { return }
+            try activate(webExtension, record: record)
+            failures[id] = nil
+        } catch {
+            guard records.contains(where: { $0.id == id }) else { return }
+            failures[id] = error.localizedDescription
+            log.error("Couldn't load extension at \(url.path, privacy: .public): \(error.localizedDescription, privacy: .public)")
         }
     }
 
     func isInstalled(_ listing: ExtensionGallery.Listing) -> Bool {
-        installed.contains { item in records.contains { $0.id == item.id && $0.source == listing.source } }
+        records.contains { $0.source == listing.source }
     }
 
     /// Downloads an extension from its store page, then installs it like a
@@ -117,17 +153,28 @@ final class ExtensionHost: NSObject {
     /// Asks the user, then installs: a folder or `.zip` is copied into
     /// Application Support; a Safari extension app is used in place.
     func install(from url: URL, askFirst: Bool = true, source: String? = nil) async {
+        let safariPath = url.pathExtension == "app" ? Self.safariPath(url) : nil
+        if let safariPath {
+            if let existing = registeredSafariApp(at: safariPath) {
+                await load(existing.id)
+                return
+            }
+            guard pendingSafariPaths.insert(safariPath).inserted else { return }
+        }
+        defer {
+            if let safariPath { pendingSafariPaths.remove(safariPath) }
+        }
         var stagedFolder: URL?
         defer {
             if let stagedFolder { try? FileManager.default.removeItem(at: stagedFolder) }
         }
         do {
             let id = UUID()
-            let record: Record
-            if url.pathExtension == "app" {
+            var record: Record
+            if safariPath != nil {
                 record = Record(id: id, kind: .safariApp, path: url.path)
             } else {
-                let directory = Self.directory
+                let directory = self.directory
                 let destination = directory.appending(path: id.uuidString, directoryHint: .isDirectory)
                 stagedFolder = destination
                 // Off the main thread: a big extension takes a moment to unpack.
@@ -141,9 +188,11 @@ final class ExtensionHost: NSObject {
                 }.value
                 record = Record(id: id, kind: .folder, path: destination.path, source: source)
             }
-            let webExtension = try await Self.makeExtension(record)
+            let webExtension = try await Self.makeExtension(at: record.location(in: directory), kind: record.kind)
             guard !askFirst || confirmInstall(of: webExtension) else { return }
             try activate(webExtension, record: record)
+            record.displayName = webExtension.displayName
+            records.append(record)
             stagedFolder = nil
             persist()
             app?.regularFront.showToast("Added \(webExtension.displayName ?? "extension")", symbol: "puzzlepiece.extension")
@@ -155,15 +204,30 @@ final class ExtensionHost: NSObject {
         }
     }
 
-    func uninstall(_ item: Installed) {
-        try? controller.unload(item.context)
-        installed.removeAll { $0.id == item.id }
-        if let record = records.first(where: { $0.id == item.id }), record.kind == .folder {
-            try? FileManager.default.removeItem(at: record.location)
+    func uninstall(_ id: UUID) {
+        if let item = installed.first(where: { $0.id == id }) {
+            try? controller.unload(item.context)
+            installed.removeAll { $0.id == id }
         }
-        records.removeAll { $0.id == item.id }
+        if let record = records.first(where: { $0.id == id }), record.kind == .folder {
+            try? FileManager.default.removeItem(at: record.location(in: directory))
+        }
+        failures[id] = nil
+        records.removeAll { $0.id == id }
         persist()
     }
+
+    private static func safariPath(_ url: URL) -> String {
+        url.resolvingSymlinksInPath().standardizedFileURL.path
+    }
+
+    private func registeredSafariApp(at path: String) -> Record? {
+        records.first { $0.kind == .safariApp && Self.safariPath(URL(fileURLWithPath: $0.path)) == path }
+    }
+
+    func hasSafariApp(_ url: URL) -> Bool { registeredSafariApp(at: Self.safariPath(url)) != nil }
+
+    func isAddingSafariApp(_ url: URL) -> Bool { pendingSafariPaths.contains(Self.safariPath(url)) }
 
     /// Safari web extensions bundled in apps under /Applications.
     nonisolated static func safariExtensionApps() -> [URL] {
@@ -286,9 +350,6 @@ final class ExtensionHost: NSObject {
         }
         try controller.load(context)
         installed.append(Installed(id: record.id, context: context))
-        if !records.contains(where: { $0.id == record.id }) {
-            records.append(record)
-        }
     }
 
     private func confirmInstall(of webExtension: WKWebExtension) -> Bool {
@@ -318,12 +379,11 @@ final class ExtensionHost: NSObject {
     }
 
     private func persist() {
-        UserDefaults.standard.set(try? JSONEncoder().encode(records), forKey: Self.recordsKey)
+        defaults.set(try? JSONEncoder().encode(records), forKey: Self.recordsKey)
     }
 
-    private static func makeExtension(_ record: Record) async throws -> WKWebExtension {
-        let url = record.location
-        switch record.kind {
+    private static func makeExtension(at url: URL, kind: Record.Kind) async throws -> WKWebExtension {
+        switch kind {
         case .folder:
             return try await WKWebExtension(resourceBaseURL: url)
         case .safariApp:

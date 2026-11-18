@@ -23,19 +23,19 @@
   <img src="site/img/commandbar.jpg" width="800" alt="Kaizu’s sidebar beside a Wikipedia page, with the command bar converting 10 km to 6.21 miles.">
 </p>
 
-## At home in Kaizu
+## What you can do in v0.2.5
 
-These features describe the current development build. See which changes are in the download in the [changelog](CHANGELOG.md).
-
-- **Bring your Arc setup.** Preview your spaces, folders, favorites and tabs before importing them. If you moved Macs, choose a saved sidebar JSON or Arc’s Markdown export in **File → Import from Arc…**. You can also import bookmarks and history from Chromium browsers or a Safari export.
+- **Bring your Arc setup.** On the Mac where you use Arc, choose **File → Import from Arc…** to preview your spaces, pinned folders, favorites and tabs. Use **File → Import Browsing Data…** for bookmarks and history from a Chromium browser or a Safari export.
 - **Give each project a space.** Pin the pages you keep coming back to and let Today tabs archive themselves. Use separate profiles when you want separate logins and cookies.
 - **Stay on the keyboard.** Press ⌘T to jump to an open tab, find an archived page, run a menu command or convert a measurement. Press ⌘/ to see the shortcuts.
 - **Keep your place.** Peek at a link, open it beside the page you’re reading, or split a window into up to four panes. Idle tabs can go to sleep and wake when you return.
 - **Control what loads.** Kaizu blocks ads and trackers, rejects supported cookie prompts and strips tracking parameters. Open the site settings in the address bar to pause blocking for one site.
 
+On the development branch, **Import from Arc…** also opens a saved sidebar JSON or Markdown export from another Mac. You can browse recently archived tabs in History and import a WebKit content-blocker rule list in Settings. [Unreleased changes](CHANGELOG.md#unreleased)
+
 ## Install
 
-Download the disk image, open it and drag Kaizu into Applications. The current build is ad-hoc signed and macOS asks for approval on first launch. Once installed, Kaizu checks for signed updates automatically. [First-launch instructions](https://kaizu.joinprototype.com/#open)
+Download the disk image, open it and drag Kaizu into Applications. The current build is ad-hoc signed and macOS asks for approval on first launch. Once installed, Kaizu checks for signed updates automatically. [First-launch instructions](https://kaizu.joinprototype.com/#open) · [GitHub releases and downloads](https://github.com/joinprototype/kaizu/releases/latest)
 
 Found a bug? Choose **Help → Report a Bug** in Kaizu, or open a [GitHub issue](https://github.com/joinprototype/kaizu/issues). You can also reach the team at [help@joinprototype.com](mailto:help@joinprototype.com).
 
@@ -44,7 +44,7 @@ Found a bug? Choose **Help → Report a Bug** in Kaizu, or open a [GitHub issue]
 Use Xcode with the macOS 27 SDK and Swift 6. The app runs on Apple silicon with macOS 15.4 or later.
 
 ```sh
-swift test                # run the BrowserCore test suite
+swift test                # run the BrowserCore and app test suites
 make run                  # build debug, bundle build/Kaizu.app, launch
 make app CONFIG=release   # release bundle
 make icon                 # regenerate Resources/AppIcon.icns from scripts/make-icon.swift
@@ -62,10 +62,14 @@ copy that can't touch your real browser at all, give its Info.plist another
 
 ## Release
 
+For a notarized Mac release, set `KAIZU_DEVELOPER_ID` to the **Developer ID Application** signing identity and `KAIZU_NOTARY_PROFILE` to a Keychain profile created with `xcrun notarytool store-credentials`. Set `version` to the release number.
+
 ```sh
-scripts/release.sh "$version"  # set version to the release number first
+scripts/release.sh --notarize "$version"
 cd site && npx wrangler deploy
 ```
+
+Before building, the script checks that the selected Ed25519 update signing key matches the public key trusted by Kaizu. It signs the app with Hardened Runtime, waits for Apple to accept it, and staples the ticket. It then signs the update ZIP and signs, notarizes, and staples the DMG. The browser’s updater verifies the finished ZIP before the script replaces the site files. Local packaging and CI use `scripts/release.sh "$version"` with an ad-hoc app signature. [Apple’s notarization workflow](https://developer.apple.com/documentation/security/customizing-the-notarization-workflow)
 
 Add a dated entry to [CHANGELOG.md](CHANGELOG.md) and commit the release metadata. After deploying the site, create a GitHub release tagged `v<version>` at that release commit. Attach the same DMG and update ZIP that went to the site and copy the changelog entry into the release notes.
 
@@ -77,12 +81,14 @@ It uses Apple frameworks only.
 
 ## Docs
 
-- [Roadmap](docs/ROADMAP.md): what's missing vs Arc, phases, motion spec
+- The [roadmap](docs/ROADMAP.md#path-to-10-on-mac) tracks Arc parity, switching workflows and the checks still open for 1.0.
 - [Extension compatibility](docs/ROADMAP.md#extension-compatibility) lists the tested builds of Bitwarden, uBlock Origin Lite, Dark Reader and TabCloser, plus options for 1Password.
-- [Architecture](docs/ARCHITECTURE.md): module layout, state model, rules
-- [Research](docs/research/): market and Arc analysis
+- The [architecture guide](docs/ARCHITECTURE.md) covers the module layout and state model.
+- The [research notes](docs/research/) cover Arc and other browsers.
 
 ## Data
+
+Kaizu keeps spaces, tabs and browsing history on your Mac. Submitted searches go to your chosen engine. Suggestions while typing are off by default. [Privacy details in the repository](site/privacy/index.html)
 
 - App state: `~/Library/Application Support/Kaizu/`
 - WebKit profile data: `~/Library/WebKit/com.joinprototype.kaizu/WebsiteDataStore/<profile-uuid>/`

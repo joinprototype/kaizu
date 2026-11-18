@@ -7,10 +7,6 @@ extension AppModel {
     static let archiveLimit = 500
     private static let sweepInterval: Duration = .seconds(15 * 60)
 
-    private static var archiveURL: URL {
-        AppPaths.support.appending(path: "archive.json")
-    }
-
     func startArchiving() {
         Task { [weak self] in
             while let self {
@@ -27,12 +23,12 @@ extension AppModel {
         var archived: [ArchivedTabRecord] = []
         let notifying = notifyingTabs
         for space in spaces {
-            // Anything on screen, audible or notifying stays, however long it's been.
+            // Keep visible tabs and ongoing media or notification sessions.
             let selected = Set(stores.compactMap { $0.selectedTabIDs[space.id] })
             let stale = space.today.filter { tab in
                 !selected.contains(tab.id) && !space.split.contains(tab.id) && !tab.isPlayingMedia
                     && (tab.lastActiveAt ?? now) < cutoff
-                    && !notifying.contains(tab)
+                    && !tab.isCapturingMedia && !notifying.contains(tab)
             }
             guard !stale.isEmpty else { continue }
             archived += stale.map { ArchivedTabRecord(tab: $0.record, spaceID: space.id, archivedAt: now) }
@@ -43,32 +39,29 @@ extension AppModel {
         }
         guard !archived.isEmpty else { return }
         archive = Array((archived + archive).prefix(Self.archiveLimit))
-        saveArchive()
+        save()
         scheduleSave()
-    }
-
-    func loadArchive() {
-        guard let data = try? Data(contentsOf: Self.archiveURL) else { return }
-        archive = (try? JSONCoding.decoder.decode([ArchivedTabRecord].self, from: data)) ?? []
-    }
-
-    func saveArchive() {
-        do {
-            try JSONCoding.encoder.encode(archive).write(to: Self.archiveURL, options: .atomic)
-        } catch {
-            Log.session.error("Couldn't save archived tabs: \(error.localizedDescription, privacy: .public)")
-        }
     }
 }
 
 extension BrowserStore {
+    func matchingArchivedTabs(_ query: String) -> [ArchivedTabRecord] {
+        let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return archive }
+        let spaceNames = Dictionary(uniqueKeysWithValues: spaces.map { ($0.id, $0.name) })
+        return archive.filter { entry in
+            [entry.tab.customTitle, entry.tab.title, entry.tab.url?.absoluteString, spaceNames[entry.spaceID]]
+                .compactMap { $0 }.contains { $0.localizedCaseInsensitiveContains(query) }
+        }
+    }
+
     func reopen(_ archived: ArchivedTabRecord) {
         guard !isPrivate,
               let space = spaces.first(where: { $0.id == archived.spaceID && $0.profile === activeSpace.profile }),
               let index = app.archive.firstIndex(where: { $0.id == archived.id && $0.spaceID == space.id })
         else { return }
-        app.archive.remove(at: index)
-        reopen(archived.tab, in: space)
-        app.saveArchive()
+        let entry = app.archive.remove(at: index)
+        reopen(entry.tab, in: space)
+        app.save()
     }
 }
