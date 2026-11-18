@@ -43,9 +43,13 @@ On macOS 27.0.1, the Firefox Add-ons builds of Bitwarden 2026.10.2 and 1Password
 
 ### Password-manager alternatives
 
-**Bitwarden for Safari** reached the login form on macOS 27.0.1. In Settings → Extensions, choose **Add Extension…** and select Bitwarden.app, or use **From Safari** when it is in Applications. Kaizu uses the extension in place, so keep the app installed. The [official desktop DMG 2026.10.2](https://github.com/bitwarden/clients/releases/tag/desktop-v2026.10.2) contained Safari extension 2026.10.1. Clicking **Log in** displayed the email field and server selector. The [Mac App Store extension from Bitwarden’s 2026.10.2 build](https://github.com/bitwarden/clients/actions/runs/41090170889) also rendered its welcome screen. Both reported an unsupported notification event and native messaging. Verify standalone vault sign-in and a fill on a matching HTTPS site before listing autofill as supported. Desktop unlock needs a separate check.
+**Bitwarden for Safari.** In Kaizu, open **Settings → Extensions → Add Extension…** and select Bitwarden.app. Apps in Applications also appear under **From Safari**. Keep the app installed because Kaizu loads its extension in place.
 
-**1Password** distributes its Safari extension as a separate Mac App Store app. Its desktop app also offers Universal Autofill and Quick Access. Test those on a disposable login and verify the correct site is recognized. For browser-to-desktop communication, 1Password documents adding a signed browser in Applications. Adding Kaizu through that route requires working native messaging and a suitable signed build. [Safari distribution](https://support.1password.com/update-extension/) · [Universal Autofill](https://support.1password.com/mac-universal-autofill/) · [Additional browsers](https://support.1password.com/additional-browsers/)
+On a development build running on macOS 27.0.1, Safari extension **2026.10.1**, bundled in Bitwarden desktop **2026.10.2**, signed in to a disposable self-hosted Vaultwarden **1.37.5** account. Selecting Autofill in the popup filled both the username and password on the matching HTTPS site. On a different host with the same form, the popup showed zero autofill suggestions and both fields stayed empty. [End-to-end test on macOS](https://github.com/joinprototype/kaizu/actions/runs/44291691454)
+
+Desktop unlock, biometrics, passkeys and Bitwarden cloud accounts still need separate checks. The Mac App Store extension from the 2026.10.2 build also opened its welcome screen. Both Safari builds reported unsupported native messaging and a notification event. [Bitwarden desktop release](https://github.com/bitwarden/clients/releases/tag/desktop-v2026.10.2) · [Mac App Store extension build](https://github.com/bitwarden/clients/actions/runs/41090170889)
+
+**1Password** distributes its Safari extension as a separate Mac App Store app. The desktop app also offers Universal Autofill (Command–Backslash) and Quick Access (Shift–Command–Space). Site recognition and filling through those shortcuts still need a Kaizu test. For browser-to-desktop communication, 1Password documents adding a signed browser in Applications. That route uses the Chrome or Firefox extension and requires working native messaging. On Mac, the signed browser must be in Applications. [Safari distribution](https://support.1password.com/update-extension/) · [Universal Autofill](https://support.1password.com/mac-universal-autofill/) · [Additional browsers](https://support.1password.com/additional-browsers/)
 
 ## Strategy (Oct 2026)
 
@@ -130,7 +134,7 @@ default-browser capable · curated themes · app icon.
 | Media: now playing, mute, auto-PiP | ✓ | ✓ | — | M | event-driven via isolated-world script; auto-PiP ✓ |
 | Capture / screenshots | ✓ | ✓ | — | S | `takeSnapshot`, `createPDF` ✓ |
 | Extensions | Chrome Web Store | ✓ Chrome Web Store, Firefox Add-ons, Safari | — | L | `WKWebExtension` ✓ (macOS 15.4+) |
-| Password managers | extensions | Bitwarden and 1Password install, with background errors | verify | L | Test sign-in and autofill with Bitwarden and 1Password |
+| Password managers | extensions | Bitwarden for Safari filled a self-hosted login | partial | L | Verify 1Password autofill and desktop unlock separately |
 | Site notifications | ✓ | on the tab and Dock; macOS banners need Developer ID | P6 | M | no public `Notification` delivery: a page script plus `UserNotifications`; macOS refuses ad-hoc signed apps |
 | Passkeys | ✓ | blocked | P6 | — | needs Apple's browser passkey entitlement |
 | Import (Arc / Chrome / Safari) | ✓ | ✓ | — | M | Arc keeps its sidebar in `StorableSidebar.json`; Chromium browsers share one history and bookmarks format; Safari exports a .zip |
@@ -342,7 +346,7 @@ engine), not Safari. Installed Safari extensions are wired into Safari itself:
   to Safari, and macOS stops other apps from reading AdGuard's data.
 - Legacy "Safari App Extensions" (AdGuard's toolbar popup) are Safari-only.
 - Modern *web* extensions (WebExtension format) can be hosted by us via
-  `WKWebExtension`, which is Phase 4.
+  `WKWebExtension`, available in Settings → Extensions.
 
 Tested Oct 24, 2026: the system registry (`pluginkit`) lists AdGuard's six
 blockers, but Foundation's extension host API returns none of them to a

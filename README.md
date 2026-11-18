@@ -76,6 +76,7 @@ It uses Apple frameworks only.
 ## Docs
 
 - [Roadmap](docs/ROADMAP.md): what's missing vs Arc, phases, motion spec
+- [Extension compatibility](docs/ROADMAP.md#password-manager-alternatives) covers the tested Bitwarden build, installation and 1Password alternatives.
 - [Architecture](docs/ARCHITECTURE.md): module layout, state model, rules
 - [Research](docs/research/): market and Arc analysis
 
