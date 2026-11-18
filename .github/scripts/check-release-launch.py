@@ -20,7 +20,7 @@ class Page(BaseHTTPRequestHandler):
             if server.issue_cookie:
                 self.send_header("Set-Cookie", server.cookie + "; Max-Age=3600; Path=/; HttpOnly; SameSite=Strict")
             self.end_headers()
-            self.wfile.write(f"""<!doctype html><title>Kaizu launch test</title>
+            self.wfile.write(f"""<!doctype html><title>Kaizu launch test</title><link rel="icon" href="data:,">
                 <body><h1>Ready</h1><script>
                 if (document.querySelector('h1').textContent === 'Ready') fetch('/{server.challenge}');
                 </script></body>""".encode())
@@ -33,7 +33,8 @@ class Page(BaseHTTPRequestHandler):
             self.end_headers()
             server.rendered = True
         else:
-            self.send_error(404)
+            self.send_response(404)
+            self.end_headers()
 
 
 def launch(server, app, *urls):

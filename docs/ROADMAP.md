@@ -37,7 +37,9 @@ Two publicly available Arc sidebar samples were imported into separate, empty Ka
 
 Chrome 157 wrote a fresh test profile with a loopback visit and a bookmark. Kaizu imported both, kept the bookmarks folder collapsed, recognized the bookmark on a repeat preview, and removed the imported visit and folder on Undo. A tab added to the folder after import survived Undo. Both source files retained their original hashes.
 
-Still to verify with comparable evidence: a real Safari export, an upgrade with existing profile logins, and password-manager autofill.
+On macOS 15.8.2, the published v0.2.5 app opened a saved tab and received a persistent login cookie from a local test site. After the app quit, the runner replaced its bundle and launched the candidate without a URL. The same tab reopened in its original space and profile, and the site received its original cookie. CI repeats this [upgrade check](https://github.com/joinprototype/kaizu/actions/runs/44264250004) alongside a clean launch. Delivery through the signed updater and installation on macOS 15.4 still need separate checks.
+
+Bitwarden 2026.10.2 from Firefox Add-ons installed in an empty Kaizu profile. Its toolbar button opened the extension's own popup, which showed a loading indicator. Sign-in, vault access, autofill, and desktop integration remain unverified. Other migration checks still open include a real Safari export and 1Password.
 
 ## Strategy (Oct 2026)
 
@@ -122,7 +124,7 @@ default-browser capable · curated themes · app icon.
 | Media: now playing, mute, auto-PiP | ✓ | ✓ | — | M | event-driven via isolated-world script; auto-PiP ✓ |
 | Capture / screenshots | ✓ | ✓ | — | S | `takeSnapshot`, `createPDF` ✓ |
 | Extensions | Chrome Web Store | ✓ Chrome Web Store, Firefox Add-ons, Safari | — | L | `WKWebExtension` ✓ (macOS 15.4+) |
-| Password managers | extensions | via extensions, not yet tried by hand | verify | L | 1Password/Bitwarden web extensions |
+| Password managers | extensions | Bitwarden installs and opens its popup | verify | L | Test sign-in and autofill with Bitwarden and 1Password |
 | Site notifications | ✓ | on the tab and Dock; macOS banners need Developer ID | P6 | M | no public `Notification` delivery: a page script plus `UserNotifications`; macOS refuses ad-hoc signed apps |
 | Passkeys | ✓ | blocked | P6 | — | needs Apple's browser passkey entitlement |
 | Import (Arc / Chrome / Safari) | ✓ | ✓ | — | M | Arc keeps its sidebar in `StorableSidebar.json`; Chromium browsers share one history and bookmarks format; Safari exports a .zip |
@@ -286,7 +288,7 @@ What makes someone keep it as their default browser.
 - [x] Install flow: unpacked folder or .zip (Settings → Extensions), install confirmation listing access **M**
 - [x] Install from Chrome Web Store / Firefox Add-ons: "Add to Kaizu" on an extension's page (CRX unwrapped to its ZIP; XPI as is) **M**
 - [x] Import from Safari: Settings → Extensions lists Safari *web* extensions in /Applications and loads them via `WKWebExtension(appExtensionBundle:)` **M**
-- [ ] Chrome-style native messaging (reuse Chrome/Brave `NativeMessagingHosts` manifests) to unlock 1Password/Bitwarden desktop integration **M**. On hold: 1Password's app only talks to browsers it approves (it has a "trust this browser" option, but Orion, also WebKit, still failed with it per their forum); Bitwarden's app writes host manifests per known browser. Worth asking both vendors once Kaizu is public; their extensions work on their own meanwhile
+- [ ] Chrome-style native messaging (reuse Chrome/Brave `NativeMessagingHosts` manifests) to unlock 1Password/Bitwarden desktop integration **M**. On hold: 1Password's app only talks to browsers it approves (it has a "trust this browser" option, but Orion, also WebKit, still failed with it per their forum); Bitwarden's app writes host manifests per known browser. Verify standalone extension autofill and desktop integration separately
 - [x] Import from Arc (spaces, pinned tabs, folders, favorites, Today tabs) **M**
 - [x] Import Browsing Data: history and bookmarks from Arc, Chrome, Brave, Edge, Vivaldi, a Safari export or any bookmarks .html; history goes to a space's profile, bookmarks to a closed pinned folder, Undo takes both back **M**
 
