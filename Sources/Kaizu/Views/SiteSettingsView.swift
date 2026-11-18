@@ -30,7 +30,7 @@ struct SiteSettingsView: View {
                     GridRow {
                         Text("Block ads and trackers")
                         Toggle("", isOn: Binding(
-                            get: { !store.contentBlocker.isPaused(on: url) },
+                            get: { !store.contentBlocker.isPaused(on: url, privateID: tab.profile.privateID) },
                             set: { _ in store.toggleBlockingOnCurrentSite(tab) }
                         ))
                         .labelsHidden()

@@ -168,9 +168,7 @@ final class AppModel {
     func windowDidClose(_ store: BrowserStore) {
         if store.isPrivate {
             privateStores.removeAll { $0 === store }
-            if privateStores.isEmpty {
-                contentBlocker.forgetTemporaryPauses()
-            }
+            contentBlocker.forgetPrivateOverrides(for: store.activeSpace.profile.id)
         } else {
             guard stores.count > 1 else { return }
             stores.removeAll { $0 === store }

@@ -163,7 +163,10 @@ enum MainMenu {
         menu.addItem(ActionMenuItem("Block Ads & Trackers", isOn: { app.front.contentBlocker.isEnabled }) {
             app.front.toggleContentBlocking()
         })
-        menu.addItem(ActionMenuItem("Pause Blocking on This Site", isOn: { app.front.contentBlocker.isPaused(on: app.front.commandTab?.url) }) {
+        menu.addItem(ActionMenuItem("Pause Blocking on This Site", isOn: {
+            let tab = app.front.commandTab
+            return app.front.contentBlocker.isPaused(on: tab?.url, privateID: tab?.profile.privateID)
+        }) {
             app.front.toggleBlockingOnCurrentSite(app.front.commandTab)
         })
         menu.addItem(ActionMenuItem("Auto-Reject Cookie Pop-ups", isOn: { app.front.contentBlocker.isCookieRejectionEnabled }) {

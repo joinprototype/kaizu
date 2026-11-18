@@ -8,6 +8,8 @@ Undoing an Arc import preserves tabs and folders you added afterward, including 
 
 **File → Import from Arc…** now accepts a saved sidebar JSON or the Markdown file from Arc’s Export Data command. Markdown links become pinned tabs inside the exported spaces and folders. The sidebar JSON also preserves profile groups, Favorites and Today tabs.
 
+Pausing or resuming blocking in a private window now affects only that window. Regular windows keep their saved site preferences.
+
 When a site requests the camera and microphone together, Kaizu asks only about devices that still need an answer. Declining the microphone preserves an existing camera permission.
 
 An extension that activates a background tab now selects it in that tab’s own window. The focused window keeps its current space and page. Switching spaces also tells extensions which tab became active.

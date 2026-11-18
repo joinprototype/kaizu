@@ -35,6 +35,12 @@ jobs:
           KAIZU_DEBUG: bookmark-import-undo
           KAIZU_SUPPORT: ${{ runner.temp }}/bookmark-undo-profile
         run: build/Kaizu.app/Contents/MacOS/Kaizu
+      - name: Keep per-site blocking changes inside their private window
+        timeout-minutes: 2
+        env:
+          KAIZU_SUPPORT: ${{ runner.temp }}/private-blocking
+          KAIZU_DEBUG: private-blocking
+        run: build/Kaizu.app/Contents/MacOS/Kaizu
       - name: Route notification clicks after closing and restoring a work tab
         timeout-minutes: 2
         env:

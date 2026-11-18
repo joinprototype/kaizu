@@ -213,8 +213,8 @@ private struct AddressPill: View {
             }
             .buttonStyle(.plain)
 
-            if let url = tab?.url, url.host() != nil {
-                let isPaused = store.contentBlocker.isPaused(on: url)
+            if let tab, let url = tab.url, url.host() != nil {
+                let isPaused = store.contentBlocker.isPaused(on: url, privateID: tab.profile.privateID)
                 if isHovering || isPaused {
                     Button {
                         store.toggleBlockingOnCurrentSite()
