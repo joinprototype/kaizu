@@ -37,7 +37,7 @@ final class ExtensionHost: NSObject {
         }
     }
 
-    @ObservationIgnored let controller = WKWebExtensionController(configuration: .default())
+    @ObservationIgnored let controller: WKWebExtensionController
     @ObservationIgnored weak var app: AppModel?
     /// Where the next action popup should anchor (the clicked toolbar button), in window coordinates.
     @ObservationIgnored var popupAnchor: CGRect = .zero
@@ -58,6 +58,11 @@ final class ExtensionHost: NSObject {
     }
 
     override init() {
+        let configuration = WKWebExtensionController.Configuration.default()
+        let webViewConfiguration = configuration.webViewConfiguration ?? WKWebViewConfiguration()
+        webViewConfiguration.applicationNameForUserAgent = UserAgent.safariSuffix
+        configuration.webViewConfiguration = webViewConfiguration
+        controller = WKWebExtensionController(configuration: configuration)
         super.init()
         controller.delegate = self
     }
@@ -219,8 +224,9 @@ final class ExtensionHost: NSObject {
 
     private func activate(_ webExtension: WKWebExtension, record: Record) {
         let context = WKWebExtensionContext(for: webExtension)
-        // A stable identifier keeps the extension's storage across launches.
+        // WebKit generates the resource origin independently of the runtime ID.
         context.uniqueIdentifier = record.id.uuidString
+        context.baseURL = URL(string: "webkit-extension://\(record.id.uuidString.lowercased())/")!
         // Installing is the user's consent to what the extension asked for.
         for permission in webExtension.requestedPermissions {
             context.setPermissionStatus(.grantedExplicitly, for: permission)

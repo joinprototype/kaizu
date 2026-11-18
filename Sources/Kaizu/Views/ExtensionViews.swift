@@ -83,26 +83,14 @@ struct ExtensionSettings: View {
                         .foregroundStyle(.secondary)
                 }
                 ForEach(host.installed) { item in
-                    HStack(spacing: 10) {
-                        if let icon = item.icon {
-                            Image(nsImage: icon).resizable().frame(width: 24, height: 24)
-                        } else {
-                            Image(systemName: "puzzlepiece.extension").frame(width: 24, height: 24)
-                        }
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(item.name)
-                            Text(item.version).font(.caption).foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Button("Remove") { host.uninstall(item) }
-                    }
+                    InstalledExtensionRow(item: item) { host.uninstall(item) }
                 }
                 HStack {
                     Button("Add Extension…", action: chooseExtension)
                     Spacer()
                 }
             } footer: {
-                FooterText("Add an unpacked extension folder or a .zip in the standard WebExtension format (Chrome, Firefox). Most popular extensions work; a few Chrome-only features don't.")
+                FooterText("Add an unpacked web extension or a .zip from Chrome or Firefox. Extensions that depend on browser APIs missing from WebKit may only work in part.")
             }
             Section {
                 if safariApps.isEmpty {
@@ -133,5 +121,43 @@ struct ExtensionSettings: View {
         panel.message = "Choose an extension folder (with manifest.json) or a .zip"
         guard panel.runModal() == .OK, let url = panel.url else { return }
         Task { await store.extensions.install(from: url) }
+    }
+}
+
+/// Background scripts can fail after WebKit has accepted an installation.
+private struct InstalledExtensionRow: View {
+    let item: ExtensionHost.Installed
+    let remove: () -> Void
+    @State private var messages: [String] = []
+
+    var body: some View {
+        HStack(spacing: 10) {
+            if let icon = item.icon {
+                Image(nsImage: icon).resizable().frame(width: 24, height: 24)
+            } else {
+                Image(systemName: "puzzlepiece.extension").frame(width: 24, height: 24)
+            }
+            VStack(alignment: .leading, spacing: 1) {
+                Text(item.name)
+                Text(item.version).font(.caption).foregroundStyle(.secondary)
+                if !messages.isEmpty {
+                    DisclosureGroup("Extension issues (\(messages.count))") {
+                        Text(messages.joined(separator: "\n"))
+                            .font(.caption)
+                            .textSelection(.enabled)
+                    }
+                }
+            }
+            Spacer()
+            Button("Remove", action: remove)
+        }
+        .onAppear { refresh() }
+        .onReceive(NotificationCenter.default.publisher(for: WKWebExtensionContext.errorsDidUpdateNotification, object: item.context)) { _ in
+            refresh()
+        }
+    }
+
+    private func refresh() {
+        messages = item.context.errors.map(\.localizedDescription)
     }
 }

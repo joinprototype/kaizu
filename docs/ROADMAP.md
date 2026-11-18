@@ -39,7 +39,7 @@ Chrome 157 wrote a fresh test profile with a loopback visit and a bookmark. Kaiz
 
 On macOS 15.8.2, the published v0.2.5 app opened a saved tab and received a persistent login cookie from a local test site. After the app quit, the runner replaced its bundle and launched the candidate without a URL. The same tab reopened in its original space and profile, and the site received its original cookie. CI repeats this [upgrade check](https://github.com/joinprototype/kaizu/actions/runs/44264250004) alongside a clean launch. Delivery through the signed updater and installation on macOS 15.4 still need separate checks.
 
-Bitwarden 2026.10.2 from Firefox Add-ons installed in an empty Kaizu profile. Its toolbar button opened the extension's own popup, which showed a loading indicator. Sign-in, vault access, autofill, and desktop integration remain unverified. Other migration checks still open include a real Safari export and 1Password.
+On macOS 27.0.1, the Firefox Add-ons builds of Bitwarden 2026.10.2 and 1Password 8.12.44.33 both installed in separate empty Kaizu profiles. Bitwarden opened a loading popup. Selecting 1Password on a loaded page showed no sign-in interface. WebKit loaded both background pages. Bitwarden reported an unsupported notification click event and 1Password reported a missing `chrome.notifications.onClicked` API. Sign-in, autofill and desktop integration remain unverified for both versions. A real Safari browsing-data export also remains to be checked.
 
 ## Strategy (Oct 2026)
 
@@ -124,7 +124,7 @@ default-browser capable · curated themes · app icon.
 | Media: now playing, mute, auto-PiP | ✓ | ✓ | — | M | event-driven via isolated-world script; auto-PiP ✓ |
 | Capture / screenshots | ✓ | ✓ | — | S | `takeSnapshot`, `createPDF` ✓ |
 | Extensions | Chrome Web Store | ✓ Chrome Web Store, Firefox Add-ons, Safari | — | L | `WKWebExtension` ✓ (macOS 15.4+) |
-| Password managers | extensions | Bitwarden installs and opens its popup | verify | L | Test sign-in and autofill with Bitwarden and 1Password |
+| Password managers | extensions | Bitwarden and 1Password install, with background errors | verify | L | Test sign-in and autofill with Bitwarden and 1Password |
 | Site notifications | ✓ | on the tab and Dock; macOS banners need Developer ID | P6 | M | no public `Notification` delivery: a page script plus `UserNotifications`; macOS refuses ad-hoc signed apps |
 | Passkeys | ✓ | blocked | P6 | — | needs Apple's browser passkey entitlement |
 | Import (Arc / Chrome / Safari) | ✓ | ✓ | — | M | Arc keeps its sidebar in `StorableSidebar.json`; Chromium browsers share one history and bookmarks format; Safari exports a .zip |
