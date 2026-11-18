@@ -4,7 +4,8 @@ set -euo pipefail
 export KAIZU_IMPORT
 KAIZU_IMPORT=$(python3 - <<'PY'
 from pathlib import Path
-paths = [p for name in ('Downloads','Desktop','Documents') for p in (Path.home()/name).glob('*.zip')]
+import os
+paths = list((Path(os.environ["RUNNER_TEMP"])/"fixture-export").glob("*.zip"))
 assert len(paths) == 1, f"Expected one Safari export, found {len(paths)}"
 print(paths[0])
 PY

@@ -82,9 +82,26 @@ print("Only bookmarks and history selected")
 guard let confirm = match(controls,role:"AXButton",title:"Export") else { exit(10) }
 press(confirm)
 showWindows()
-let saveControls = windows().flatMap { elements($0) }
-if let save = match(saveControls,role:"AXButton",title:"Save") ?? match(saveControls,role:"AXButton",title:"Export") {
-    press(save)
+let outputDir = ProcessInfo.processInfo.environment["RUNNER_TEMP"]! + "/fixture-export"
+try FileManager.default.createDirectory(atPath: outputDir, withIntermediateDirectories: true)
+key(5, modifiers:[.maskCommand,.maskShift]) // Go to Folder in the save panel
+NSPasteboard.general.clearContents()
+NSPasteboard.general.setString(outputDir, forType:.string)
+key(9,modifiers:.maskCommand) // Paste the runner's output path
+key(36) // Choose the folder
+guard let save = match(windows().flatMap { elements($0) },role:"AXButton",title:"Save") else {
+    print("Missing Save button"); showWindows(); exit(11)
 }
-Thread.sleep(forTimeInterval: 2)
 showWindows()
+press(save)
+for _ in 0..<40 {
+    let outputs = try FileManager.default.contentsOfDirectory(atPath:outputDir)
+    if outputs.contains(where: { $0.lowercased().hasSuffix(".zip") }) {
+        print("Safari saved its export to the selected runner directory."); exit(0)
+    }
+    Thread.sleep(forTimeInterval:0.5)
+}
+print("No ZIP in selected folder",try FileManager.default.contentsOfDirectory(atPath:outputDir))
+showWindows()
+print("Frontmost app:",NSWorkspace.shared.frontmostApplication?.localizedName ?? "")
+exit(12)
