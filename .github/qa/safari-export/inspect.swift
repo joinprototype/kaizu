@@ -21,8 +21,8 @@ func dumpUI(_ el: AXUIElement, depth: Int = 0) {
     let role = attribute(el, kAXRoleAttribute) as? String ?? ""
     let title = attribute(el, kAXTitleAttribute) as? String ?? ""
     let description = attribute(el, kAXDescriptionAttribute) as? String ?? ""
-    if !title.isEmpty || !description.isEmpty || role == "AXSheet" {
-        print(String(repeating:" ",count:depth), role, title, description, attribute(el,kAXValueAttribute) as? NSNumber ?? -1)
+    if true {
+        print(String(repeating:" ",count:depth), role, title, description, attribute(el,kAXValueAttribute) as? String ?? (attribute(el,kAXValueAttribute) as? NSNumber)?.stringValue ?? "")
     }
     if role != "AXWebArea" { for child in children(el) { dumpUI(child, depth:depth+1) } }
 }
@@ -57,4 +57,35 @@ guard let bar = attribute(app,kAXMenuBarAttribute),
       let export = match(elements(bar as! AXUIElement),role:"AXMenuItem",title:"Export Browsing Data to File…") else { exit(7) }
 press(export)
 print("Safari export options:")
+showWindows()
+let controls = windows().flatMap { elements($0) }
+let flags = controls.filter { attribute($0,kAXRoleAttribute) as? String == "AXCheckBox" }
+var selected = Set<String>()
+let labels = ["bookmark","reading list","clock","Puzzle piece extension","card","passwords"]
+for flag in flags {
+    var row = flag
+    var label: String?
+    for _ in 0..<4 {
+        if let parent = attribute(row, kAXParentAttribute) { row = parent as! AXUIElement } else { break }
+        let found = elements(row).filter { attribute($0,kAXRoleAttribute) as? String == "AXImage" }
+            .compactMap { attribute($0,kAXDescriptionAttribute) as? String }.filter { labels.contains($0) }
+        if found.count == 1 { label = found[0]; break }
+    }
+    guard let label else { print("Unrecognized export row"); exit(8) }
+    let wanted = label == "bookmark" || label == "clock"
+    let state = (attribute(flag,kAXValueAttribute) as? NSNumber)?.boolValue == true
+    let enabled = (attribute(flag,kAXEnabledAttribute) as? NSNumber)?.boolValue == true
+    if wanted != state && (wanted || enabled) { press(flag) }
+    if (attribute(flag,kAXValueAttribute) as? NSNumber)?.boolValue == true { selected.insert(label) }
+}
+guard selected == Set(["bookmark","clock"]) else { print("Export selection:", selected); exit(9) }
+print("Only bookmarks and history selected")
+guard let confirm = match(controls,role:"AXButton",title:"Export") else { exit(10) }
+press(confirm)
+showWindows()
+let saveControls = windows().flatMap { elements($0) }
+if let save = match(saveControls,role:"AXButton",title:"Save") ?? match(saveControls,role:"AXButton",title:"Export") {
+    press(save)
+}
+Thread.sleep(forTimeInterval: 2)
 showWindows()
