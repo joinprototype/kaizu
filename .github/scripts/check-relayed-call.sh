@@ -28,4 +28,7 @@ done
 nc -z 127.0.0.1 3478
 
 swiftc -parse-as-library "$(dirname "$0")/check-webkit-call.swift" -o "$scratch/webkit-control"
+probe="$(dirname "$0")/../qa/relay-peers/encode.m"
+clang -fobjc-arc -framework Foundation -framework VideoToolbox -framework CoreMedia -framework CoreVideo -framework CoreFoundation "$probe" -o "$scratch/encode"
+export KAIZU_ENCODER_PROBE="$scratch/encode"
 python3 -u "$(dirname "$0")/../qa/relay-peers/encoder_log.py" python3 -u "$(dirname "$0")/../qa/relay-peers/compare.py" "$1" "$scratch/webkit-control"

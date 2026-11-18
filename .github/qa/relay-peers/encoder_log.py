@@ -26,7 +26,8 @@ def collect(stream, counts):
         if error:
             errors[process] += 1
         if counts[process] <= 15 or (error and errors[process] <= 120):
-            print(f"Native encoder {event.get('timestamp')} {process}: {message[:450]}", flush=True)
+            sample = message if len(message) < 850 else message[:350] + " ... " + message[-475:]
+            print(f"Native encoder {event.get('timestamp')} {process}: {sample}", flush=True)
 
 
 if __name__ == "__main__":

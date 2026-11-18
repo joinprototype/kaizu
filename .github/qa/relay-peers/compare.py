@@ -89,6 +89,19 @@ class PeerPage(BaseHTTPRequestHandler):
         pass
 
 
+def native_probes(label, modes):
+    results = []
+    for mode in modes:
+        print(f"Testing native encoder {label}, mode={mode}", flush=True)
+        try:
+            process = subprocess.run([os.environ["KAIZU_ENCODER_PROBE"], mode], timeout=15)
+            results.append(process.returncode == 0)
+        except subprocess.TimeoutExpired:
+            print(f"Native encoder {mode} timed out", flush=True)
+            results.append(False)
+    return all(results)
+
+
 def trial(app, webkit, clients, number, timing):
     with ThreadingHTTPServer(("127.0.0.1", 0), PeerPage) as server:
         server.changed = threading.Condition()
@@ -116,7 +129,9 @@ def trial(app, webkit, clients, number, timing):
                     server.changed.wait(0.2)
             for side, client in zip("AB", clients):
                 print(f"Trial {number} {side}={client}: {json.dumps(server.results.get(side))}", flush=True)
-            return len(server.results) == 2 and all(
+            native_ok = native_probes(f"after call {number}, both browsers still open",
+                                      ("default", "software") if number % 2 else ("software", "default"))
+            return native_ok and len(server.results) == 2 and all(
                 r["result"] == "pass" and r["sender"]["relay"] and r["receiver"]["relay"]
                 for r in server.results.values()
             )
@@ -143,16 +158,11 @@ if __name__ == "__main__":
     if support.exists(): raise SystemExit("Expected a fresh hosted account")
     settings = json.dumps({"externalLinks":"currentSpace"}).encode().hex()
     subprocess.run(["defaults","write","com.joinprototype.kaizu","settings","-data",settings],check=True)
-    # The control gets the same launch gap as the mixed pair. Change only when
-    # each page starts its source, keeping the package, codec and verification fixed.
-    cases = [
-        (("webkit", "webkit"), "on-load"), (("webkit", "kaizu"), "paired"),
-        (("webkit", "kaizu"), "on-load"), (("webkit", "webkit"), "paired"),
-        (("webkit", "webkit"), "paired"), (("webkit", "kaizu"), "on-load"),
-        (("webkit", "kaizu"), "paired"), (("webkit", "webkit"), "on-load"),
-    ]
+    cases = [("webkit", "webkit"), ("webkit", "kaizu"), ("webkit", "kaizu"), ("webkit", "webkit")]
+    baseline = native_probes("before opening browsers", ("default", "software"))
     outcomes = []
-    for number, (clients, timing) in enumerate(cases, 1):
-        outcomes.append(trial(*sys.argv[1:3], clients, number, timing))
+    for number, clients in enumerate(cases, 1):
+        outcomes.append(trial(*sys.argv[1:3], clients, number, "paired"))
         if support.exists(): support.rename(Path(os.environ["RUNNER_TEMP"]) / f"peer-session-{number}")
-    if not all(outcomes): raise SystemExit(f"{outcomes.count(False)} of {len(cases)} paired calls failed")
+    if not baseline or not all(outcomes):
+        raise SystemExit(f"Native baseline passed={baseline}; {outcomes.count(False)} of {len(cases)} trials failed")
