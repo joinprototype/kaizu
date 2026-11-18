@@ -55,6 +55,8 @@ make icon                 # regenerate Resources/AppIcon.icns from scripts/make-
 You can also `open Package.swift` in Xcode and hit Run. The Info.plist is
 embedded into the binary, so WebKit gets a bundle identifier either way.
 
+For a daily-use trial on your Mac, run `scripts/build-trial.sh`. It packages the current commit as an ad-hoc signed DMG in `build/` and prints its SHA-256 checksum. The trial uses your regular Kaizu profile. **Kaizu → About Kaizu** and **Help → Report a Bug** include the short commit ID so you can identify the build you tested.
+
 Debug builds accept `KAIZU_DEBUG=commandbar|location|space|settings|history|private|peek|switcher|extension|nosidebar|reader|pin|split|splitdrop|capture|quickbar|open|arcimport` to
 boot straight into a UI state (handy for screenshots), and
 `KAIZU_SUPPORT=/some/folder` to keep that launch's session and history out
