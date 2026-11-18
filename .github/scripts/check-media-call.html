@@ -148,21 +148,41 @@ async function call() {
         const videoVerified = !(fromWorker || compareVP8) || [...stats.values()].some(report =>
             report.type === "inbound-rtp" && report.kind === "video" && report.framesDecoded > 0 &&
             stats.get(report.codecId)?.mimeType.toLowerCase() === expectedCodec);
-        if (config.iceTransportPolicy === "relay") {
-            if (!usesRelay(stats)) throw new Error("The receiving peer did not report a nominated relay candidate pair");
-        }
+        const relayVerified = config.iceTransportPolicy !== "relay" || usesRelay(videoPath(receiver, stats));
         for (const report of stats.values()) {
             if (report.type === "inbound-rtp" && report.kind === "audio" &&
-                report.totalAudioEnergy > 0 && report.totalSamplesDuration > 0 && videoVerified) return;
+                report.totalAudioEnergy > 0 && report.totalSamplesDuration > 0 && videoVerified && relayVerified) return;
         }
         await new Promise(resolve => setTimeout(resolve, 100));
     }
 }
 
-function usesRelay(stats) {
-    return [...stats.values()].some(report =>
-        report.type === "candidate-pair" && report.state === "succeeded" && report.nominated &&
-        stats.get(report.localCandidateId)?.candidateType === "relay");
+// A connected WebKit peer can report a stale candidate-pair state. Prefer the
+// selected pair of the video transport; retain nomination for older WebKit.
+function videoPath(peer, stats) {
+    const reports = [...stats.values()];
+    const rtp = reports.find(r => r.kind === "video" && (r.type === "inbound-rtp" || r.type === "outbound-rtp"));
+    const transport = stats.get(rtp?.transportId);
+    const pair = stats.get(transport?.selectedCandidatePairId);
+    function describe(pair, source) {
+        return {source, state: pair?.state,
+            local: stats.get(pair?.localCandidateId)?.candidateType,
+            remote: stats.get(pair?.remoteCandidateId)?.candidateType};
+    }
+    if (pair) return describe(pair, "video transport stats");
+    const video = peer.getTransceivers().find(t => t.receiver.track.kind === "video");
+    const endpoint = rtp?.type === "outbound-rtp" ? video?.sender : video?.receiver;
+    const ice = endpoint?.transport?.iceTransport;
+    const selected = ice?.getSelectedCandidatePair?.();
+    if (selected) return {source: "video ICE transport", local: selected.local?.type, remote: selected.remote?.type};
+    if (transport?.selectedCandidatePairId) return {source: "selected pair unavailable"};
+    const nominated = reports.filter(r => r.type === "candidate-pair" && r.state === "succeeded" && r.nominated &&
+        (!rtp?.transportId || !r.transportId || r.transportId === rtp.transportId));
+    return nominated.length === 1 ? describe(nominated[0], "nominated pair") : {source: "no selected pair"};
+}
+
+function usesRelay(path) {
+    return path.local === "relay" && path.remote === "relay";
 }
 
 // The hosted Mac sometimes draws the canvas without delivering any frames to the video source.
@@ -197,8 +217,9 @@ async function describePeer(peer) {
         const key = stat.type + "/" + (stat.candidateType || stat.state);
         counts[key] = (counts[key] || 0) + 1;
     }
+    const path = videoPath(peer, stats);
     return {connection: peer.connectionState, gathering: peer.iceGatheringState, ice: peer.iceConnectionState,
-        relay: usesRelay(stats), counts, media};
+        relay: usesRelay(path), path, counts, media};
 }
 
 async function reportState(reason) {
