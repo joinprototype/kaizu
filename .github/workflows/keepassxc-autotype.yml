@@ -8,13 +8,13 @@ jobs:
   fill:
     runs-on: xcode-27
     timeout-minutes: 12
-    env:
-      RUNNER_ENVIRONMENT: ${{ runner.environment }}
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Test the signed password manager on a local login form
+        env:
+          RUNNER_ENVIRONMENT: ${{ runner.environment }}
         run: |
           test "$RUNNER_ENVIRONMENT" = github-hosted
           make app CONFIG=debug > "$RUNNER_TEMP/build.log" 2>&1 || { tail -30 "$RUNNER_TEMP/build.log"; exit 1; }
