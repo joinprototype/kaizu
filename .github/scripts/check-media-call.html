@@ -87,6 +87,7 @@ async function call() {
             resolve(data);
         };
     });
+    stage = "adding video and audio tracks";
     const videoSender = caller.addTrack(stream.getVideoTracks()[0], stream);
     if (compareVP8) {
         const codecs = RTCRtpSender.getCapabilities("video").codecs.filter(codec => codec.mimeType.toLowerCase() === "video/vp8");
@@ -105,12 +106,30 @@ async function call() {
         throw new Error("The receiving peer did not render the expected video and echo the call message");
     }
     if (fromWorker) {
-        const sample = document.createElement("canvas").getContext("2d");
-        sample.drawImage(video, 0, 0, 1, 1);
-        const [red, green, blue] = sample.getImageData(0, 0, 1, 1).data;
-        if (Math.max(red, blue) < 150 || Math.abs(red - blue) < 80 || green > 110) {
-            throw new Error("The rendered frame did not contain the generated color");
+        stage = "reading the rendered video frame";
+        while (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+            await new Promise(resolve => setTimeout(resolve, 50));
         }
+        // Read pixels from the decoded video frame without requiring a second canvas backing store.
+        const snapshot = new VideoFrame(video, {timestamp: 0});
+        try {
+            const region = {rect: {x: 0, y: 0, width: 2, height: 2}};
+            const pixels = new Uint8Array(snapshot.allocationSize(region));
+            const planes = await snapshot.copyTo(pixels, region);
+            let hasColor;
+            if (snapshot.format === "NV12" || snapshot.format === "I420" || snapshot.format === "I420A") {
+                // A red or blue patch has one high chroma component. Green and neutral patches do not.
+                const u = pixels[planes[1].offset];
+                const v = pixels[snapshot.format === "NV12" ? planes[1].offset + 1 : planes[2].offset];
+                hasColor = Math.max(u, v) > 175 && Math.min(u, v) < 150;
+            } else if (["RGBA", "RGBX", "BGRA", "BGRX"].includes(snapshot.format)) {
+                const [first, green, third] = pixels.subarray(planes[0].offset);
+                hasColor = Math.max(first, third) >= 150 && Math.abs(first - third) >= 80 && green <= 110;
+            } else {
+                throw new Error(`Unrecognized decoded frame format: ${snapshot.format}`);
+            }
+            if (!hasColor) throw new Error(`The rendered frame did not contain the generated color (${snapshot.format})`);
+        } finally { snapshot.close(); }
     }
     stage = "waiting for decoded audio";
     while (true) {
@@ -156,20 +175,21 @@ async function describePeer(peer) {
     return [peer.connectionState, peer.iceGatheringState, peer.iceConnectionState, JSON.stringify(counts), JSON.stringify(media)].join(" ");
 }
 
-const timeout = setTimeout(async () => {
+async function reportState(reason) {
     const summary = await Promise.all([describePeer(caller), describePeer(receiver)]);
     const page = {
         visibility: document.visibilityState, drawn: frame, generated, echoed, audio: audio.state,
-        videoReady: video.readyState, videoPaused: video.paused,
+        videoReady: video.readyState, videoPaused: video.paused, width: video.videoWidth, height: video.videoHeight,
         remoteVideo: video.srcObject?.getVideoTracks().map(track => ({state: track.readyState, muted: track.muted}))
     };
-    reportFailure(`Timeout during ${stage}. Caller ${summary[0]}, receiver ${summary[1]}, page ${JSON.stringify(page)}`);
-}, 30000);
+    reportFailure(`${reason} during ${stage}. Caller ${summary[0]}, receiver ${summary[1]}, page ${JSON.stringify(page)}`);
+}
+const timeout = setTimeout(() => reportState("Timeout"), 30000);
 try {
     await call();
     location.replace("/start");
 } catch (error) {
-    reportFailure(error.message);
+    await reportState(`${error.name}: ${error.message}`);
 } finally {
     clearTimeout(timeout);
     clearInterval(draw);
