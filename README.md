@@ -1,38 +1,48 @@
-# Kaizu
+<p align="center">
+  <img src="site/apple-touch-icon.png" width="84" height="84" alt="">
+</p>
 
-An Arc-style browser for macOS built on WebKit (the Safari engine), with a
-quiet, crafted soul. Vertical tabs, pinned tabs, a command bar, and real profiles with
-fully isolated website data.
+<h1 align="center">Kaizu</h1>
 
-**[Download for Mac](https://kaizu.joinprototype.com)**. Free, open source and early. It needs an
-Apple silicon Mac on macOS 15.4 or later. Apple hasn't checked Kaizu yet, so your Mac stops it the
-first time: the site has the steps. After that it updates itself.
+<p align="center">An Arc-style browser for Mac. Bring your sidebar, keep work and personal logins separate, and browse with WebKit.</p>
 
-Found a bug? Choose Help → Report a Bug in Kaizu, or write to
-[help@joinprototype.com](mailto:help@joinprototype.com). Made by
-[Prototype](https://joinprototype.com) in Santa Monica.
+<p align="center">
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fkaizu.joinprototype.com%2Fversion.json&amp;query=%24.version&amp;label=release&amp;color=35466e" alt="Current Kaizu release"></a>
+  <img src="https://img.shields.io/badge/macOS-15.4%2B-555555" alt="macOS 15.4 and later">
+  <img src="https://img.shields.io/badge/Mac-Apple%20silicon-555555" alt="Apple silicon">
+</p>
 
-## What's in it
+<p align="center">
+  <strong><a href="https://kaizu.joinprototype.com/download">Download for Mac</a></strong> ·
+  <a href="https://kaizu.joinprototype.com/#open">First launch</a> ·
+  <a href="CHANGELOG.md">Changelog</a> ·
+  <a href="docs/ROADMAP.md">Roadmap</a>
+</p>
 
-- **Sidebar**: spaces (two-finger swipe), favorites, pinned tabs and folders, Today tabs that archive themselves, peek on hover when hidden
-- **Command bar** (⌘T): addresses with inline completion, open tabs, history, archived tabs, commands by name (every menu item too), `20+20`, `10 km to mi`, `time in tokyo`, `100 usd to eur`, `yt lofi`; optionally from any app with a shortcut (Settings → General), like Spotlight; pinned tabs and favorites show up in the system Spotlight too
-- **Windows**: little windows for links from other apps, private windows, split view (up to 4; drag a tab onto the page), link peek, ⌃Tab recent-tab switcher
-- **Privacy, built in**: ads and trackers blocked (EasyList/EasyPrivacy, updated daily), YouTube ads, cookie pop-ups rejected automatically, tracking parameters stripped, HTTPS first, Global Privacy Control; per-site pause
-- **Light on the Mac**: idle tabs hibernate (and on memory pressure) and wake where you left them
-- **Import from Arc** (File menu): spaces, pinned tabs, folders, favorites and Today tabs, with a preview first; it reads Arc's sidebar on this Mac and never changes it
-- **Extensions**: "Add to Kaizu" on Chrome Web Store and Firefox Add-ons pages, or from a folder, a `.zip` or a Safari extension app
-- **Capture** (⇧⌘2): drag over part of the page to copy it as an image
-- **Hide Distracting Items**: click away banners and clutter; the site remembers
-- **Right-click**: open links in a new tab, Split View, a new window or a private window, search with your own engine, share a page
-- **Reading**: Reader (⇧⌘R), picture in picture when you leave a playing video, per-tab mute
-- **Site notifications**: sites you allow can reach you from the background, with a dot on the tab and a count on the Dock
-- **Remembers per site**: camera, microphone and location answers, zoom; all of it (plus blocking and clearing the site's data) in a popover from the address pill's lock
+<p align="center">
+  <img src="site/img/commandbar.jpg" width="800" alt="Kaizu’s sidebar beside a Wikipedia page, with the command bar converting 10 km to 6.21 miles.">
+</p>
 
-## Run
+## At home in Kaizu
 
-Requires macOS 15.4+ and Xcode 16.3+ (Swift 6).
+- **Bring your Arc setup.** Preview your spaces, folders, favorites and tabs before importing them. Your original Arc sidebar stays intact. You can also import bookmarks and history from Chromium browsers or a Safari export.
+- **Give each project a space.** Pin the pages you keep coming back to and let Today tabs archive themselves. Use separate profiles when you want separate logins and cookies.
+- **Stay on the keyboard.** Press ⌘T to jump to an open tab, find an archived page, run a menu command or convert a measurement. Press ⌘/ to see the shortcuts.
+- **Keep your place.** Peek at a link, open it beside the page you’re reading, or split a window into up to four panes. Idle tabs can go to sleep and wake when you return.
+- **Control what loads.** Kaizu blocks ads and trackers, rejects supported cookie prompts and strips tracking parameters. Open the site settings in the address bar to pause blocking for one site.
+
+## Install
+
+Download the disk image, open it and drag Kaizu into Applications. The current build is ad-hoc signed and macOS asks for approval on first launch. Once installed, Kaizu checks for signed updates automatically. [First-launch instructions](https://kaizu.joinprototype.com/#open)
+
+Found a bug? Choose **Help → Report a Bug** in Kaizu, or open a [GitHub issue](https://github.com/joinprototype/kaizu/issues). You can also reach the team at [help@joinprototype.com](mailto:help@joinprototype.com).
+
+## Build and test
+
+Use Xcode with the macOS 27 SDK and Swift 6. The app runs on Apple silicon with macOS 15.4 or later.
 
 ```sh
+swift test                # run the BrowserCore test suite
 make run                  # build debug, bundle build/Kaizu.app, launch
 make app CONFIG=release   # release bundle
 make icon                 # regenerate Resources/AppIcon.icns from scripts/make-icon.swift
@@ -51,11 +61,13 @@ copy that can't touch your real browser at all, give its Info.plist another
 ## Release
 
 ```sh
-scripts/release.sh 0.1.3      # bump the version, write the DMG, signed zip and version.json into site/
+scripts/release.sh "$version"  # set version to the release number first
 cd site && npx wrangler deploy
 ```
 
-Run one release at a time, and it needs the update signing key. Kaizu reads `version.json` 10
+Add a dated entry to [CHANGELOG.md](CHANGELOG.md) and commit the release metadata. After deploying the site, create a GitHub release tagged `v<version>` at that release commit. Attach the same DMG and update ZIP that went to the site and copy the changelog entry into the release notes.
+
+Build one release at a time with the update signing key. Kaizu reads `version.json` 10
 seconds after launch and every 6 hours. A newer build downloads quietly and goes in on restart or
 quit, once its Ed25519 signature, bundle id, build number and code signature all check out. If
 anything fails, or Kaizu can't replace itself, people get a notice with the download link instead.
