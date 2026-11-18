@@ -16,14 +16,17 @@ func items(_ element: AXUIElement, depth: Int = 0) -> [AXUIElement] {
     return [element] + (attr(element,kAXChildrenAttribute) as? [AXUIElement] ?? []).flatMap { items($0,depth:depth+1) }
 }
 func controls() -> [AXUIElement] { (attr(source,kAXWindowsAttribute) as? [AXUIElement] ?? []).flatMap { items($0) } }
+func labels(_ el: AXUIElement) -> [String] {
+    [kAXTitleAttribute, kAXDescriptionAttribute, kAXValueAttribute].compactMap { attr(el,$0) as? String }
+}
 func button(_ title: String) -> AXUIElement {
     for _ in 0..<50 {
         if let result = controls().first(where: { e in
-            attr(e,kAXRoleAttribute) as? String == "AXButton" && (attr(e,kAXTitleAttribute) as? String)?.lowercased() == title.lowercased()
+            attr(e,kAXRoleAttribute) as? String == "AXButton" && labels(e).contains { $0.caseInsensitiveCompare(title) == .orderedSame }
         }) { return result }
         Thread.sleep(forTimeInterval:0.2)
     }
-    print("Missing",title,"buttons:",controls().filter { attr($0,kAXRoleAttribute) as? String == "AXButton" }.compactMap { attr($0,kAXTitleAttribute) as? String })
+    print("Missing",title,"controls:",controls().map { [attr($0,kAXRoleAttribute) as? String ?? ""] + labels($0) }.filter { $0.count > 1 })
     exit(3)
 }
 func key(_ code: CGKeyCode, _ flags: CGEventFlags = []) {

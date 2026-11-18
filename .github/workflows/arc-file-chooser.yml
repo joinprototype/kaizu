@@ -24,7 +24,7 @@ jobs:
           export KAIZU_DEBUG=arcimport KAIZU_ARC="$RUNNER_TEMP/missing-sidebar.json" KAIZU_SUPPORT="$RUNNER_TEMP/kaizu" KAIZU_SHOTS="$RUNNER_TEMP"
           build/Kaizu.app/Contents/MacOS/Kaizu > "$RUNNER_TEMP/kaizu.log" 2>&1 &
           sleep 3
-          swift .github/qa/arc-export/chooser.swift "$fixture"
+          swift .github/qa/arc-export/chooser.swift "$fixture" || { tail -20 "$RUNNER_TEMP/kaizu.log"; exit 1; }
           osascript -e 'tell application id "com.joinprototype.kaizu" to quit'
           test "$checksum" = "$(shasum -a 256 "$fixture")"
           python3 - <<'PY'
