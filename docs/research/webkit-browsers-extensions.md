@@ -75,6 +75,21 @@ On November 18, 2026, a standalone WebKit test on macOS 27.0.1 compiled all 15,6
 
 Kaizu’s development build implements **Settings → Privacy → Import Rule List…** for published WebKit JSON files. Kaizu compiles the selected file before activation and allows each list to be disabled or removed. [Packaged browser results](../ROADMAP.md#extension-compatibility) The Hush result covers static rules only. A blocker that generates rules inside its Safari extension would need to offer an export or publish its lists separately.
 
+## First-page filtering
+
+On macOS 27.0.1, a fresh Kaizu development profile opened a loopback page whose first script, `/88/tag.min.js`, matches both the bundled EasyList and uBlock Origin Lite’s Safari ZIP (2026.1116.1650). A second script served as the control. The page then repeatedly fetched the matching URL with caching disabled. Each configuration used a separate app identifier and profile. For the extension trials, Kaizu installed the vendor ZIP and relaunched before opening the test page. [Upstream extension build](https://github.com/uBlockOrigin/uBOL-home/releases/tag/2026.1116.1650)
+
+| Kaizu blocker | uBlock Origin Lite | First matching script reached the server | Later matching fetch reached the page | Control script ran |
+|---|---|---|---|---|
+| Off | Absent | Yes | Yes | Yes |
+| Off | Installed | Yes | No, by 5.4 seconds from launch | Yes |
+| On | Absent | No | No | Yes |
+| On | Installed | No | No | Yes |
+
+In a separate nonpersistent WebKit window with extension access explicitly enabled for the test session, the public `controller.load` call returned and `hasContentModificationRules` was true before the first matching script reached the server. Explicitly awaiting `loadBackgroundContent()` produced the same result. Later fetches were blocked roughly five seconds after starting each of the four trials. In WebKit’s implementation, loading the extension schedules the rule work and the compiled rules are attached asynchronously. A host that delays navigation until the background page loads can still send the first request. [WebKit extension loading and rule compilation](https://github.com/WebKit/WebKit/blob/main/Source/WebKit/UIProcess/Extensions/Cocoa/WebExtensionContextCocoa.mm)
+
+Keep the built-in blocker enabled for first-page coverage of its own lists. Rules that appear only in a third-party extension still depend on that extension becoming active. The observed times describe these trials on one Mac.
+
 ## Recommendations for Kaizu
 
 1. **Support published blocking rules through WebKit.** Use openly distributed lists or a user-selected rule export. The Hush experiment above verifies one such file.
