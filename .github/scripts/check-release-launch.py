@@ -15,6 +15,14 @@ from pathlib import Path
 
 
 class Page(BaseHTTPRequestHandler):
+    # An idle WebKit preconnection must return control to the launch deadline.
+    timeout = 3
+
+    def request_recheck(self):
+        self.send_response(202)
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+
     def do_GET(self):
         server = self.server
         if self.path == "/start":
@@ -41,7 +49,9 @@ class Page(BaseHTTPRequestHandler):
                     try {{
                         const marker = {json.dumps(server.storage_token)};
                         {seed}
-                        headers['X-Kaizu-Storage'] = localStorage.getItem('upgrade-test') === marker ? 'match' : 'missing';
+                        const value = localStorage.getItem('upgrade-test');
+                        if (value === null) headers['X-Kaizu-Storage'] = 'missing';
+                        else headers['X-Kaizu-Storage'] = value === marker ? 'match' : 'different';
                     }} catch {{
                         headers['X-Kaizu-Storage'] = 'unavailable';
                     }}
@@ -51,12 +61,12 @@ class Page(BaseHTTPRequestHandler):
                 blocker_probe = '<script src="/ads/cbr.js"></script><script src="/launch-control.js"></script>'
             self.wfile.write(f"""<!doctype html><title>Kaizu launch test</title><link rel="icon" href="data:,">
                 <body><h1>Ready</h1>{blocker_probe}<script>
-                const headers = {{}};
-                {storage_check}
                 if ({json.dumps(server.check_first_page_blocking)} && !window.launchControl) throw Error("Control script did not run");
                 async function checkLogin() {{
                     for (const delay of [0, 1000, 4000, 10000]) {{
                         if (delay) await new Promise(resolve => setTimeout(resolve, delay));
+                        const headers = {{}};
+                        {storage_check}
                         const result = await fetch('/{server.challenge}', {{headers, cache: 'no-store'}});
                         if (result.status !== 202) return;
                     }}
@@ -84,12 +94,21 @@ class Page(BaseHTTPRequestHandler):
                                        f"local storage {storage}")
                 self.send_error(403)
                 return
+            cookie_status = "match" if cookie_matches else "missing"
+            if server.first_storage_failure:
+                server.page_failure = (f"{server.first_storage_failure}; next probe: "
+                                       f"login cookie {cookie_status}, local storage {storage}")
+                self.send_error(403)
+                return
+            if not server.issue_cookie and check_storage and storage != "match" and not server.missing_probes:
+                server.first_storage_failure = f"restored launch: login cookie {cookie_status}, local storage {storage}"
+                print(server.first_storage_failure, flush=True)
+                self.request_recheck()
+                return
             if not server.issue_cookie and not cookie_matches and storage == "match" and server.missing_probes < 3:
                 server.missing_probes += 1
                 print(f"Restored login cookie missing on probe {server.missing_probes}, local storage matched", flush=True)
-                self.send_response(202)
-                self.send_header("Cache-Control", "no-store")
-                self.end_headers()
+                self.request_recheck()
                 return
             if server.missing_probes and cookie_matches:
                 server.page_failure = f"Restored login cookie appeared only after {server.missing_probes} failed probes"
@@ -127,6 +146,7 @@ def launch(server, app, *urls):
     server.rendered = False
     server.page_failure = None
     server.missing_probes = 0
+    server.first_storage_failure = None
     server.document_missing_lax = False
     server.challenge = secrets.token_hex(12)
     process = subprocess.Popen(["open", "-W", "-n", "-a", str(app), *urls])
