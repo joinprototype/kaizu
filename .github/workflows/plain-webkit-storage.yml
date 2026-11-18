@@ -1,18 +1,22 @@
-name: Check new and edited drafts on immediate WebKit quit
+name: Compare draft preservation when a page exits on quit
 on:
   push:
-    branches: [qa/local-storage-at-ack]
+    branches: [qa/webkit-quit-navigation]
 permissions:
   contents: read
 jobs:
   compare:
-    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, xcode-27]
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - name: Quit directly on the page acknowledgement and compare committed writes
+      - name: Compare ordinary quit, completed navigation and a short commit interval
         run: |
           sw_vers
           python3 -u .github/qa/webkit-storage/check.py
