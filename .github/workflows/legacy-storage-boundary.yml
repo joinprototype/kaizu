@@ -1,0 +1,30 @@
+name: Trace published v0.2.5 storage across a restart and an upgrade
+on:
+  push:
+    branches: [qa/legacy-storage-boundary]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  compare:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          github-token: ${{ github.token }}
+          run-id: 44388451163
+          name: kaizu-runtime-check
+          path: ${{ runner.temp }}/candidate
+      - name: Compare first reads with committed values in the original profile
+        env:
+          RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        run: |
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          cd "$RUNNER_TEMP"
+          curl --fail --location --retry 3 --output published.zip https://github.com/joinprototype/kaizu/releases/download/v0.2.5/Kaizu-0.2.5.zip
+          echo '709b3ecacfd26e73c7b8eb77d958e3ad57317833420b1f0d6d4698f5101ebc08  published.zip' | shasum -a 256 --check
+          python3 -u "$GITHUB_WORKSPACE/.github/scripts/compare-legacy-storage.py" published.zip candidate/Kaizu.zip
