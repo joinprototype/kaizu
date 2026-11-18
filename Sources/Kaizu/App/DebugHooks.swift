@@ -764,6 +764,11 @@ enum DebugHooks {
             store.reopenClosedTab()
             try? await Task.sleep(for: .milliseconds(500))
             check("⇧⌘T keeps a tab's name", store.selectedTab?.customTitle == "Named")
+            let beforeClear = home.today.map(\.displayTitle)
+            store.clearToday(in: home)
+            store.reopenClosedTab()
+            store.undoToast()
+            check("Clear, reopen and Undo return every tab exactly once", home.today.map(\.displayTitle) == beforeClear)
             try? await Task.sleep(for: .seconds(1))
             NSApp.terminate(nil)
         }

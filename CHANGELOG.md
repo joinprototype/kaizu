@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+Reopen Closed Tab (⇧⌘T) restores Back and Forward history for the 32 most recently closed Today tabs when each snapshot fits in 1 MiB. Older tabs and larger pages reopen at their saved address. After Clear Today, Undo skips tabs you already reopened.
+
 The Arc import preview shows each destination’s profile and sidebar position so you can distinguish spaces with the same name before importing. When both profiles have identical pins in a space, re-import also checks the other space names in the same Arc profile.
 
 Pressing ⌘O in a little window moves the live page into its opening space, even after you switch windows. If that space was deleted, the page can move to another space in the same profile. Deleting the profile closes its little windows.

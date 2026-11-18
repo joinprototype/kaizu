@@ -82,6 +82,12 @@ final class BrowserTab: NSObject, Identifiable {
         favicon = url?.host().flatMap { FaviconStore.shared.cachedImage(for: $0) }
     }
 
+    convenience init(reopening record: TabRecord, profile: Profile, app: AppModel?, navigationState: Data?) {
+        self.init(profile: profile, app: app, url: record.url, title: record.title)
+        customTitle = record.customTitle
+        savedState = navigationState
+    }
+
     /// A pinned or favorite tab that navigated off its saved page.
     var hasWanderedFromPin: Bool {
         guard let pinnedURL, let url else { return false }
