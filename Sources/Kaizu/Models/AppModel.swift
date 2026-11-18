@@ -44,7 +44,7 @@ final class AppModel {
     private weak var lastKeyStore: BrowserStore?
     private weak var lastRegularStore: BrowserStore?
 
-    init() {
+    init(session: SessionFiles.Opened?) {
         contentBlocker.standardScripts = [MediaEvents.script] + SiteNotifications.scripts
         contentBlocker.start()
         extensions.app = self
@@ -52,7 +52,7 @@ final class AppModel {
             await extensions.loadInstalled()
             spaces.flatMap(\.allTabs).forEach { $0.reopenExtensionPage() }
         }
-        restore()
+        restore(session)
         loadChoices()
         startArchiving()
         startHibernating()
