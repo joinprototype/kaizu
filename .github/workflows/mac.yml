@@ -35,6 +35,10 @@ jobs:
     needs: verify
     runs-on: macos-15
     timeout-minutes: 7
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: [clean-launch, upgrade-from-0.2.5]
     steps:
       - uses: actions/checkout@v7
         with:
@@ -43,9 +47,22 @@ jobs:
         with:
           name: kaizu-runtime-check
           path: ${{ runner.temp }}
-      - name: Launch release and verify WebKit navigation
+      - name: Unpack the candidate
         run: |
           sw_vers
           ditto -x -k "$RUNNER_TEMP/Kaizu.zip" "$RUNNER_TEMP/launch"
           codesign --verify --strict "$RUNNER_TEMP/launch/Kaizu.app"
-          python3 .github/scripts/check-release-launch.py "$RUNNER_TEMP/launch/Kaizu.app"
+      - name: Launch release and verify WebKit navigation
+        if: matrix.scenario == 'clean-launch'
+        run: python3 .github/scripts/check-release-launch.py "$RUNNER_TEMP/launch/Kaizu.app"
+      - name: Upgrade the published app with a saved tab and login cookie
+        if: matrix.scenario == 'upgrade-from-0.2.5'
+        env:
+          RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        working-directory: ${{ runner.temp }}
+        run: |
+          curl --fail --location --retry 3 --output previous.zip https://github.com/joinprototype/kaizu/releases/download/v0.2.5/Kaizu-0.2.5.zip
+          echo '709b3ecacfd26e73c7b8eb77d958e3ad57317833420b1f0d6d4698f5101ebc08  previous.zip' | shasum -a 256 --check
+          ditto -x -k previous.zip installed
+          codesign --verify --strict installed/Kaizu.app
+          python3 "$GITHUB_WORKSPACE/.github/scripts/check-release-launch.py" launch/Kaizu.app installed/Kaizu.app
