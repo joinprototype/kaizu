@@ -24,6 +24,8 @@ public struct ArcImport: Equatable, Sendable {
     /// What goes into profiles and spaces that already exist, by id.
     public var favorites: [UUID: [TabRecord]] = [:]
     public var pinned: [UUID: [SidebarItemRecord]] = [:]
+    /// New children to append to folders that already exist, keyed by folder ID.
+    public var folderAdditions: [UUID: [SidebarItemRecord]] = [:]
     public var today: [UUID: [TabRecord]] = [:]
     public var takeover: Takeover?
     /// One row per Arc space, for the preview.
@@ -34,7 +36,8 @@ public struct ArcImport: Equatable, Sendable {
         let inNewSpaces = newSpaces.reduce(0) { $0 + $1.pinned.tabCount + $1.today.count }
         let inNewProfiles = newProfiles.reduce(0) { $0 + $1.favorites.count }
         let added = pinned.values.reduce(0) { $0 + $1.tabCount } + today.values.reduce(0) { $0 + $1.count }
-        return inNewSpaces + inNewProfiles + added + favorites.values.reduce(0) { $0 + $1.count }
+        let inFolders = folderAdditions.values.reduce(0) { $0 + $1.tabCount }
+        return inNewSpaces + inNewProfiles + inFolders + added + favorites.values.reduce(0) { $0 + $1.count }
     }
 
     /// `hues` and `symbols` are what new spaces cycle through, as they do
@@ -78,11 +81,14 @@ public struct ArcImport: Equatable, Sendable {
             if let match = matches[index] {
                 let favorites = profiles.first { $0.id == match.profileID }?.favorites ?? []
                 let known = Self.addresses(of: match.pinned.tabs + match.today + favorites)
-                let pinned = arc.pinned.compactMap { Self.record($0, skipping: known) }
+                var folders: [UUID: [SidebarItemRecord]] = [:]
+                let pinned = Self.additions(arc.pinned, alongside: match.pinned, skipping: known, folders: &folders)
+                for (id, items) in folders { folderAdditions[id] = items }
+                let pinnedCount = folders.values.reduce(pinned.tabCount) { $0 + $1.tabCount }
                 let fresh = today.filter { !known.contains($0.url) }.map { Self.record($0, now: now) }
                 if !pinned.isEmpty { self.pinned[match.id] = pinned }
                 if !fresh.isEmpty { self.today[match.id] = fresh }
-                summary.append(SpaceSummary(name: arc.name, isNew: false, pinned: pinned.tabCount, today: fresh.count))
+                summary.append(SpaceSummary(name: arc.name, isNew: false, pinned: pinnedCount, today: fresh.count))
                 continue
             }
             let profileID = kaizuProfile[arc.profile] ?? UUID()
@@ -115,6 +121,31 @@ public struct ArcImport: Equatable, Sendable {
 
     private static func addresses(of tabs: [TabRecord]) -> Set<URL> {
         Set(tabs.flatMap { [$0.url, $0.pinnedURL].compactMap(\.self) })
+    }
+
+    /// Reuse a folder only when its name identifies one sibling on each side.
+    /// Absolute paths and sidebar order can change, and Arc exports allow repeated headings.
+    private static func additions(
+        _ source: [ArcSidebar.Item], alongside existing: [SidebarItemRecord], skipping known: Set<URL>,
+        folders: inout [UUID: [SidebarItemRecord]]
+    ) -> [SidebarItemRecord] {
+        var byName: [String: FolderRecord] = [:]
+        var ambiguous = Set<String>()
+        for case .folder(let folder) in existing {
+            if byName.updateValue(folder, forKey: folder.name) != nil { ambiguous.insert(folder.name) }
+        }
+        var seen = Set<String>()
+        for case .folder(let name, _) in source where !seen.insert(name).inserted {
+            ambiguous.insert(name)
+        }
+        return source.compactMap { item in
+            guard case .folder(let name, let children) = item, let folder = byName[name], !ambiguous.contains(name) else {
+                return record(item, skipping: known)
+            }
+            let added = additions(children, alongside: folder.children, skipping: known, folders: &folders)
+            if !added.isEmpty { folders[folder.id] = added }
+            return nil
+        }
     }
 
     private static func record(_ item: ArcSidebar.Item, skipping known: Set<URL>) -> SidebarItemRecord? {
@@ -166,6 +197,7 @@ extension ArcImport {
             }
         }
         for items in pinned.values { include(items) }
+        for items in folderAdditions.values { include(items) }
         for space in newSpaces {
             include(space.pinned)
             ids.formUnion(space.today.map(\.id))
