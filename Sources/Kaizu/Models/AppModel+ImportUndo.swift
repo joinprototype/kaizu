@@ -29,7 +29,7 @@ extension AppModel {
         closedTabs.removeAll { ids.contains($0.record.id) }
         let archiveCount = archive.count
         archive.removeAll { ids.contains($0.tab.id) }
-        if archive.count != archiveCount { saveArchive() }
+        if archive.count != archiveCount { save() }
     }
 }
 
