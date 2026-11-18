@@ -59,7 +59,7 @@ struct SpaceSwitcher: View {
             Button("Delete Space", role: .destructive) { store.delete(space) }
         } message: { space in
             if store.deletesProfile(space) {
-                Text("Its tabs, favorites and all website data (cookies, logins, site storage) will be permanently removed.")
+                Text("Little windows using this profile will close. Its tabs, favorites and all website data (cookies, logins, site storage) will be permanently removed.")
             } else {
                 Text("Its pinned and today tabs will be removed. Logins stay with the spaces that share its profile.")
             }

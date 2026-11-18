@@ -1760,6 +1760,8 @@ enum DebugHooks {
                 FileHandle.standardError.write(Data("QA notify \(passed ? "ok" : "FAILED"): allowed tab woke at launch, another stayed asleep\n".utf8))
                 NSApp.terminate(nil)
             }
+        case "little-window-promotion":
+            Task { await checkLittleWindowPromotion(in: store) }
         case "archive-sweep-interrupt":
             interruptArchiveSweep(in: store)
         case "archive-interrupt", "archive-restored":

@@ -190,7 +190,7 @@ default-browser capable · curated themes · app icon.
 | Ad + tracker blocking | via extensions | ✓ built in | — | M | `WKContentRuleList` ✓ (same engine as Safari content blockers) |
 | Split view | ✓ | ✓ | — | L | several page views per window |
 | Peek (link preview overlay) | ✓ | ✓ | — | M | promote preview to tab without reload |
-| Little Arc (mini window) | ✓ | ✓ | — | M | `NSPanel` |
+| Little Arc (mini window) | ✓ | ✓ | — | M | On macOS 27.0.1, the File menu moved a live page and its unsaved draft back to its opening space across two windows. |
 | ⌃Tab recent-tab switcher | ✓ | ✓ | — | M | `takeSnapshot` ✓ for thumbnails |
 | Media: now playing, mute, auto-PiP | ✓ | ✓ | — | M | event-driven via isolated-world script; auto-PiP ✓ |
 | Capture / screenshots | ✓ | ✓ | — | S | `takeSnapshot`, `createPDF` ✓ |
