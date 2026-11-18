@@ -11,7 +11,7 @@ window.addEventListener("error", event => reportFailure(event.message));
 window.addEventListener("unhandledrejection", event => reportFailure(String(event.reason)));
 </script>
 <script type="module">
-// Use two local peers and a canvas camera so the test never needs a physical device.
+// The two local peers exchange a canvas video and a synthesized audio track.
 let stage = "creating peers";
 const caller = new RTCPeerConnection({iceServers: []});
 const receiver = new RTCPeerConnection({iceServers: []});
@@ -19,6 +19,11 @@ const canvas = document.querySelector("canvas");
 const context = canvas.getContext("2d");
 const video = document.querySelector("video");
 const stream = canvas.captureStream(10);
+const audio = new AudioContext();
+const microphone = audio.createMediaStreamDestination();
+const tone = audio.createOscillator();
+tone.connect(microphone);
+tone.start();
 let frame = 0;
 const draw = setInterval(() => {
     context.fillStyle = ++frame % 2 ? "tomato" : "navy";
@@ -44,6 +49,7 @@ async function connect(from, to, description) {
 async function call() {
     const receivedFrame = new Promise(resolve => {
         receiver.ontrack = event => {
+            if (event.track.kind !== "video") return;
             video.srcObject = event.streams[0];
             video.requestVideoFrameCallback((_, metadata) => resolve(metadata));
         };
@@ -57,12 +63,25 @@ async function call() {
         channel.onmessage = ({data}) => resolve(data);
     });
     caller.addTrack(stream.getVideoTracks()[0], stream);
+    const audioTrack = microphone.stream.getAudioTracks()[0];
+    caller.addTrack(audioTrack, microphone.stream);
+    stage = "starting synthesized audio";
+    await audio.resume();
     await connect(caller, receiver, await caller.createOffer());
     await connect(receiver, caller, await receiver.createAnswer());
     stage = "waiting for video and data";
     const [metadata, echo] = await Promise.all([receivedFrame, reply]);
     if (metadata.width !== canvas.width || metadata.height !== canvas.height || echo !== "received hello") {
         throw new Error("The receiving peer did not render the expected video and echo the call message");
+    }
+    stage = "waiting for decoded audio";
+    while (true) {
+        const stats = await receiver.getStats();
+        for (const report of stats.values()) {
+            if (report.type === "inbound-rtp" && report.kind === "audio" &&
+                report.totalAudioEnergy > 0 && report.totalSamplesDuration > 0) return;
+        }
+        await new Promise(resolve => setTimeout(resolve, 100));
     }
 }
 
@@ -77,6 +96,9 @@ try {
 } finally {
     clearTimeout(timeout);
     clearInterval(draw);
+    tone.stop();
+    microphone.stream.getTracks().forEach(track => track.stop());
+    audio.close();
     stream.getTracks().forEach(track => track.stop());
     caller.close();
     receiver.close();

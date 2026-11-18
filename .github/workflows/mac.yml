@@ -82,7 +82,7 @@ jobs:
           ditto -x -k previous.zip installed
           codesign --verify --strict installed/Kaizu.app
           python3 "$GITHUB_WORKSPACE/.github/scripts/check-release-launch.py" launch/Kaizu.app installed/Kaizu.app
-      - name: Verify video and data transfer between WebRTC peers
+      - name: Verify audio, video and data transfer between WebRTC peers
         if: matrix.scenario == 'media-call'
         env:
           RUNNER_ENVIRONMENT: ${{ runner.environment }}
