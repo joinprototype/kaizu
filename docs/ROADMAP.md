@@ -51,6 +51,8 @@ Eight additional macOS 27.0.1 trials exchanged the app bundle between launches. 
 
 On macOS 27.0.1, the Firefox Add-ons builds of Bitwarden 2026.10.2 and 1Password 8.12.44.33 both installed in separate empty Kaizu profiles. Bitwarden opened a loading popup. Selecting 1Password on a loaded page showed no sign-in interface. WebKit loaded both background pages. Bitwarden reported an unsupported notification click event and 1Password reported a missing `chrome.notifications.onClicked` API. Sign-in, autofill and desktop integration remain unverified for both versions.
 
+A second macOS 15 signed-update run installed v0.2.5 and restored the page. The page recovered its original local-storage value, but its request to the same server lacked the HTTP-only cookie. Cookie persistence through this update remains an open release gate. [Second failed update check](https://github.com/joinprototype/kaizu/actions/runs/44315757109/attempts/3)
+
 ### Cookie consent on live sites
 
 On macOS 27.0.1, fresh profiles with content blocking and automatic rejection turned off showed a banner on both sites below. Both providers initially reported that the visitor had made no choice. With Kaizu's default settings, both recorded a response. After quitting and reopening the browser with both protections off, each site still reported the same decision without showing its banner again.

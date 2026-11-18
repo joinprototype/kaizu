@@ -18,6 +18,9 @@ class Page(BaseHTTPRequestHandler):
     def do_GET(self):
         server = self.server
         if self.path == "/start":
+            if not server.issue_cookie and getattr(server, "storage_token", None):
+                received = server.cookie in self.headers.get("Cookie", "").split("; ")
+                print(f"Restored document request included the test cookie: {received}", flush=True)
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Cache-Control", "no-store")
@@ -41,12 +44,30 @@ class Page(BaseHTTPRequestHandler):
                 <body><h1>Ready</h1><script>
                 const headers = {{}};
                 {storage_check}
-                if (document.querySelector('h1').textContent === 'Ready') fetch('/{server.challenge}', {{headers}});
+                async function checkLogin() {{
+                    for (const delay of [0, 1000, 4000, 10000]) {{
+                        if (delay) await new Promise(resolve => setTimeout(resolve, delay));
+                        const result = await fetch('/{server.challenge}', {{headers, cache: 'no-store'}});
+                        if (result.status !== 202) return;
+                    }}
+                }}
+                if (document.querySelector('h1').textContent === 'Ready') checkLogin();
                 </script></body>""".encode())
         elif self.path == "/" + server.challenge:
             cookie_matches = server.cookie in self.headers.get("Cookie", "").split("; ")
             storage = self.headers.get("X-Kaizu-Storage", "unreported")
             check_storage = bool(getattr(server, "storage_token", None))
+            if not server.issue_cookie and not cookie_matches and storage == "match" and server.missing_probes < 3:
+                server.missing_probes += 1
+                print(f"Restored login cookie missing on probe {server.missing_probes}, local storage matched", flush=True)
+                self.send_response(202)
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                return
+            if server.missing_probes and cookie_matches:
+                server.page_failure = f"Restored login cookie appeared only after {server.missing_probes} failed probes"
+                self.send_error(403)
+                return
             if not cookie_matches or (check_storage and storage != "match"):
                 phase = "initial launch" if server.issue_cookie else "restored launch"
                 server.page_failure = (f"{phase}: login cookie {'match' if cookie_matches else 'missing'}, "
@@ -78,6 +99,7 @@ class Page(BaseHTTPRequestHandler):
 def launch(server, app, *urls):
     server.rendered = False
     server.page_failure = None
+    server.missing_probes = 0
     server.challenge = secrets.token_hex(12)
     process = subprocess.Popen(["open", "-W", "-n", "-a", str(app), *urls])
     deadline = time.monotonic() + 90
@@ -136,6 +158,21 @@ def staged_release(process):
     raise SystemExit("The app did not stage a signed release from the production feed")
 
 
+def report_cookie_checkpoint(server, path, phase):
+    # This file belongs to the generated profile in a disposable hosted account.
+    # Report only whether the fixture's random value appears in WebKit's on-disk file.
+    try:
+        data = path.read_bytes()
+    except FileNotFoundError:
+        status = "no cookie file"
+    except OSError as error:
+        status = f"file unavailable ({error.errno})"
+    else:
+        token = server.cookie.partition("=")[2].encode()
+        status = f"fixture marker {'present' if token in data else 'absent'} in {len(data)} bytes"
+    print(f"Cookie checkpoint {phase}: {status}", flush=True)
+
+
 def install_signed_update(server, app, url):
     # Only this disposable bundle advertises build zero. The updater, feed
     # URL and embedded verification key are from the candidate release binary.
@@ -150,7 +187,17 @@ def install_signed_update(server, app, url):
     digest = hashlib.sha256((staged / executable).read_bytes()).digest()
     if int(build) <= 0 or info["CFBundleIdentifier"] != "com.joinprototype.kaizu":
         raise SystemExit("The app staged an unexpected release")
+    try:
+        profile_id = str(uuid.UUID(saved_tab(url)[0]))
+    except (FileNotFoundError, SystemExit):
+        profile_id = None   # The throttled session save may still be pending.
+    cookie_root = Path.home() / "Library/WebKit/com.joinprototype.kaizu/WebsiteDataStore"
+    if profile_id:
+        report_cookie_checkpoint(server, cookie_root / profile_id / "Cookies/Cookies.binarycookies", "before quit")
     quit_app(process)
+    profile_id = str(uuid.UUID(saved_tab(url)[0]))
+    cookie_file = cookie_root / profile_id / "Cookies/Cookies.binarycookies"
+    report_cookie_checkpoint(server, cookie_file, "after quit")
 
     # The detached install helper replaces the bundle after the original PID exits.
     deadline = time.monotonic() + 30
@@ -166,6 +213,7 @@ def install_signed_update(server, app, url):
     subprocess.run(["codesign", "--verify", "--strict", str(app)], check=True)
     if hashlib.sha256((app / executable).read_bytes()).digest() != digest:
         raise SystemExit("The installed executable differs from the verified staged release")
+    report_cookie_checkpoint(server, cookie_file, "after bundle swap")
     print(f"The candidate's updater installed signed release {version} (build {build}) on quit.")
 
 
