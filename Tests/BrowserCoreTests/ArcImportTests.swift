@@ -272,6 +272,49 @@ import Testing
         #expect(second.today.isEmpty)
     }
 
+    @Test func repeatImportKeepsEditedFoldersAndNavigatedPins() throws {
+        let home = Self.tab("https://b.test/")
+        let nested = Self.tab("https://nested.test/")
+        let new = Self.tab("https://new.test/")
+        var source = Self.sidebar()
+        source.spaces[0].pinned = [.folder(name: "Docs", children: [
+            .tab(home), .folder(name: "API", children: [.tab(nested), .tab(new)])
+        ])]
+        let old = TabRecord(id: UUID(), title: "Renamed", url: URL(string: "https://b.test/later"), pinnedURL: home.url)
+        let local = TabRecord(id: UUID(), title: "My local tab", url: URL(string: "https://local.test/"))
+        let inner = FolderRecord(id: UUID(), name: "API", isExpanded: false, children: [
+            .tab(TabRecord(id: UUID(), title: "Saved", url: nested.url)), .tab(local)
+        ])
+        let outer = FolderRecord(id: UUID(), name: "Docs", isExpanded: false, children: [.folder(inner), .tab(old)])
+        var space = Self.emptySpace()
+        space.pinned = [.folder(outer)]
+        let plan = Self.plan(source, spaces: [space], includesToday: false)
+        #expect(plan.pinned[space.id] == nil)
+        #expect(plan.folderAdditions.keys.sorted() == [inner.id])
+        let added = try #require(plan.folderAdditions[inner.id]?.tabs.first)
+        #expect(added.pinnedURL == new.url)
+        #expect(plan.addedItemIDs.contains(added.id))
+        #expect(plan.summary.first?.pinned == 1)
+        #expect(plan.tabCount == 2) // One nested tab and one favorite.
+        #expect(plan.addedItemIDs.isDisjoint(with: [inner.id, outer.id, old.id, local.id]))
+    }
+
+    @Test func doesNotGuessBetweenSameNamedSiblingFolders() {
+        let folder = { FolderRecord(id: UUID(), name: "Docs", isExpanded: false, children: []) }
+        var space = Self.emptySpace()
+        space.pinned = [.folder(folder()), .folder(folder())]
+        var source = Self.sidebar()
+        let twoDestinations = Self.plan(source, spaces: [space])
+        #expect(twoDestinations.folderAdditions.isEmpty)
+        #expect(twoDestinations.pinned[space.id]?.tabCount == 2)
+
+        space.pinned.removeLast()
+        source.spaces[0].pinned.append(.folder(name: "Docs", children: [.tab(Self.tab("https://second.test/"))]))
+        let twoSources = Self.plan(source, spaces: [space])
+        #expect(twoSources.folderAdditions.isEmpty)
+        #expect(twoSources.pinned[space.id]?.tabCount == 3)
+    }
+
     @Test func keepsOnlyTheNewTabsOfAFolder() throws {
         var space = Self.emptySpace()
         space.pinned = [.tab(TabRecord(id: UUID(), title: "B", url: URL(string: "https://b.test/")))]

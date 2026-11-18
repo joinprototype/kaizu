@@ -22,6 +22,7 @@ extension DebugHooks {
         store.importFromArc(plan)
         let undo = store.toast!.undo!
         let design = store.spaces.first { $0.name == "Design" }!
+        checkIncrementalArcImport(in: store, space: design, sidebar: sidebar)
         let imported = design.pinned.tabs[0]
         let folder = home.pinned.folders.first!
         store.move(original, to: .pinned(folder: folder, before: nil))
@@ -55,6 +56,33 @@ extension DebugHooks {
         store.app.save()
         print("Arc import Undo preserved later edits, a favorite and a profile login, and removed the untouched space.")
     }
+
+    @MainActor private static func checkIncrementalArcImport(in store: BrowserStore, space: Space, sidebar: ArcSidebar) {
+        let folder = space.pinned.folders.first { $0.name == "Type" }!
+        let pin = folder.children.tabs[0]
+        store.rename(pin, to: "My reference")
+        folder.isExpanded = false
+        pin.load(URL(string: "about:blank#later-page")!)
+        let original = space.pinned.map(\.record)
+        var updated = sidebar
+        var design = sidebar.spaces.first { $0.name == "Design" }!
+        let previous = design.pinned.tabs.first { $0.url == pin.pinnedURL }!
+        var new = previous
+        new.url = URL(string: "https://additional.example.test/")!
+        design.pinned = [.folder(name: "Research", children: [.folder(name: "Type", children: [.tab(previous), .tab(new)])])]
+        updated.spaces = [design]
+        let addition = store.arcImport(of: updated, includesToday: true)
+        precondition(addition.tabCount == 1)
+        store.importFromArc(addition)
+        precondition(folder.children.tabs.map(\.pinnedURL) == [pin.pinnedURL, new.url])
+        precondition(space.pinned.folders.filter { $0.name == "Research" }.count == 1 && !folder.isExpanded)
+        let undo = store.toast!.undo!
+        precondition(store.arcImport(of: updated, includesToday: true).tabCount == 0)
+        undo()
+        precondition(space.pinned.map(\.record) == original)
+        print("Repeat Arc import appended one nested pin and Undo restored the edited sidebar exactly.")
+    }
+
     @MainActor static func checkRestoredArcImportUndo(in store: BrowserStore) async {
         let design = store.spaces.first { $0.name == "Design" }!
         let personal = store.spaces.first { $0.name == "Personal" }!
