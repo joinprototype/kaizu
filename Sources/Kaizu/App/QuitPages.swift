@@ -4,10 +4,10 @@ import WebKit
 @MainActor
 final class QuitPages: NSObject, WKNavigationDelegate {
     private var pending = Set<ObjectIdentifier>()
-    private var deadline: Task<Void, Never>?
-    private var completion: (() -> Void)?
+    private var deadline: Timer?
+    private var completion: (@MainActor () -> Void)?
 
-    func start(_ views: [WKWebView], completion: @escaping () -> Void) {
+    func start(_ views: [WKWebView], completion: @escaping @MainActor () -> Void) {
         self.completion = completion
         for view in views {
             view.navigationDelegate = self
@@ -16,11 +16,7 @@ final class QuitPages: NSObject, WKNavigationDelegate {
             }
         }
         // An unresponsive renderer must not keep the Mac from quitting.
-        deadline = Task {
-            try? await Task.sleep(for: .seconds(2))
-            guard !Task.isCancelled else { return }
-            finish()
-        }
+        deadline = after(2) { self.finish() }
         if pending.isEmpty { finish() }
     }
 
@@ -32,12 +28,20 @@ final class QuitPages: NSObject, WKNavigationDelegate {
     private func finish() {
         guard let completion else { return }
         self.completion = nil
-        deadline?.cancel()
+        deadline?.invalidate()
         deadline = nil
-        Task {
-            // WebKit commits local storage asynchronously after pagehide.
-            try? await Task.sleep(for: .milliseconds(750))
-            completion()
+        // WebKit commits local storage asynchronously after pagehide.
+        _ = after(0.75, completion)
+    }
+
+    private func after(_ interval: TimeInterval, _ action: @escaping @MainActor () -> Void) -> Timer {
+        // terminateLater can nest AppKit's modal loop inside a main-actor action.
+        // A queued main-actor task cannot resume until that outer action returns.
+        let timer = Timer(timeInterval: interval, repeats: false) { _ in
+            MainActor.assumeIsolated { action() }
         }
+        RunLoop.main.add(timer, forMode: .common)
+        RunLoop.main.add(timer, forMode: .modalPanel)
+        return timer
     }
 }
