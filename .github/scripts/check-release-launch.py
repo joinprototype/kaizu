@@ -7,22 +7,41 @@ import os
 import plistlib
 import secrets
 import shutil
+import sqlite3
 import subprocess
 import time
 import uuid
+from contextlib import closing
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
 
 class Page(BaseHTTPRequestHandler):
+    # An idle WebKit preconnection must return control to the launch deadline.
+    timeout = 3
+
+    def request_recheck(self):
+        self.send_response(202)
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+
     def do_GET(self):
         server = self.server
         if self.path == "/start":
+            if not server.issue_cookie and server.navigation_cookie:
+                cookies = self.headers.get("Cookie", "").split("; ")
+                strict = server.cookie in cookies
+                lax = server.navigation_cookie in cookies
+                print(f"Restored document cookies: Lax={lax}, Strict={strict}", flush=True)
+                if not lax:
+                    server.document_missing_lax = True
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Cache-Control", "no-store")
             if server.issue_cookie:
                 self.send_header("Set-Cookie", server.cookie + "; Max-Age=3600; Path=/; HttpOnly; SameSite=Strict")
+                if server.navigation_cookie:
+                    self.send_header("Set-Cookie", server.navigation_cookie + "; Max-Age=3600; Path=/; HttpOnly; SameSite=Lax")
             self.end_headers()
             storage_check = ""
             if getattr(server, "storage_token", None):
@@ -32,7 +51,9 @@ class Page(BaseHTTPRequestHandler):
                     try {{
                         const marker = {json.dumps(server.storage_token)};
                         {seed}
-                        headers['X-Kaizu-Storage'] = localStorage.getItem('upgrade-test') === marker ? 'match' : 'missing';
+                        const value = localStorage.getItem('upgrade-test');
+                        if (value === null) headers['X-Kaizu-Storage'] = 'missing';
+                        else headers['X-Kaizu-Storage'] = value === marker ? 'match' : 'different';
                     }} catch {{
                         headers['X-Kaizu-Storage'] = 'unavailable';
                     }}
@@ -46,10 +67,17 @@ class Page(BaseHTTPRequestHandler):
             self.wfile.write(f"""<!doctype html><title>Kaizu launch test</title><link rel="icon" href="data:,">
                 <body><h1>Ready</h1>{blocker_probe}<script>
                 {save_on_exit}
-                const headers = {{}};
-                {storage_check}
                 if ({json.dumps(server.check_first_page_blocking)} && !window.launchControl) throw Error("Control script did not run");
-                if (document.querySelector('h1').textContent === 'Ready') fetch('/{server.challenge}', {{headers}});
+                async function checkLogin() {{
+                    for (const delay of [0, 1000, 4000, 10000]) {{
+                        if (delay) await new Promise(resolve => setTimeout(resolve, delay));
+                        const headers = {{}};
+                        {storage_check}
+                        const result = await fetch('/{server.challenge}', {{headers, cache: 'no-store'}});
+                        if (result.status !== 202) return;
+                    }}
+                }}
+                if (document.querySelector('h1').textContent === 'Ready') checkLogin();
                 </script></body>""".encode())
         elif self.path == "/ads/cbr.js":
             # This script path matches a bundled EasyList rule.
@@ -61,9 +89,37 @@ class Page(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(b"window.launchControl = true;")
         elif self.path == "/" + server.challenge:
-            cookie_matches = server.cookie in self.headers.get("Cookie", "").split("; ")
+            cookies = self.headers.get("Cookie", "").split("; ")
+            cookie_matches = server.cookie in cookies
             storage = self.headers.get("X-Kaizu-Storage", "unreported")
             check_storage = bool(getattr(server, "storage_token", None))
+            if server.navigation_cookie and (server.document_missing_lax or server.navigation_cookie not in cookies):
+                phase = "restored" if not server.issue_cookie else "initial"
+                server.page_failure = (f"{phase} login: first document missing Lax={server.document_missing_lax}, "
+                                       f"page Lax={server.navigation_cookie in cookies}, page Strict={cookie_matches}, "
+                                       f"local storage {storage}")
+                self.send_error(403)
+                return
+            cookie_status = "match" if cookie_matches else "missing"
+            if server.first_storage_failure:
+                server.page_failure = (f"{server.first_storage_failure}; next probe: "
+                                       f"login cookie {cookie_status}, local storage {storage}")
+                self.send_error(403)
+                return
+            if not server.issue_cookie and check_storage and storage != "match" and not server.missing_probes:
+                server.first_storage_failure = f"restored launch: login cookie {cookie_status}, local storage {storage}"
+                print(server.first_storage_failure, flush=True)
+                self.request_recheck()
+                return
+            if not server.issue_cookie and not cookie_matches and storage == "match" and server.missing_probes < 3:
+                server.missing_probes += 1
+                print(f"Restored login cookie missing on probe {server.missing_probes}, local storage matched", flush=True)
+                self.request_recheck()
+                return
+            if server.missing_probes and cookie_matches:
+                server.page_failure = f"Restored login cookie appeared only after {server.missing_probes} failed probes"
+                self.send_error(403)
+                return
             if not cookie_matches or (check_storage and storage != "match"):
                 phase = "initial launch" if server.issue_cookie else "restored launch"
                 server.page_failure = (f"{phase}: login cookie {'match' if cookie_matches else 'missing'}, "
@@ -118,6 +174,9 @@ def launch(server, app, *urls):
 def wait_for_page(server, process, app):
     server.rendered = False
     server.page_failure = None
+    server.missing_probes = 0
+    server.first_storage_failure = None
+    server.document_missing_lax = False
     server.challenge = secrets.token_hex(12)
     deadline = time.monotonic() + 90
     while not server.rendered:
@@ -177,6 +236,43 @@ def staged_release(process):
     raise SystemExit("The app did not stage a signed release from the production feed")
 
 
+def report_cookie_checkpoint(server, path, phase):
+    # This file belongs to the generated profile in a disposable hosted account.
+    # Report only whether the fixture's random value appears in WebKit's on-disk file.
+    try:
+        data = path.read_bytes()
+    except FileNotFoundError:
+        status = "no cookie file"
+    except OSError as error:
+        status = f"file unavailable ({error.errno})"
+    else:
+        token = server.cookie.partition("=")[2].encode()
+        status = f"fixture marker {'present' if token in data else 'absent'} in {len(data)} bytes"
+    print(f"Cookie checkpoint {phase}: {status}", flush=True)
+
+
+def storage_checkpoint(profile_directory, marker):
+    # Query the committed row, including its WAL. Deleted rows can still leave marker bytes on disk.
+    if not profile_directory.is_dir():
+        return "profile directory unavailable"
+    expected = (marker, marker.encode("ascii"), marker.encode("utf-16-le"), marker.encode("utf-16-be"))
+    results = []
+    for database in sorted(profile_directory.rglob("localstorage.sqlite3")):
+        try:
+            with closing(sqlite3.connect(database.as_uri() + "?mode=ro", uri=True, timeout=0)) as connection:
+                row = connection.execute("SELECT value FROM ItemTable WHERE key = ?", ("upgrade-test",)).fetchone()
+        except sqlite3.Error as error:
+            results.append(f"unreadable ({type(error).__name__})")
+            continue
+        if row is None:
+            results.append("key absent")
+        elif row[0] in expected:
+            results.append("value matches")
+        else:
+            results.append("value differs")
+    return ", ".join(results) if results else "no local storage database found"
+
+
 def install_signed_update(server, app, url):
     # Only this disposable bundle advertises build zero. The updater, feed
     # URL and embedded verification key are from the candidate release binary.
@@ -192,7 +288,17 @@ def install_signed_update(server, app, url):
     digest = hashlib.sha256((staged / executable).read_bytes()).digest()
     if int(build) <= 0 or info["CFBundleIdentifier"] != "com.joinprototype.kaizu":
         raise SystemExit("The app staged an unexpected release")
+    try:
+        profile_id = str(uuid.UUID(saved_tab(url)[0]))
+    except (FileNotFoundError, SystemExit):
+        profile_id = None   # The throttled session save may still be pending.
+    cookie_root = Path.home() / "Library/WebKit/com.joinprototype.kaizu/WebsiteDataStore"
+    if profile_id:
+        report_cookie_checkpoint(server, cookie_root / profile_id / "Cookies/Cookies.binarycookies", "before quit")
     quit_app(process)
+    profile_id = str(uuid.UUID(saved_tab(url)[0]))
+    cookie_file = cookie_root / profile_id / "Cookies/Cookies.binarycookies"
+    report_cookie_checkpoint(server, cookie_file, "after quit")
 
     # The detached install helper replaces the bundle after the original PID exits.
     deadline = time.monotonic() + 30
@@ -208,6 +314,7 @@ def install_signed_update(server, app, url):
     subprocess.run(["codesign", "--verify", "--strict", str(app)], check=True)
     if hashlib.sha256((app / executable).read_bytes()).digest() != digest:
         raise SystemExit("The installed executable differs from the verified staged release")
+    report_cookie_checkpoint(server, cookie_file, "after bundle swap")
     print(f"The candidate's updater installed signed release {version} (build {build}) on quit.")
 
 
@@ -234,12 +341,17 @@ def main():
     mode.add_argument("--media-call", action="store_true")
     mode.add_argument("--webkit-control", action="store_true")
     args = parser.parse_args()
+    if os.environ.get("RUNNER_ENVIRONMENT") != "github-hosted":
+        raise SystemExit("This test requires a disposable GitHub-hosted runner account")
     candidate = args.candidate.resolve(strict=True)
     with HTTPServer(("127.0.0.1", 0), Page) as server:
         server.timeout = 1
         server.issue_cookie = True
         server.cookie = "kaizu_login=" + secrets.token_hex(16)
         server.storage_token = secrets.token_hex(16) if args.previous or args.signed_update else None
+        # A top-level GET can carry Lax even when navigation withholds Strict.
+        # The same-site request from the loaded page must carry both.
+        server.navigation_cookie = "kaizu_navigation=" + secrets.token_hex(16) if server.storage_token else None
         url = f"http://127.0.0.1:{server.server_port}/start"
         server.last_edit = secrets.token_hex(16) if args.signed_update else None
         server.check_first_page_blocking = not (args.previous or args.signed_update or args.extension_windows or args.media_call or args.webkit_control)
@@ -260,8 +372,6 @@ def main():
             print("On the first external page, WebKit blocked the matching script and ran the control script with cookies.")
             return
 
-        if os.environ.get("RUNNER_ENVIRONMENT") != "github-hosted":
-            raise SystemExit("This test requires a disposable GitHub-hosted runner account")
         # Open the test link as a saved tab using the app's current-space setting.
         settings = json.dumps({"externalLinks": "currentSpace"}).encode().hex()
         subprocess.run(["defaults", "write", "com.joinprototype.kaizu", "settings", "-data", settings], check=True)
@@ -288,9 +398,15 @@ def main():
             candidate.rename(installed)
 
         before = saved_tab(url)
+        stores = Path.home() / "Library/WebKit/com.joinprototype.kaizu/WebsiteDataStore"
+        profile_directory = stores / str(uuid.UUID(before[0]))
+        print("Before restored launch:", storage_checkpoint(profile_directory, server.storage_token), flush=True)
         server.issue_cookie = False
         # No URL is passed. Only the restored tab can request the new challenge.
-        quit_app(launch(server, installed))
+        try:
+            quit_app(launch(server, installed))
+        finally:
+            print("After restore attempt:", storage_checkpoint(profile_directory, server.storage_token), flush=True)
         if saved_tab(url) != before:
             raise SystemExit("The profile, space or tab identity changed across the upgrade")
         print("Restored the tab in its original space and profile with its login cookie and local storage.")

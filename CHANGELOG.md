@@ -8,6 +8,8 @@ In **Settings → Privacy → Import Rule List…**, add a WebKit content-blocke
 
 Undoing a bookmark import keeps a single copy of each pre-existing tab and removes imported tabs that moved to Today or Favorites.
 
+Opening a workspace saved by an older build repairs duplicate Today rows left by bookmark Undo. If you edited the copies separately, Kaizu keeps both. When two copies point to different pages, each reopens its own URL and Kaizu backs up the shared navigation history.
+
 Undoing an Arc import preserves tabs and folders you added afterward, including changes made in another window. A newly imported profile also survives Undo once you have used its website data.
 
 **File → Import from Arc…** now accepts a saved sidebar JSON or the Markdown file from Arc’s Export Data command. Markdown links become pinned tabs inside the exported spaces and folders. The sidebar JSON also preserves profile groups, Favorites and Today tabs.
