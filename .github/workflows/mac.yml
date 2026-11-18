@@ -21,6 +21,8 @@ jobs:
   verify:
     runs-on: xcode-27
     timeout-minutes: 20
+    outputs:
+      runtime_bundle_ready: ${{ steps.upload_runtime_bundle.outcome == 'success' }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -92,6 +94,13 @@ jobs:
           ditto -c -k --keepParent build/Kaizu.app "$RUNNER_TEMP/Kaizu.zip"
           mkdir -p "$RUNNER_TEMP/package-check/unpacked"
           ditto -x -k "$rehearsal/site/updates/Kaizu-$version.zip" "$RUNNER_TEMP/package-check/unpacked"
+      - uses: actions/upload-artifact@v7
+        id: upload_runtime_bundle
+        with:
+          name: kaizu-runtime-check
+          path: ${{ runner.temp }}/Kaizu.zip
+          if-no-files-found: error
+          retention-days: 1
       - name: Install the loopback TURN relay
         run: HOMEBREW_NO_AUTO_UPDATE=1 brew install coturn
       - name: Verify a relayed WebRTC call in the packaged release
@@ -101,14 +110,11 @@ jobs:
         run: |
           sw_vers
           .github/scripts/check-relayed-call.sh "$RUNNER_TEMP/package-check/unpacked/Kaizu.app"
-      - uses: actions/upload-artifact@v7
-        with:
-          name: kaizu-runtime-check
-          path: ${{ runner.temp }}/Kaizu.zip
-          retention-days: 1
 
   launch-on-macos-15:
     needs: verify
+    # The relay call has its own result. These checks require the verified bundle.
+    if: ${{ !cancelled() && needs.verify.result != 'cancelled' && needs.verify.outputs.runtime_bundle_ready == 'true' }}
     runs-on: macos-15
     timeout-minutes: 7
     strategy:
