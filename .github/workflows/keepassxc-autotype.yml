@@ -1,0 +1,29 @@
+name: KeePassXC Global Auto-Type acceptance
+on:
+  push:
+    branches: [qa/keepassxc-autotype]
+permissions:
+  contents: read
+jobs:
+  fill:
+    runs-on: xcode-27
+    timeout-minutes: 12
+    env:
+      RUNNER_ENVIRONMENT: ${{ runner.environment }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Test the signed password manager on a local login form
+        run: |
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          make app CONFIG=debug > "$RUNNER_TEMP/build.log" 2>&1 || { tail -30 "$RUNNER_TEMP/build.log"; exit 1; }
+          swiftc .github/qa/keepassxc/trigger.swift -o "$RUNNER_TEMP/trigger"
+          image="$RUNNER_TEMP/vendor.dmg"
+          curl --fail --retry 2 --location 'https://github.com/keepassxreboot/keepassxc/releases/download/2.8.0/KeePassXC-2.8.0-1-arm64.dmg' --output "$image"
+          echo "85f0e75e258ef513f0fc7f5bf470cad0943b7d7e8191b2171f9898ad32e62b9c  $image" | shasum -a 256 --check
+          hdiutil attach -readonly -nobrowse -noautoopen -mountpoint "$RUNNER_TEMP/vendor" "$image"
+          ditto "$RUNNER_TEMP/vendor/KeePassXC.app" "$RUNNER_TEMP/KeePassXC.app"
+          hdiutil detach "$RUNNER_TEMP/vendor"
+          codesign --verify --deep --strict "$RUNNER_TEMP/KeePassXC.app"
+          python3 .github/qa/keepassxc/fixture.py "$RUNNER_TEMP/KeePassXC.app"
