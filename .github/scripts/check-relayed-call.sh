@@ -45,6 +45,6 @@ else
     [[ $result == 75 ]] || exit "$result"
 fi
 
-echo "Both canvas sources stalled before encoding. Checking decoded video from generated frames on the same relay."
+echo "Both canvas sources stalled before encoding. Checking rendered 640×480 H.264 video from generated frames on the same relay."
 KAIZU_TEST_VIDEO_SOURCE=frames python3 "$fixture" "$1" --media-call
 KAIZU_TEST_VIDEO_SOURCE=frames python3 "$fixture" "$scratch/webkit-control" --webkit-control

@@ -2,7 +2,7 @@
 <meta charset="utf-8">
 <title>Kaizu WebRTC call check</title>
 <canvas width="160" height="90"></canvas>
-<video autoplay muted playsinline></video>
+<video width="160" height="90" autoplay muted playsinline></video>
 <script>
 function reportFailure(message, route = "failure") {
     location.replace("/media-call/" + route + "?message=" + encodeURIComponent(message));
@@ -21,6 +21,10 @@ const canvas = document.querySelector("canvas");
 const context = canvas.getContext("2d");
 const video = document.querySelector("video");
 const fromWorker = new URLSearchParams(location.search).get("source") === "frames";
+// The hosted Mac's low-latency H.264 encoder can reject 160×90 worker frames (issue #54).
+const width = fromWorker ? 640 : canvas.width;
+const height = fromWorker ? 480 : canvas.height;
+let firstRendered;
 let worker;
 let generated = 0;
 function generatedStream() {
@@ -36,7 +40,7 @@ function generatedStream() {
             if (data.number) generated = data.number;
             if (data.error) reportFailure("Video frame generation: " + data.error);
         };
-        worker.postMessage({width: canvas.width, height: canvas.height});
+        worker.postMessage({width, height});
     });
 }
 const stream = fromWorker ? await generatedStream() : canvas.captureStream(10);
@@ -73,7 +77,12 @@ async function call() {
         receiver.ontrack = event => {
             if (event.track.kind !== "video") return;
             video.srcObject = event.streams[0];
-            video.requestVideoFrameCallback((_, metadata) => resolve(metadata));
+            function checkFrame(_, metadata) {
+                firstRendered ??= [metadata.width, metadata.height];
+                if (metadata.width === width && metadata.height === height) resolve();
+                else video.requestVideoFrameCallback(checkFrame);
+            }
+            video.requestVideoFrameCallback(checkFrame);
         };
     });
     const channel = caller.createDataChannel("call");
@@ -101,10 +110,8 @@ async function call() {
     await connect(caller, receiver, await caller.createOffer());
     await connect(receiver, caller, await receiver.createAnswer());
     stage = "waiting for video and data";
-    const [metadata, echo] = await Promise.all([receivedFrame, reply]);
-    if (metadata.width !== canvas.width || metadata.height !== canvas.height || echo !== "received hello") {
-        throw new Error("The receiving peer did not render the expected video and echo the call message");
-    }
+    const [, echo] = await Promise.all([receivedFrame, reply]);
+    if (echo !== "received hello") throw new Error("The receiving peer did not echo the call message");
     if (fromWorker) {
         stage = "reading the rendered video frame";
         while (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
@@ -113,6 +120,9 @@ async function call() {
         // Read pixels from the decoded video frame without requiring a second canvas backing store.
         const snapshot = new VideoFrame(video, {timestamp: 0});
         try {
+            if (snapshot.displayWidth !== width || snapshot.displayHeight !== height) {
+                throw new Error(`Expected a ${width}×${height} decoded frame, got ${snapshot.displayWidth}×${snapshot.displayHeight}`);
+            }
             const region = {rect: {x: 0, y: 0, width: 2, height: 2}};
             const pixels = new Uint8Array(snapshot.allocationSize(region));
             const planes = await snapshot.copyTo(pixels, region);
@@ -131,19 +141,19 @@ async function call() {
             if (!hasColor) throw new Error(`The rendered frame did not contain the generated color (${snapshot.format})`);
         } finally { snapshot.close(); }
     }
-    stage = "waiting for decoded audio";
+    stage = "waiting for decoded audio and video statistics";
+    const expectedCodec = compareVP8 ? "video/vp8" : "video/h264";
     while (true) {
         const stats = await receiver.getStats();
-        if (compareVP8 && ![...stats.values()].some(report =>
-            report.type === "inbound-rtp" && report.kind === "video" && stats.get(report.codecId)?.mimeType.toLowerCase() === "video/vp8")) {
-            throw new Error("The receiver did not report VP8 video");
-        }
+        const videoVerified = !(fromWorker || compareVP8) || [...stats.values()].some(report =>
+            report.type === "inbound-rtp" && report.kind === "video" && report.framesDecoded > 0 &&
+            stats.get(report.codecId)?.mimeType.toLowerCase() === expectedCodec);
         if (config.iceTransportPolicy === "relay") {
             if (!usesRelay(stats)) throw new Error("The receiving peer did not report a nominated relay candidate pair");
         }
         for (const report of stats.values()) {
             if (report.type === "inbound-rtp" && report.kind === "audio" &&
-                report.totalAudioEnergy > 0 && report.totalSamplesDuration > 0) return;
+                report.totalAudioEnergy > 0 && report.totalSamplesDuration > 0 && videoVerified) return;
         }
         await new Promise(resolve => setTimeout(resolve, 100));
     }
@@ -194,7 +204,7 @@ async function describePeer(peer) {
 async function reportState(reason) {
     const summary = await Promise.all([describePeer(caller), describePeer(receiver)]);
     const page = {
-        visibility: document.visibilityState, drawn: frame, generated, echoed, audio: audio.state,
+        visibility: document.visibilityState, drawn: frame, generated, echoed, firstRendered, expected: [width, height], audio: audio.state,
         videoReady: video.readyState, videoPaused: video.paused, width: video.videoWidth, height: video.videoHeight,
         remoteVideo: video.srcObject?.getVideoTracks().map(track => ({state: track.readyState, muted: track.muted}))
     };
