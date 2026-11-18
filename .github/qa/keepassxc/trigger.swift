@@ -38,6 +38,13 @@ if command == "trigger" {
     let app = AXUIElementCreateApplication(vendor.processIdentifier)
     let windows = attr(app,kAXWindowsAttribute) as? [AXUIElement] ?? []
     let labels = windows.flatMap { descriptions($0) }.joined(separator:" ").lowercased()
+    let front = NSWorkspace.shared.frontmostApplication?.localizedName ?? "unknown"
+    let windowTitles = windows.compactMap { attr($0, kAXTitleAttribute) as? String }
+    let entryVisible = labels.contains(title.lowercased())
+    print("Vendor windows:", windowTitles, "fixture entry visible:", entryVisible, "front app:", front)
+    if command == "vault" {
+        exit(entryVisible ? 0 : 6)
+    }
     if labels.contains("permission required") || labels.contains("screen recording") || labels.contains("accessibility permission") {
         print("KeePassXC requested macOS permissions; automated trial stops at that prompt."); exit(5)
     }
