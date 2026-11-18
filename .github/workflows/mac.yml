@@ -67,8 +67,14 @@ jobs:
         timeout-minutes: 2
         env:
           KAIZU_SUPPORT: ${{ runner.temp }}/private-blocking
-          KAIZU_DEBUG: private-blocking
-        run: build/Kaizu.app/Contents/MacOS/Kaizu
+        run: |
+          log="$RUNNER_TEMP/private-blocking.log"
+          touch "$log"
+          tail -n +1 -f "$log" &
+          tail_pid=$!
+          trap 'kill "$tail_pid" 2>/dev/null || true' EXIT
+          open -n -W --env KAIZU_DEBUG=private-blocking --env "KAIZU_SUPPORT=$KAIZU_SUPPORT" --stderr "$log" -a "$GITHUB_WORKSPACE/build/Kaizu.app"
+          grep -Fxq 'Verified regular and two private windows with independently rendered bundled and imported rules' "$log"
       - name: Route notification clicks after closing and restoring a work tab
         timeout-minutes: 2
         env:

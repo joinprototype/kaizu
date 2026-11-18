@@ -5,6 +5,10 @@ import WebKit
 extension DebugHooks {
     @MainActor static func checkPrivateBlocking(in store: BrowserStore) async throws {
         precondition(ProcessInfo.processInfo.environment["KAIZU_SUPPORT"] != nil)
+        func report(_ message: String) {
+            FileHandle.standardError.write(Data((message + "\n").utf8))
+        }
+        report("Opening private and regular test windows")
         let app = store.app
         let blocker = store.contentBlocker
         let site = URL(string: "https://team.example.test/")!
@@ -21,6 +25,7 @@ extension DebugHooks {
             blocker.togglePause(on: url, privateID: tab.profile.privateID)
         }
         func check(_ label: String, _ tab: BrowserTab, hidden: Bool, listEnabled: Bool = true) async {
+            report(label)
             let token = UUID().uuidString
             let html = "<!doctype html><p id='control' data-token='\(token)'>Ordinary</p><div class='ADBox'>Ad</div><div class='kaizu-custom-fixture'>Custom</div>"
             tab.webView.loadSimulatedRequest(URLRequest(url: site), responseHTML: html)
@@ -31,13 +36,18 @@ extension DebugHooks {
                  getComputedStyle(document.querySelector('.kaizu-custom-fixture')).display]
                 """
             let expected = ["block", hidden ? "none" : "block", hidden && listEnabled ? "none" : "block"]
+            var lastStyles: [String]?
             for _ in 0..<100 {
-                if let styles = try? await tab.webView.evaluateJavaScript(script) as? [String], styles == expected { return }
+                if let styles = try? await tab.webView.evaluateJavaScript(script) as? [String] {
+                    lastStyles = styles
+                    if styles == expected { return }
+                }
                 try? await Task.sleep(for: .milliseconds(50))
             }
-            print("FAILED: \(label), expected control, bundled and imported display \(expected)")
+            report("FAILED: \(label), expected control, bundled and imported display \(expected), received \(String(describing: lastStyles))")
             exit(1)
         }
+        report("Waiting for bundled rules")
         await withCheckedContinuation { continuation in
             blocker.whenReady(for: site) { continuation.resume() }
         }
@@ -46,6 +56,7 @@ extension DebugHooks {
         let json = #"[{"trigger":{"url-filter":".*"},"action":{"type":"css-display-none","selector":".kaizu-custom-fixture"}}]"#
         defer { try? FileManager.default.removeItem(at: rules) }
         try json.write(to: rules, atomically: true, encoding: .utf8)
+        report("Importing a custom rule list")
         try await lists.add(rules)
         let listID = lists.entries.first { $0.name == rules.lastPathComponent }!.id
         toggle(parent, one)
@@ -73,7 +84,7 @@ extension DebugHooks {
         let replacement = app.openPrivateWindow()
         await check("a new private window starts clean", replacement.openTab(nil), hidden: true)
         try await lists.remove(listID)
-        print("Verified regular and two private windows with independently rendered bundled and imported rules")
+        report("Verified regular and two private windows with independently rendered bundled and imported rules")
     }
 }
 #endif
