@@ -142,7 +142,19 @@ import Testing
         #expect(URLInput.explicitURL("192.168.1.1")?.absoluteString == "http://192.168.1.1")
     }
 
-    @Test(arguments: ["hello world", "v1.2", "swift"])
+    @Test(arguments: [
+        ("portal.example.test?ticket=Demo%2F42#Notes", "https://portal.example.test?ticket=Demo%2F42#Notes"),
+        ("portal.example.test#notes", "https://portal.example.test#notes"),
+        ("localhost?view=qa", "http://localhost?view=qa"),
+        ("192.168.1.1#settings", "http://192.168.1.1#settings"),
+        ("[::1]:8080/health?q=1", "http://[::1]:8080/health?q=1"),
+        ("docs.example.test:8443?q=one", "https://docs.example.test:8443?q=one"),
+    ])
+    func keepsAddressComponents(input: String, expected: String) {
+        #expect(URLInput.explicitURL(input)?.absoluteString == expected)
+    }
+
+    @Test(arguments: ["hello world", "v1.2", "swift", "search?example.test", "word#example.test", "[hello:there]"])
     func phrasesAreNotURLs(text: String) {
         #expect(URLInput.explicitURL(text) == nil)
     }

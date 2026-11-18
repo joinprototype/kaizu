@@ -31,6 +31,10 @@ The first release should carry an Arc user from importing a sidebar through a we
 
 Kaizu’s advantages to demonstrate are built-in tracking protection, a local sidebar with no account requirement, and mixed row-and-column splits. Performance comparisons require the same pages, hardware and measurement procedure in both browsers. Sync, Boosts, Easels and an AI panel are outside this proposed 1.0 scope. Cross-device sync remains a significant gap for people who use Arc on multiple devices.
 
+### Archive recovery
+
+On macOS 27.0.1, an interrupted reopen used to remove a tab from the archive before saving it in its space. The workspace and archive now commit together. With two profiles containing the same URL, the command bar found the renamed tab by its custom title or space. After an abrupt exit it reopened in its original space with the custom title intact, and the other profile kept its archived copy. A separate interrupted auto-archive sweep preserved the stale tab in the archive and excluded a private-window tab. The session reader from v0.2.5 decoded the saved workspace and separate archive. After that reader rewrote the session in its older format, the development build restored it again.
+
 ### Migration checks
 
 Two publicly available Arc sidebar samples were imported into separate, empty Kaizu sessions. The [linkcache fixture](https://github.com/adlio/linkcache/blob/95d64d3739b3d9afd4b4e3be58f8cd42e33c6062/test_data/StorableSidebar.json) produced 9 tabs in 2 spaces on 1 profile. The [A New Arc Begins fixture](https://github.com/Zarrar09/A-New-Arc-Begins/blob/41f0df8520c4ff13b7f25d387a9046547b927f31/tests/fixtures/sampleStorableSidebar.json) produced 78 tabs in 4 spaces on 2 profiles. After a restart, importing each sidebar again added zero tabs and preserved the saved session. Undo in a fresh run returned each session to one empty space. The source files retained their original hashes.
@@ -84,6 +88,8 @@ On macOS 27.0.1, two fresh profiles with camera and microphone denied reached Ji
 
 In **Settings → Extensions → Add Extension…**, select the Mac app that contains a Safari web extension or choose a WebExtension ZIP. Kaizu reads the web extension in place from a Mac app, so keep the app installed. Safari App Extensions and Safari content-blocker bundles use different APIs. For example, AdGuard for Safari 3.0.0 contains six content blockers and a Safari App Extension. Kaizu's built-in ad and tracker blocker is available for that use case. [Apple's web extension loader](https://developer.apple.com/documentation/webkit/wkwebextension/init(appextensionbundle:)) · [Safari App Extensions](https://developer.apple.com/documentation/safariservices/safari-app-extensions)
 
+In the development build, **Settings → Privacy → Import Rule List…** accepts a Safari content-blocker JSON file. Kaizu keeps a local copy and uses it wherever ad and tracker blocking is enabled. On macOS 27.0.1, six launches of the packaged debug app tested the 15,667 rules from Hush v1.0. With the list enabled, the Hush banner selector was hidden and the matching request was blocked. Disabling the list, pausing the test site or removing the list restored both. The control element and request remained available in every case. This test exercised the importer and the packaged browser with disposable data. [Hush release](https://github.com/oblador/hush/releases/tag/v1.0)
+
 Some tab-management extensions need access to the website whose tabs they manage. On the site, right-click the extension’s icon in the sidebar, choose **Allow Access to [host]…**, and review the site in the confirmation. This grants that extension access on that scheme and host across regular profiles. To revoke a grant, open **Settings → Extensions → Remove Access** next to the site.
 
 These checks ran on a Kaizu development build on macOS 27.0.1 in fresh profiles.
@@ -104,7 +110,7 @@ Desktop unlock, biometrics, passkeys and Bitwarden cloud accounts still need sep
 
 **1Password** distributes its Safari extension as a separate Mac App Store app. The desktop app also offers Universal Autofill (Command–Backslash) and Quick Access (Shift–Command–Space). Site recognition and filling through those shortcuts still need a Kaizu test. For browser-to-desktop communication, 1Password documents adding a signed browser in Applications. That route uses the Chrome or Firefox extension and requires working native messaging. On Mac, the signed browser must be in Applications. [Safari distribution](https://support.1password.com/update-extension/) · [Universal Autofill](https://support.1password.com/mac-universal-autofill/) · [Additional browsers](https://support.1password.com/additional-browsers/)
 
-**KeePassXC** offers an extension-free alternative for people with a local vault. Its Global Auto-Type selects entries using the focused window title and types into the focused fields. A page controls its title, so users need to check the address before filling. Kaizu has yet to verify this workflow with a disposable KeePassXC database. [KeePassXC Auto-Type guide](https://keepassxc.org/docs/KeePassXC_UserGuide#_auto_type)
+**KeePassXC 2.8.0** filled a Kaizu login form through Global Auto-Type in a hosted macOS test. Using a disposable database, KeePassXC selected the entry for the focused window and the form submitted the expected username and password. This works without a browser extension. A site controls its page title, so check the address before invoking Auto-Type. [Packaged acceptance run](https://github.com/joinprototype/kaizu/actions/runs/44350921478/job/134965984919) · [KeePassXC Auto-Type guide](https://keepassxc.org/docs/KeePassXC_UserGuide#_auto_type)
 
 ## Strategy (Oct 2026)
 

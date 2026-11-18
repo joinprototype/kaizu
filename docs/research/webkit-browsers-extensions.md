@@ -56,11 +56,24 @@ Three things do **not** carry over:
 - **Safari's per-extension state:** enabled state, permissions, storage and sync.
 - **Safari's extension IDs.**
 
-**Safari content blockers: NO.** Nobody has done it, and it is blocked by design. On this Mac, `/System/Library/ExtensionKit/ExtensionPoints/com.apple.Safari.content-blocker.appexpt` declares `NSExtensionHostEntitlement = com.apple.private.extension-host.safari-content-blocker` and `EXRequiredEntitlements = com.apple.private.can-load-any-content-blocker`. `codesign -d --entitlements - /Applications/Safari.app` shows Safari holds both. Third parties cannot be granted `com.apple.private.*` entitlements, which is exactly why `NSExtension` lookups return nil for us.
+**Hosting Safari content-blocker app extensions requires a private entitlement.** On this Mac, `/System/Library/ExtensionKit/ExtensionPoints/com.apple.Safari.content-blocker.appexpt` declares `NSExtensionHostEntitlement = com.apple.private.extension-host.safari-content-blocker` and `EXRequiredEntitlements = com.apple.private.can-load-any-content-blocker`. `codesign -d --entitlements - /Applications/Safari.app` shows Safari holds both. Third parties cannot be granted `com.apple.private.*` entitlements, which is exactly why `NSExtension` lookups return nil for us.
 
 Apple's public answer since 2015 has been to compile your own rules. WebKit bug [148632](https://bugs.webkit.org/show_bug.cgi?id=148632), "Please allow WKWebView to use Content Blocking extensions", was closed as a duplicate of "Expose public APIs for content filters", the request that became `WKContentRuleList`. An Orion user confirms that "Wipr doesn't work outside of Safari" ([forum](https://orionfeedback.org/d/11879-requesting-more-powerful-inbuilt-adblocking-functionality-equivalent-to-ublock-origin-or-adguard-safari)). The local `AdGuard for Safari.app` contains six content-blocker appexes plus one `com.apple.Safari.extension` popup and **no** web extension, so nothing in it is loadable.
 
 **Safari App Extensions: NO.** `com.apple.Safari.extension.appexpt` requires `com.apple.private.extension-host.safari-extension`. Kagi called them "closed source proprietary format", and later status reports confirm they still do not work. On macOS 27.0.1 the installed Safari web-extension point also names `com.apple.private.can-load-any-content-blocker` as its host entitlement. Apple documents a default native-message route for extensions loaded from an app bundle. WebKit asks macOS to resolve the bundle’s native handler and returns an unsupported error if that lookup fails. Kaizu uses the bundle loader and the default route. Bitwarden’s Safari build reported unsupported native messaging in Kaizu even though standalone autofill worked. [Apple’s delegate contract](https://developer.apple.com/documentation/webkit/wkwebextensioncontrollerdelegate) · [WebKit’s runtime implementation](https://github.com/WebKit/WebKit/blob/main/Source/WebKit/UIProcess/Extensions/Cocoa/API/WebExtensionContextAPIRuntimeCocoa.mm)
+
+### Reusing a published blocker rule list
+
+On November 18, 2026, a standalone WebKit test on macOS 27.0.1 compiled all 15,667 rules from the `blockerList.json` bundled in the public Hush v1.0 disk image. The test used a temporary rule store, a nonpersistent web view for each condition, and a loopback page. It did not launch Hush. [Hush v1.0](https://github.com/oblador/hush/releases/tag/v1.0) · [Apple’s rule-list API](https://developer.apple.com/documentation/webkit/wkcontentrulelist)
+
+| Observation on the rendered page | Without Hush rules | With Hush rules |
+| --- | --- | --- |
+| Banner matching `#AF_GDPR` | Visible | Hidden |
+| Ordinary page content | Visible | Visible |
+| Request containing `&accept_cookies=1` | Loaded | Blocked |
+| Control request | Loaded | Loaded |
+
+Kaizu’s development build implements **Settings → Privacy → Import Rule List…** for published WebKit JSON files. Kaizu compiles the selected file before activation and allows each list to be disabled or removed. [Packaged browser results](../ROADMAP.md#extension-compatibility) The Hush result covers static rules only. A blocker that generates rules inside its Safari extension would need to offer an export or publish its lists separately.
 
 ## First-page filtering
 
@@ -79,7 +92,7 @@ Keep the built-in blocker enabled for first-page coverage of its own lists. Rule
 
 ## Recommendations for Kaizu
 
-1. **Drop Safari content-blocker reuse.** Do not ask for Full Disk Access to scrape AdGuard's group container. It is hostile to privacy, fragile, and AdGuard's lists are public anyway.
+1. **Support published blocking rules through WebKit.** Use openly distributed lists or a user-selected rule export. The Hush experiment above verifies one such file.
 2. **Ship a built-in blocker on `WKContentRuleList`.**
    - **Lists:** EasyList, EasyPrivacy, AdGuard Base/Tracking and uBO filters.
    - **Converter:** pick by license. Brave's adblock-rust is MPL-2.0 (Nook). AdGuard's SafariConverterLib is GPL-3.0 (Ora).

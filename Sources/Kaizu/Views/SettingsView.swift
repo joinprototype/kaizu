@@ -130,6 +130,7 @@ private struct PrivacySettings: View {
             } footer: {
                 FooterText("Also always on: HTTPS-first browsing, tracking-parameter removal and the Global Privacy Control signal.")
             }
+            ImportedRuleListSettings(blocker: blocker)
             Section("Blocking paused on") {
                 if blocker.pausedSites.isEmpty {
                     Text("No sites. Use the shield in the address bar to pause blocking on a site.")

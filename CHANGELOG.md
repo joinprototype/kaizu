@@ -2,11 +2,15 @@
 
 ## Unreleased
 
+In **Settings → Privacy → Import Rule List…**, add a WebKit content-blocker JSON file. You can turn individual lists off or remove them. Imported rules follow the shield’s per-site pause setting.
+
 Undoing a bookmark import keeps a single copy of each pre-existing tab and removes imported tabs that moved to Today or Favorites.
 
 Undoing an Arc import preserves tabs and folders you added afterward, including changes made in another window. A newly imported profile also survives Undo once you have used its website data.
 
 **File → Import from Arc…** now accepts a saved sidebar JSON or the Markdown file from Arc’s Export Data command. Markdown links become pinned tabs inside the exported spaces and folders. The sidebar JSON also preserves profile groups, Favorites and Today tabs.
+
+Pasting an address such as `example.com?view=weekly` or `example.com#notes` now opens the page directly. The address bar also recognizes bracketed IPv6 addresses with ports.
 
 When a site requests the camera and microphone together, Kaizu asks only about devices that still need an answer. Declining the microphone preserves an existing camera permission.
 
