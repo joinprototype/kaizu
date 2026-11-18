@@ -1,7 +1,7 @@
-name: Compare WebKit local storage on quit
+name: Check new and edited drafts on immediate WebKit quit
 on:
   push:
-    branches: [qa/plain-webkit-storage]
+    branches: [qa/local-storage-at-ack]
 permissions:
   contents: read
 jobs:
@@ -12,7 +12,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - name: Compare immediate quit with a confirmed commit
+      - name: Quit directly on the page acknowledgement and compare committed writes
         run: |
           sw_vers
           python3 -u .github/qa/webkit-storage/check.py

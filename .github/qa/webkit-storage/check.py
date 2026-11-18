@@ -1,12 +1,15 @@
 """Compare immediate quit with quit after the generated value reaches persistent storage."""
 import importlib.util
+import json
+import selectors
+import threading
 import plistlib
 import secrets
 import subprocess
 import tempfile
 import time
 import uuid
-from http.server import HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 here = Path(__file__).resolve().parent
@@ -27,69 +30,98 @@ def build_control(directory, bundle_id):
     return binary
 
 
-def wait_for_page(server, process):
-    deadline = time.monotonic() + 40
-    while not server.rendered and not server.page_failure:
-        if process.poll() is not None or time.monotonic() >= deadline:
-            raise RuntimeError("Control exited or timed out before the page responded")
-        server.handle_request()
+class Page(BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path != "/draft":
+            self.send_error(404)
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html")
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        marker = json.dumps(self.server.marker)
+        previous = json.dumps(self.server.previous)
+        write = "localStorage.setItem('upgrade-test', expected);" if self.server.writing else ""
+        self.wfile.write(f"""<!doctype html><title>Draft</title><link rel="icon" href="data:,">
+            <script>
+            try {{
+                const expected = {marker};
+                {write}
+                const saved = localStorage.getItem('upgrade-test');
+                webkit.messageHandlers.report.postMessage(
+                    saved === expected ? 'match' : saved === null ? 'missing' :
+                    saved === {previous} ? 'previous' : 'different');
+            }} catch {{ webkit.messageHandlers.report.postMessage('error'); }}
+            </script>""".encode())
+
+    def log_message(self, *args):
+        pass
 
 
-def trial(binary, bundle_id, wait_for_commit):
-    profile = uuid.uuid4()
-    directory = Path.home() / "Library/WebKit" / bundle_id / "WebsiteDataStore" / str(profile)
-    with HTTPServer(("127.0.0.1", 0), fixture.Page) as server:
-        url = f"http://127.0.0.1:{server.server_port}/start"
-        server.timeout = 0.2
-        server.storage_token = secrets.token_hex(16)
-        server.navigation_cookie = "nav=" + secrets.token_hex(16)
-        server.cookie = "login=" + secrets.token_hex(16)
-        server.check_first_page_blocking = False
-
-        for initial in (True, False):
-            server.issue_cookie = initial
-            server.rendered = False
-            server.page_failure = server.first_storage_failure = None
-            server.missing_probes = 0
-            server.document_missing_lax = False
-            server.challenge = secrets.token_hex(12)
-            process = subprocess.Popen([str(binary), str(profile), url])
-            try:
-                wait_for_page(server, process)
-                if initial and server.page_failure:
-                    raise RuntimeError(server.page_failure)
-                if initial:
-                    start = time.monotonic()
-                    state = fixture.storage_checkpoint(directory, server.storage_token)
-                    print(f"After the site confirmed its write: {state}", flush=True)
-                    if wait_for_commit:
-                        while state != "value matches" and time.monotonic() - start < 15:
-                            time.sleep(0.025)
-                            state = fixture.storage_checkpoint(directory, server.storage_token)
-                        if state != "value matches":
-                            raise RuntimeError("No committed value appeared within 15 seconds")
-                        print(f"Commit observed after {time.monotonic() - start:.3f}s", flush=True)
-                subprocess.run(["osascript", "-e", f'tell application id "{bundle_id}" to quit'], check=True, timeout=15)
-                if process.wait(timeout=15) != 0:
-                    raise RuntimeError("Control did not quit cleanly")
-            finally:
-                if process.poll() is None:
-                    process.terminate()
-                    process.wait(timeout=10)
-            print("After writer quit:" if initial else "After reader quit:",
-                  fixture.storage_checkpoint(directory, server.storage_token), flush=True)
-        return server.page_failure or "match"
+def launch(binary, identifier, profile, server, *, writing, wait_for_disk):
+    server.writing = writing
+    url = f"http://127.0.0.1:{server.server_port}/draft"
+    folder = Path.home() / "Library/WebKit" / identifier / "WebsiteDataStore" / str(profile)
+    with subprocess.Popen([str(binary), str(profile), url, "hold" if wait_for_disk else "quit"],
+                          stdout=subprocess.PIPE) as app:
+        try:
+            with selectors.DefaultSelector() as selector:
+                selector.register(app.stdout, selectors.EVENT_READ)
+                if not selector.select(timeout=20):
+                    raise RuntimeError("No response from the page")
+            outcome = app.stdout.readline().decode().strip()
+            if outcome not in {"match", "previous", "different", "missing", "error"}:
+                raise RuntimeError(f"Unexpected response from the page: {outcome!r}")
+            if wait_for_disk:
+                if outcome != "match":
+                    raise RuntimeError(f"Writer did not acknowledge its value: {outcome}")
+                deadline = time.monotonic() + 10
+                while fixture.storage_checkpoint(folder, server.marker) != "value matches":
+                    if time.monotonic() >= deadline:
+                        raise RuntimeError("Timed out waiting for committed value")
+                    time.sleep(.025)
+                subprocess.run(["osascript", "-e", f'tell application id "{identifier}" to quit'],
+                               check=True, timeout=10)
+            if app.wait(timeout=10) != 0:
+                raise RuntimeError("Test app did not quit normally")
+        finally:
+            if app.poll() is None:
+                app.terminate()
+                app.wait(timeout=10)
+    state = fixture.storage_checkpoint(folder, server.marker)
+    if state == "value differs" and server.previous is not None:
+        if fixture.storage_checkpoint(folder, server.previous) == "value matches":
+            state = "previous value"
+    return outcome, state
 
 
-with tempfile.TemporaryDirectory(prefix="kaizu-webkit-storage-") as scratch:
+with tempfile.TemporaryDirectory(prefix="kaizu-storage-at-ack-") as scratch:
     identifier = "dev.kaizu.qa.webkit-storage." + uuid.uuid4().hex
     binary = build_control(Path(scratch), identifier)
     failures = 0
     for number in range(1, 7):
-        for mode in ("immediate", "committed"):
-            print(f"Trial {number} {mode}", flush=True)
-            outcome = trial(binary, identifier, wait_for_commit=mode == "committed")
-            print(f"Result {number} {mode}: {outcome}", flush=True)
-            failures += outcome != "match"
+        for edit in (False, True):
+            for wait in (False, True):
+                profile = uuid.uuid4()
+                with ThreadingHTTPServer(("127.0.0.1", 0), Page) as server:
+                    thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": .05}, daemon=True)
+                    thread.start()
+                    try:
+                        server.previous = None
+                        if edit:
+                            server.marker = secrets.token_hex(16)
+                            launch(binary, identifier, profile, server, writing=True, wait_for_disk=True)
+                            server.previous = server.marker
+                        server.marker = secrets.token_hex(16)
+                        writer, disk = launch(binary, identifier, profile, server, writing=True, wait_for_disk=wait)
+                        if writer != "match":
+                            raise RuntimeError(f"Writer did not read back its value: {writer}")
+                        reader, after = launch(binary, identifier, profile, server, writing=False, wait_for_disk=False)
+                        print(f"Trial {number} {'edit' if edit else 'new'} {'committed' if wait else 'immediate'}: "
+                              f"writer={writer}, disk={disk}, reader={reader}, final={after}", flush=True)
+                        failures += reader != "match" or after != "value matches"
+                    finally:
+                        server.shutdown()
+                        thread.join()
     if failures:
         raise SystemExit(f"{failures} restores failed")
