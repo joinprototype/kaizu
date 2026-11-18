@@ -10,7 +10,7 @@ enum Suggestion: Identifiable {
     case url(URL)
     case search(String)
     case command(PaletteCommand)
-    case tab(BrowserTab)
+    case tab(BrowserTab, in: Space)
     case history(HistoryStore.Entry)
     case archived(ArchivedTabRecord)
 
@@ -21,10 +21,32 @@ enum Suggestion: Identifiable {
         case .url(let url): "url:\(url.absoluteString)"
         case .search(let query): "search:\(query)"
         case .command(let command): "command:\(command.id)"
-        case .tab(let tab): "tab:\(tab.id)"
+        case .tab(let tab, _): "tab:\(tab.id)"
         case .history(let entry): "history:\(entry.url.absoluteString)"
         case .archived(let archived): "archived:\(archived.id)"
         }
+    }
+}
+
+private func matchesPage(_ query: String, title: String, url: URL?) -> Bool {
+    title.localizedCaseInsensitiveContains(query) || (url?.absoluteString.localizedCaseInsensitiveContains(query) ?? false)
+}
+
+extension BrowserStore {
+    /// Favorites belong to the profile and appear once, in the active space.
+    func matchingTabs(_ query: String, acrossSpaces: Bool) -> [(tab: BrowserTab, space: Space)] {
+        let active = activeSpace
+        let selected = selectedTab
+        let others = acrossSpaces ? spaces.filter { $0 !== active && $0.profile === active.profile } : []
+        var matches: [(tab: BrowserTab, space: Space)] = []
+        for space in [active] + others {
+            let tabs = space === active ? space.allTabs : space.pinned.tabs + space.today
+            for tab in tabs where tab !== selected && matchesPage(query, title: tab.displayTitle, url: tab.url) {
+                matches.append((tab, space))
+                if matches.count == 5 { return matches }
+            }
+        }
+        return matches
     }
 }
 
@@ -55,7 +77,7 @@ struct CommandBar: View {
         let tabs = store.activeSpace.allTabs
         guard !query.isEmpty else {
             let others = tabs.filter { $0 !== store.selectedTab }
-            return mode == .newTab ? others.prefix(6).map(Suggestion.tab) : []
+            return mode == .newTab ? others.prefix(6).map { .tab($0, in: store.activeSpace) } : []
         }
         var results: [Suggestion] = []
         if let answer = QuickAnswer.evaluate(query, rates: CurrencyFeed.shared.rates) {
@@ -70,11 +92,11 @@ struct CommandBar: View {
         results.append(.search(query))
         results += engineSuggestions.filter { $0.caseInsensitiveCompare(query) != .orderedSame }.prefix(3).map(Suggestion.search)
         results += store.commands(matching: query).prefix(3).map(Suggestion.command)
-        let matchingTabs = tabs.filter { $0.id != store.selectedTab?.id && Self.matches(query, title: $0.displayTitle, url: $0.url) }
-        results += matchingTabs.prefix(5).map(Suggestion.tab)
-        let openURLs = Set(tabs.compactMap(\.url))
+        let matches = store.matchingTabs(query, acrossSpaces: mode == .newTab)
+        results += matches.map { .tab($0.tab, in: $0.space) }
+        let openURLs = Set(tabs.compactMap(\.url) + matches.compactMap { $0.tab.url })
         results += historyMatches.filter { !openURLs.contains($0.url) }.prefix(4).map(Suggestion.history)
-        let archived = store.archive.filter { Self.matches(query, title: $0.tab.title, url: $0.tab.url) }
+        let archived = store.archive.filter { matchesPage(query, title: $0.tab.title, url: $0.tab.url) }
         results += archived.prefix(3).map(Suggestion.archived)
         // What you usually pick for this leads (after an instant answer).
         if let top = store.app.topChoice(for: query, among: results, in: store.activeSpace.profile), let index = results.firstIndex(where: { $0.id == top.id }) {
@@ -118,10 +140,6 @@ struct CommandBar: View {
             update()
             selection = suggestions.firstIndex { $0.id == selected } ?? 0
         }
-    }
-
-    private static func matches(_ query: String, title: String, url: URL?) -> Bool {
-        title.localizedCaseInsensitiveContains(query) || (url?.absoluteString.localizedCaseInsensitiveContains(query) ?? false)
     }
 
     var body: some View {
@@ -307,8 +325,8 @@ extension Suggestion {
             .init(icon: .symbol("magnifyingglass"), title: query, subtitle: "Search \(searchEngine.name)")
         case .command(let command):
             .init(icon: .symbol(command.symbol), title: command.title, subtitle: "Command", action: command.shortcut)
-        case .tab(let tab):
-            .init(icon: .favicon(tab), title: tab.displayTitle, subtitle: tab.url?.displayHost, action: "Switch to Tab")
+        case .tab(let tab, let space):
+            .init(icon: .favicon(tab), title: tab.displayTitle, subtitle: [space.name, tab.url?.displayHost].compactMap { $0 }.joined(separator: " · "), action: "Switch to Tab")
         case .history(let entry):
             .init(icon: .symbol("clock.arrow.circlepath"), title: entry.title.isEmpty ? entry.url.displayHost : entry.title, subtitle: entry.url.displayHost)
         case .archived(let archived):

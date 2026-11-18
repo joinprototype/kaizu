@@ -675,6 +675,46 @@ enum DebugHooks {
         }
     }
 
+    /// Run against a scratch session with KAIZU_DEBUG=tabsearch.
+    private static func qaTabSearch(_ store: BrowserStore) {
+        let app = store.app
+        let home = store.activeSpace
+        let work = Space(profile: home.profile, name: "Work", symbol: "briefcase", hue: 0.5)
+        let foreign = Space(profile: Profile(name: "Other"), name: "Other", symbol: "star", hue: 0)
+        app.profiles.append(foreign.profile)
+        app.spaces += [work, foreign]
+        let privateStore = app.openPrivateWindow()
+        let url = URL(string: "about:blank#qa-tab-search")!
+        let selected = store.openTab(url)
+        let favorite = store.openTab(url, select: false)
+        store.move(favorite, to: .favorites(before: nil))
+        let target = store.openTab(url, in: work, select: false)
+        let folder = Folder(name: "Reading", isExpanded: false)
+        work.pinned = [.folder(folder)]
+        store.move(target, to: .pinned(folder: folder, before: nil), in: work)
+        target.customTitle = "QA notes"
+        let other = store.openTab(url, in: foreign, select: false)
+        let hidden = privateStore.openTab(url, select: false)
+        app.archive.append(ArchivedTabRecord(tab: other.record, spaceID: foreign.id, archivedAt: .now))
+
+        let matches = store.matchingTabs("qa-tab-search", acrossSpaces: true)
+        precondition(matches.map(\.tab.id) == [favorite.id, target.id])
+        precondition(matches.map(\.space.id) == [home.id, work.id])
+        precondition(store.selectedTab === selected && !target.isLoaded)
+        precondition(store.matchingTabs("QA notes", acrossSpaces: false).isEmpty)
+        precondition(privateStore.matchingTabs("qa-tab-search", acrossSpaces: true).map(\.tab.id) == [hidden.id])
+        precondition(!store.archive.contains { $0.spaceID == foreign.id } && privateStore.archive.isEmpty)
+
+        let match = store.matchingTabs("qa NOTES", acrossSpaces: true).first!
+        let suggestion = Suggestion.tab(match.tab, in: match.space)
+        precondition(suggestion.presentation(searchEngine: store.settings.searchEngine).subtitle?.contains("Work") == true)
+        store.perform(suggestion, mode: .newTab)
+        precondition(store.activeSpace === work && store.selectedTab === target)
+        precondition(work.pinned.tabs == [target] && work.today.isEmpty)
+        FileHandle.standardError.write(Data("QA tab search passed\n".utf8))
+        NSApp.terminate(nil)
+    }
+
     private static func qaTabMoves(_ store: BrowserStore) {
         func check(_ name: String, _ passed: Bool) {
             FileHandle.standardError.write(Data("QA tabs \(passed ? "ok" : "FAILED"): \(name)\n".utf8))
@@ -1718,6 +1758,8 @@ enum DebugHooks {
                 FileHandle.standardError.write(Data("QA notify \(passed ? "ok" : "FAILED"): allowed tab woke at launch, another stayed asleep\n".utf8))
                 NSApp.terminate(nil)
             }
+        case "tabsearch":
+            qaTabSearch(store)
         case "tabmoves":
             qaTabMoves(store)
         case "showcase":
@@ -1760,12 +1802,12 @@ enum DebugHooks {
                 let first = store.openTab(URL(string: "https://example.com/"))
                 let second = store.openTab(URL(string: "https://example.org/"))
                 _ = first
-                store.app.learn(.tab(second), for: "ex", in: store.activeSpace.profile)
-                store.app.learn(.tab(second), for: "ex", in: store.activeSpace.profile)
+                store.app.learn(.tab(second, in: store.activeSpace), for: "ex", in: store.activeSpace.profile)
+                store.app.learn(.tab(second, in: store.activeSpace), for: "ex", in: store.activeSpace.profile)
                 store.app.save()
             } else {
-                let lead = store.app.topChoice(for: "ex", among: tabs.map(Suggestion.tab), in: store.activeSpace.profile)
-                let leads = lead.map { if case .tab(let tab) = $0 { tab.url?.absoluteString ?? "" } else { "" } } ?? "nothing"
+                let lead = store.app.topChoice(for: "ex", among: tabs.map { .tab($0, in: store.activeSpace) }, in: store.activeSpace.profile)
+                let leads = lead.map { if case .tab(let tab, _) = $0 { tab.url?.absoluteString ?? "" } else { "" } } ?? "nothing"
                 FileHandle.standardError.write(Data("QA learned: ex leads with \(leads)\n".utf8))
             }
         case "appearance":
