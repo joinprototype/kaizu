@@ -25,20 +25,22 @@ extension DebugHooks {
         }
         check(view.url == url && !view.isLoading, "fixture page completed loading")
         _ = try? await view.evaluateJavaScript("window.kaizuDraft = 'unfinished note'")
-        store.window?.makeKeyAndOrderFront(nil)
-        for _ in 0..<100 where store.window?.isKeyWindow != true {
-            try? await Task.sleep(for: .milliseconds(50))
+        func focus(_ window: NSWindow?) async {
+            guard let window else { check(false, "expected a browser window"); return }
+            NSApp.activate(ignoringOtherApps: true)
+            window.makeKeyAndOrderFront(nil)
+            for _ in 0..<100 where !window.isKeyWindow {
+                try? await Task.sleep(for: .milliseconds(50))
+            }
+            check(window.isKeyWindow, "AppKit focus (active=\(NSApp.isActive), visible=\(window.isVisible), canBecomeKey=\(window.canBecomeKey))")
         }
-        check(store.window?.isKeyWindow == true, "main window accepted focus")
+        check(work !== store, "two independent regular windows opened")
+        await focus(store.window)
         let file = NSApp.mainMenu!.item(withTitle: "File")!.submenu!
         let promote = file.item(withTitle: "Open Little Window in Kaizu")!
         file.update()
         check(!promote.isEnabled, "promotion requires a focused little window")
-        little.window?.makeKeyAndOrderFront(nil)
-        for _ in 0..<100 where app.keyLittleWindow !== little {
-            try? await Task.sleep(for: .milliseconds(50))
-        }
-        check(app.keyLittleWindow === little, "little window accepted focus")
+        await focus(little.window)
         file.update()
         check(promote.isEnabled && promote.keyEquivalent == "o", "promotion is available on Command-O")
         file.performActionForItem(at: file.index(of: promote))
