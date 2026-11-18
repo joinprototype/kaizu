@@ -58,27 +58,26 @@ guard let bar = attribute(app,kAXMenuBarAttribute),
 press(export)
 print("Safari export options:")
 showWindows()
+Thread.sleep(forTimeInterval: 3)
 let controls = windows().flatMap { elements($0) }
-let flags = controls.filter { attribute($0,kAXRoleAttribute) as? String == "AXCheckBox" }
+let types = ["Bookmarks","Reading List","History","Extensions","Credit Cards","Passwords"]
 var selected = Set<String>()
-let labels = ["bookmark","reading list","clock","Puzzle piece extension","card","passwords"]
-for flag in flags {
-    var row = flag
-    var label: String?
-    for _ in 0..<4 {
-        if let parent = attribute(row, kAXParentAttribute) { row = parent as! AXUIElement } else { break }
-        let found = elements(row).filter { attribute($0,kAXRoleAttribute) as? String == "AXImage" }
-            .compactMap { attribute($0,kAXDescriptionAttribute) as? String }.filter { labels.contains($0) }
-        if found.count == 1 { label = found[0]; break }
-    }
-    guard let label else { print("Unrecognized export row"); exit(8) }
-    let wanted = label == "bookmark" || label == "clock"
+var visited = Set<String>()
+for row in controls where attribute(row,kAXRoleAttribute) as? String == "AXUnknown" {
+    let contents = children(row)
+    guard let label = contents.compactMap({ attribute($0,kAXValueAttribute) as? String }).first(where: types.contains),
+          let flag = contents.first(where: { attribute($0,kAXRoleAttribute) as? String == "AXButton" })
+    else { continue }
+    visited.insert(label)
+    let wanted = label == "Bookmarks" || label == "History"
     let state = (attribute(flag,kAXValueAttribute) as? NSNumber)?.boolValue == true
     let enabled = (attribute(flag,kAXEnabledAttribute) as? NSNumber)?.boolValue == true
-    if wanted != state && (wanted || enabled) { press(flag) }
+    if wanted != state && enabled { press(flag) }
     if (attribute(flag,kAXValueAttribute) as? NSNumber)?.boolValue == true { selected.insert(label) }
 }
-guard selected == Set(["bookmark","clock"]) else { print("Export selection:", selected); exit(9) }
+guard visited == Set(types), selected == Set(["Bookmarks","History"]) else {
+    print("Export selection:",selected, "available types:", visited); showWindows(); exit(9)
+}
 print("Only bookmarks and history selected")
 guard let confirm = match(controls,role:"AXButton",title:"Export") else { exit(10) }
 press(confirm)
