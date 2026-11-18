@@ -1,0 +1,31 @@
+name: Production updater cookie trials
+on:
+  push:
+    branches: [qa/signed-update-cookie-trials]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  repeat:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, xcode-27]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          name: kaizu-runtime-check
+          run-id: 44335592888
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/artifact
+      - name: Exercise six independent login sessions across a verified update
+        env:
+          RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        run: |
+          sw_vers
+          python3 .github/qa/cookie-updates/repeat.py

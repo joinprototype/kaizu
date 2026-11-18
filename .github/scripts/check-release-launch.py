@@ -149,7 +149,7 @@ def bundle_info(app):
         return plistlib.load(info)
 
 
-def staged_release(process):
+def staged_release(process, since):
     cache = Path.home() / "Library/Caches/com.joinprototype.kaizu/Updates"
     predicate = 'subsystem == "com.joinprototype.kaizu" AND category == "updates"'
     deadline = time.monotonic() + 120
@@ -161,12 +161,12 @@ def staged_release(process):
             if not build.isdecimal():
                 continue
             ready = f' AND eventMessage == "Update {build} staged"'
-            logs = subprocess.check_output(["/usr/bin/log", "show", "--last", "5m", "--style", "compact",
+            logs = subprocess.check_output(["/usr/bin/log", "show", "--start", since, "--style", "compact",
                                             "--predicate", predicate + ready], text=True, timeout=20)
             if any(line.endswith(f" Update {build} staged") for line in logs.splitlines()):
                 return staged
         time.sleep(1)
-    subprocess.run(["/usr/bin/log", "show", "--last", "5m", "--style", "compact", "--predicate", predicate],
+    subprocess.run(["/usr/bin/log", "show", "--start", since, "--style", "compact", "--predicate", predicate],
                    timeout=20)
     raise SystemExit("The app did not stage a signed release from the production feed")
 
@@ -192,8 +192,9 @@ def install_signed_update(server, app, url):
     subprocess.run(["plutil", "-replace", "CFBundleVersion", "-string", "0", str(app / "Contents/Info.plist")],
                    check=True)
     subprocess.run(["codesign", "--force", "--sign", "-", str(app)], check=True)
+    since = time.strftime("%Y-%m-%d %H:%M:%S")
     process = launch(server, app, url)
-    staged = staged_release(process)
+    staged = staged_release(process, since)
     info = bundle_info(staged)
     version, build = info["CFBundleShortVersionString"], info["CFBundleVersion"]
     executable = Path("Contents/MacOS/Kaizu")
