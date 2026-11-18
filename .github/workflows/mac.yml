@@ -29,6 +29,12 @@ jobs:
           export KAIZU_ARC="$GITHUB_WORKSPACE/Tests/BrowserCoreTests/Fixtures/Arc Data Export.md"
           build/Kaizu.app/Contents/MacOS/Kaizu
           KAIZU_DEBUG=arcimport-undo-restored build/Kaizu.app/Contents/MacOS/Kaizu
+      - name: Undo a bookmark import after deleting the folder in a second window
+        timeout-minutes: 2
+        env:
+          KAIZU_DEBUG: bookmark-import-undo
+          KAIZU_SUPPORT: ${{ runner.temp }}/bookmark-undo-profile
+        run: build/Kaizu.app/Contents/MacOS/Kaizu
       - name: Build release app
         run: make app CONFIG=release
       - name: Verify app bundle
