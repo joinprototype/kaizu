@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy in Kaizu for Mac</title>
+<meta name="description" content="What Kaizu saves on your Mac, which services it contacts, and how to manage browsing data and support reports.">
+<link rel="canonical" href="https://kaizu.joinprototype.com/privacy/">
+<link rel="icon" type="image/png" href="/favicon.png">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<header class="top">
+  <a href="/">Kaizu</a>
+  <a href="https://joinprototype.com/">by Prototype</a>
+</header>
+
+<main class="guide">
+  <h1>Privacy in Kaizu.</h1>
+  <p class="lede">Kaizu keeps your sidebar, history and settings on your Mac. You can use the browser without an account. The app has no usage analytics.</p>
+
+  <section>
+    <h2>What your Mac remembers</h2>
+    <p>Kaizu saves your spaces, tabs, archived tabs, history and command-bar choices locally. WebKit keeps cookies and other website data separate for each profile. Spaces that share a profile share its logins.</p>
+    <h3>Spotlight</h3>
+    <p>Pinned tabs and favorites can appear in macOS Spotlight. Kaizu gives the local index the tab’s address, a display name, its space and an icon when available.</p>
+    <h3>Private windows</h3>
+    <p>A private window uses an in-memory website data store. Kaizu leaves its tabs out of saved sessions, history and Spotlight, and disables extensions and search suggestions there. Websites and the network you use still receive your requests. Files you download remain on disk.</p>
+  </section>
+
+  <section>
+    <h2>When Kaizu connects</h2>
+    <p>Opening a page contacts that website and the services it loads. Each service you reach can see connection details such as your IP address. Kaizu also makes the following requests.</p>
+    <h3>Searches and suggestions</h3>
+    <p>Submitting a web search sends your query to the search engine you chose. Search shortcuts send the query to the shortcut’s destination. Suggestions while typing are off by default. If you enable them in Settings → General, eligible text goes to your search engine before you press Return. Kaizu skips text it recognizes as an address or a search shortcut.</p>
+    <h3>Updates and blocking lists</h3>
+    <p>Kaizu checks kaizu.joinprototype.com for new versions and downloads a signed update when available. It checks easylist.to and secure.fanboy.co.nz for ad, tracker and cookie-banner rules. Your Mac applies those rules locally as you browse.</p>
+    <h3>Icons, currency and extensions</h3>
+    <p>Kaizu fetches site icons from addresses supplied by the page or from the site itself, without sending cookies in the icon request. A currency conversion can fetch a table of exchange rates from Frankfurter. Your Mac calculates the amount. Installing an extension from the Chrome Web Store or Firefox Add-ons requests its package from Google or Mozilla. Installed extensions can access pages according to their permissions.</p>
+  </section>
+
+  <section>
+    <h2>What you can clear</h2>
+    <p><strong>History → Clear History</strong> clears visited pages and learned command-bar choices across profiles. Open tabs, favorites and the archive stay in place.</p>
+    <h3>Cookies and site data</h3>
+    <p>Open the lock in the address bar and choose <strong>Clear Cookies and Site Data</strong>. The confirmation names the domain that will be cleared in the tab’s profile. This can sign you out of that site.</p>
+  </section>
+
+  <section>
+    <h2>When you report a problem</h2>
+    <p><strong>Help → Report a Bug</strong> prepares an email draft with your description, Kaizu version and macOS version. You can include diagnostics such as settings, extension names, the session log and recent crash reports. You can inspect the attachment before sending it.</p>
+    <h3>Broken sites</h3>
+    <p>A broken-site report includes the site name and browser setup. You choose whether to include the full page address. Prototype receives the report when you send it. For questions about browser privacy, email <a href="mailto:help@joinprototype.com">help@joinprototype.com</a>.</p>
+  </section>
+</main>
+
+<footer><p><a href="/">Back to Kaizu</a></p></footer>
+</body>
+</html>
