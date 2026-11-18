@@ -19,6 +19,16 @@ jobs:
           persist-credentials: false
       - name: Run Swift tests
         run: swift test
+      - name: Verify Arc import Undo preserves later edits and profile cookies
+        timeout-minutes: 4
+        env:
+          KAIZU_DEBUG: arcimport-undo-edits
+          KAIZU_SUPPORT: ${{ runner.temp }}/arc-undo-profile
+        run: |
+          make app
+          export KAIZU_ARC="$GITHUB_WORKSPACE/Tests/BrowserCoreTests/Fixtures/Arc Data Export.md"
+          build/Kaizu.app/Contents/MacOS/Kaizu
+          KAIZU_DEBUG=arcimport-undo-restored build/Kaizu.app/Contents/MacOS/Kaizu
       - name: Build release app
         run: make app CONFIG=release
       - name: Verify app bundle

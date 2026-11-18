@@ -1935,6 +1935,21 @@ enum DebugHooks {
                 try? await Task.sleep(for: .seconds(2))
                 saveShot(ofWindow: "Import from Arc")
             }
+        case "arcimport-undo-restored":
+            Task {
+                await checkRestoredArcImportUndo(in: store)
+                NSApp.terminate(nil)
+            }
+        case "arcimport-undo-edits":
+            Task {
+                do {
+                    try await checkArcImportUndo(in: store, file: arcFile)
+                    NSApp.terminate(nil)
+                } catch {
+                    print("Arc import Undo check failed:", error)
+                    exit(1)
+                }
+            }
         case "arcimport-run":
             do {
                 let plan = store.arcImport(of: try ArcSidebar.load(from: arcFile), includesToday: true)

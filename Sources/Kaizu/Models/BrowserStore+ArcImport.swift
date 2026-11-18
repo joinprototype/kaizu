@@ -16,22 +16,16 @@ extension BrowserStore {
             profile.favorites = record.favorites.map { app.makeTab($0, profile: profile) }
             return profile
         }
-        var favorites: [(profile: Profile, ids: Set<UUID>)] = []
         for (id, records) in plan.favorites {
             guard let profile = profiles.first(where: { $0.id == id }) else { continue }
             let tabs = records.map { app.makeTab($0, profile: profile) }
             profile.favorites += tabs
-            favorites.append((profile, Set(tabs.map(\.id))))
         }
-        var sections: [(space: Space, ids: Set<UUID>)] = []
         for space in spaces {
             let items = (plan.pinned[space.id] ?? []).map { app.makeItem($0, profile: space.profile) }
             let today = (plan.today[space.id] ?? []).map { app.makeTab($0, profile: space.profile) }
             space.pinned += items
             space.today += today
-            if !items.isEmpty || !today.isEmpty {
-                sections.append((space, Set(items.map(\.id) + today.map(\.id))))
-            }
         }
         let renamed = plan.takeover.flatMap { takeover in
             spaces.first { $0.id == takeover.spaceID }.map { space in
@@ -54,20 +48,10 @@ extension BrowserStore {
         let count = plan.tabCount
         showToast("Imported \(count.counted("tab")) from Arc", symbol: "square.and.arrow.down", undo: { [weak self] in
             guard let self else { return }
-            newSpaces.forEach(self.delete)
-            for (profile, ids) in favorites {
-                self.app.discard(profile.favorites.filter { ids.contains($0.id) })
-                profile.favorites.removeAll { ids.contains($0.id) }
-            }
-            for (space, ids) in sections {
-                let items = space.pinned.filter { ids.contains($0.id) }
-                self.app.discard(items.tabs + space.today.filter { ids.contains($0.id) })
-                space.pinned.removeAll { ids.contains($0.id) }
-                space.today.removeAll { ids.contains($0.id) }
-            }
-            if let (space, name, hue) = renamed {
-                space.name = name
-                space.hue = hue
+            self.undoArcImport(plan)
+            if let (space, name, hue) = renamed, let takeover = plan.takeover {
+                if space.name == takeover.name { space.name = name }
+                if space.hue == takeover.hue { space.hue = hue }
             }
             self.scheduleSave()
         }, lasts: .seconds(12))

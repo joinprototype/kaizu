@@ -12,8 +12,11 @@ final class Profile: Identifiable {
     let isPrivate: Bool
 
     /// Website data lives under the profile's id, so it must never change.
-    @ObservationIgnored private(set) lazy var dataStore: WKWebsiteDataStore =
-        isPrivate ? .nonPersistent() : WKWebsiteDataStore(forIdentifier: id)
+    @ObservationIgnored private(set) var didOpenWebsiteData = false
+    @ObservationIgnored private(set) lazy var dataStore: WKWebsiteDataStore = {
+        didOpenWebsiteData = true
+        return isPrivate ? .nonPersistent() : WKWebsiteDataStore(forIdentifier: id)
+    }()
 
     init(id: UUID = UUID(), name: String, isPrivate: Bool = false) {
         self.id = id
