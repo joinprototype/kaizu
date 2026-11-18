@@ -21,6 +21,7 @@ final class AppModel {
     /// Another app already holds the quick bar's shortcut.
     var isQuickBarKeyTaken = false
 
+    let tabStateFiles = TabStateFiles(directory: AppPaths.support.appending(path: "TabStates", directoryHint: .isDirectory))
     let settings = Settings()
     let contentBlocker = ContentBlocker()
     let extensions = ExtensionHost()

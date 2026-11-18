@@ -73,7 +73,7 @@ extension AppModel {
             id: record.id, profile: profile, app: self, url: record.url, title: record.title,
             pinnedURL: record.pinnedURL, lastActiveAt: record.lastActiveAt
         )
-        tab.savedState = savedTabState(for: record.id)
+        tab.savedState = tabStateFiles.read(record.id)
         tab.customTitle = record.customTitle
         return tab
     }
