@@ -28,4 +28,4 @@ done
 nc -z 127.0.0.1 3478
 
 swiftc -parse-as-library "$(dirname "$0")/check-webkit-call.swift" -o "$scratch/webkit-control"
-python3 -u "$(dirname "$0")/../qa/relay-peers/compare.py" "$1" "$scratch/webkit-control"
+python3 -u "$(dirname "$0")/../qa/relay-peers/encoder_log.py" python3 -u "$(dirname "$0")/../qa/relay-peers/compare.py" "$1" "$scratch/webkit-control"

@@ -53,8 +53,13 @@ class PeerPage(BaseHTTPRequestHandler):
             server = {"urls":"turn:127.0.0.1:3478?transport=tcp","username":"kaizu-test",
                       "credential":os.environ["KAIZU_TEST_TURN_PASSWORD"]}
             self.respond(json.dumps({"iceServers":[server],"iceTransportPolicy":"relay"}).encode())
-        elif path in ("/ready/A", "/ready/B"):
-            self.exchange("ready", path[-1], True)
+        elif len(parts) == 2 and parts[1] in ("A", "B") and parts[0] in ("sources", "ready", "done"):
+            self.exchange(parts[0], parts[1], True)
+        elif path in ("/loaded/A", "/loaded/B"):
+            with self.server.changed:
+                self.server.loaded.add(parts[1])
+                self.server.changed.notify_all()
+            self.respond(b"{}")
         else:
             self.send_error(404)
 
@@ -84,17 +89,24 @@ class PeerPage(BaseHTTPRequestHandler):
         pass
 
 
-def trial(app, webkit, clients, number):
+def trial(app, webkit, clients, number, timing):
     with ThreadingHTTPServer(("127.0.0.1", 0), PeerPage) as server:
         server.changed = threading.Condition()
         server.messages, server.candidates, server.results = {}, {}, {}
+        server.loaded = set()
         server.closing = False
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
         processes = []
         try:
+            print(f"Starting trial {number} {clients} source={timing}", flush=True)
             for side, client in zip("AB", clients):
-                url = f"http://127.0.0.1:{server.server_port}/media-call?side={side}&source=frames"
+                if side == "B":
+                    with server.changed:
+                        if not server.changed.wait_for(lambda: "A" in server.loaded, 45):
+                            raise RuntimeError("The first browser did not load the page")
+                    time.sleep(15)
+                url = f"http://127.0.0.1:{server.server_port}/media-call?side={side}&source=frames&timing={timing}"
                 cmd = ["open","-W","-n","-a",app,url] if client == "kaizu" else [webkit,url]
                 processes.append((client, subprocess.Popen(cmd)))
             with server.changed:
@@ -131,10 +143,16 @@ if __name__ == "__main__":
     if support.exists(): raise SystemExit("Expected a fresh hosted account")
     settings = json.dumps({"externalLinks":"currentSpace"}).encode().hex()
     subprocess.run(["defaults","write","com.joinprototype.kaizu","settings","-data",settings],check=True)
-    cases = [("webkit","webkit"),("kaizu","webkit"),("webkit","kaizu"),
-             ("webkit","kaizu"),("kaizu","webkit"),("webkit","webkit")]
+    # The control gets the same launch gap as the mixed pair. Change only when
+    # each page starts its source, keeping the package, codec and verification fixed.
+    cases = [
+        (("webkit", "webkit"), "on-load"), (("webkit", "kaizu"), "paired"),
+        (("webkit", "kaizu"), "on-load"), (("webkit", "webkit"), "paired"),
+        (("webkit", "webkit"), "paired"), (("webkit", "kaizu"), "on-load"),
+        (("webkit", "kaizu"), "paired"), (("webkit", "webkit"), "on-load"),
+    ]
     outcomes = []
-    for number, clients in enumerate(cases, 1):
-        outcomes.append(trial(*sys.argv[1:3], clients, number))
+    for number, (clients, timing) in enumerate(cases, 1):
+        outcomes.append(trial(*sys.argv[1:3], clients, number, timing))
         if support.exists(): support.rename(Path(os.environ["RUNNER_TEMP"]) / f"peer-session-{number}")
     if not all(outcomes): raise SystemExit(f"{outcomes.count(False)} of {len(cases)} paired calls failed")

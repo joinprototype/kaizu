@@ -41,6 +41,13 @@ function generatedStream() {
         worker.postMessage({width: canvas.width, height: canvas.height});
     });
 }
+const params = new URLSearchParams(location.search);
+const side = params.get("side");
+const sourceMode = params.get("timing");
+await fetch("/loaded/" + side);
+if (sourceMode === "paired") await fetch("/sources/" + side);
+const sourceStarted = performance.now();
+let negotiationStarted;
 const stream = fromWorker ? await generatedStream() : canvas.captureStream(10);
 const audio = new AudioContext();
 const microphone = audio.createMediaStreamDestination();
@@ -54,11 +61,10 @@ const draw = fromWorker ? null : setInterval(() => {
     context.fillRect(0, 0, canvas.width, canvas.height);
 }, 100);
 
-const side = new URLSearchParams(location.search).get("side");
 // Each peer publishes its description immediately and trickles candidates in event order.
 async function readRemoteCandidates(peer, path) {
     let cursor = 0;
-    while (!reported) {
+    while (!finalized) {
         const response = await fetch(path + "/" + cursor);
         if (!response.ok) throw new Error("Could not receive remote ICE candidates");
         for (const candidate of await response.json()) {
@@ -202,22 +208,31 @@ async function describePeer(peer) {
         const key = stat.type + "/" + (stat.candidateType || stat.state);
         counts[key] = (counts[key] || 0) + 1;
     }
-    return {connection: peer.connectionState, gathering: peer.iceGatheringState, ice: peer.iceConnectionState,
+    const pair = [...stats.values()].find(r => r.type === "candidate-pair" && r.nominated && r.state === "succeeded");
+    const link = pair && {outgoingBitrate: pair.availableOutgoingBitrate, rtt: pair.currentRoundTripTime};
+    return {link, connection: peer.connectionState, gathering: peer.iceGatheringState, ice: peer.iceConnectionState,
         relay: usesRelay(stats), counts, media};
 }
 
 let reported = false;
+let finalized = false;
 async function finish(result) {
     if (reported) return;
     reported = true;
+    // Record both senders after the slowest peer finishes. An early receive pass can
+    // precede a sender either starting to encode or remaining stalled for the whole call.
+    await fetch("/done/" + side);
     const summary = await Promise.all([describePeer(caller), describePeer(receiver)]);
+    finalized = true;
     await fetch("/result/" + side, {method: "POST", body: JSON.stringify({result, stage,
         sender: summary[0], receiver: summary[1], generated, echoed, firstRendered,
+        sourceAgeAtCall: Math.round(negotiationStarted - sourceStarted),
         visible: document.visibilityState, focus: document.hasFocus(), viewport: [innerWidth, innerHeight],
         video: [video.videoWidth, video.videoHeight], audio: audio.state})});
     // Keep sending until both processes have independently reported their result.
 }
 await fetch("/ready/" + side);
+negotiationStarted = performance.now();
 const timeout = setTimeout(() => finish("timeout"), 40000);
 try {
     await call();
