@@ -7,6 +7,7 @@ extension BrowserStore {
     /// (see SpacePager); `animation` is the swipe's spring when one ends it.
     func switchTo(_ space: Space, animation: Animation? = Motion.glide) {
         guard space.id != activeSpaceID else { return }
+        let previousTab = selectedTab
         let from = spaces.firstIndex { $0.id == activeSpaceID } ?? 0
         let leaving = activeSpaceID
         spaceSwitchForward = (spaces.firstIndex { $0 === space } ?? 0) > from
@@ -23,7 +24,10 @@ extension BrowserStore {
         reader = nil
         closePeek()
         endHidingItems()
-        selectedTab(in: space)?.activate()
+        if let tab = selectedTab(in: space) {
+            tab.activate()
+            extensions.didActivate(tab, previous: previousTab)
+        }
         focusWebView()
         scheduleSave()
     }
