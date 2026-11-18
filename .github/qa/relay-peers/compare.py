@@ -19,7 +19,11 @@ class PeerPage(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
-        self.wfile.write(body)
+        try:
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError):
+            # A peer can quit after its final result with a candidate read outstanding.
+            pass
 
     def exchange(self, kind, side, value):
         remote = (kind, "B" if side == "A" else "A")
@@ -32,7 +36,16 @@ class PeerPage(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urlsplit(self.path).path
-        if path == "/media-call":
+        parts = path.strip("/").split("/")
+        if (len(parts) == 4 and parts[0] == "ice" and parts[1] in ("A", "B")
+                and parts[2] in ("offer", "answer") and parts[3].isdigit()):
+            key, cursor = (parts[1], parts[2]), int(parts[3])
+            with self.server.changed:
+                items = self.server.candidates.setdefault(key, [])
+                self.server.changed.wait_for(lambda: len(items) > cursor or self.server.closing, 10)
+                batch = items[cursor:]
+            self.respond(json.dumps(batch).encode())
+        elif path == "/media-call":
             self.respond((SCRIPTS / "check-media-call.html").read_bytes(), "text/html")
         elif path == "/media-call/video-source.js":
             self.respond((SCRIPTS / "check-video-source.js").read_bytes(), "text/javascript")
@@ -54,6 +67,11 @@ class PeerPage(BaseHTTPRequestHandler):
         value = json.loads(self.rfile.read(size))
         if parts[0] == "signal" and len(parts) == 3 and parts[2] in ("offer", "answer"):
             self.exchange(parts[2], parts[1], value)
+        elif parts[0] == "ice" and len(parts) == 3 and parts[2] in ("offer", "answer"):
+            with self.server.changed:
+                self.server.candidates.setdefault((parts[1], parts[2]), []).append(value)
+                self.server.changed.notify_all()
+            self.respond(b"{}")
         elif parts[0] == "result" and len(parts) == 2:
             with self.server.changed:
                 self.server.results.setdefault(parts[1], value)
@@ -69,7 +87,8 @@ class PeerPage(BaseHTTPRequestHandler):
 def trial(app, webkit, clients, number):
     with ThreadingHTTPServer(("127.0.0.1", 0), PeerPage) as server:
         server.changed = threading.Condition()
-        server.messages, server.results, server.closing = {}, {}, False
+        server.messages, server.candidates, server.results = {}, {}, {}
+        server.closing = False
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
         processes = []

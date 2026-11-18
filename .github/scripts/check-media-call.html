@@ -55,21 +55,38 @@ const draw = fromWorker ? null : setInterval(() => {
 }, 100);
 
 const side = new URLSearchParams(location.search).get("side");
-async function connect(from, to, description) {
-    stage = "gathering " + description.type;
-    await from.setLocalDescription(description);
-    if (from.iceGatheringState !== "complete") {
-        await new Promise(resolve => from.addEventListener("icegatheringstatechange", () => {
-            if (from.iceGatheringState === "complete") resolve();
-        }));
+// Each peer publishes its description immediately and trickles candidates in event order.
+async function readRemoteCandidates(peer, path) {
+    let cursor = 0;
+    while (!reported) {
+        const response = await fetch(path + "/" + cursor);
+        if (!response.ok) throw new Error("Could not receive remote ICE candidates");
+        for (const candidate of await response.json()) {
+            if (candidate === null) return;
+            await peer.addIceCandidate(candidate);
+            cursor++;
+        }
     }
-    if (!from.localDescription.sdp.includes(" typ relay")) throw new Error("No relay candidate in local description");
+}
+async function connect(from, to, description) {
+    const localCandidates = "/ice/" + side + "/" + description.type;
+    const remoteCandidates = "/ice/" + (side === "A" ? "B" : "A") + "/" + description.type;
+    let writes = Promise.resolve();
+    from.onicecandidate = ({candidate}) => {
+        const body = JSON.stringify(candidate?.toJSON() ?? null);
+        writes = writes.then(async () => {
+            const response = await fetch(localCandidates, {method: "POST", body});
+            if (!response.ok) throw new Error("Could not publish ICE candidate");
+        }).catch(error => finish(String(error)));
+    };
     stage = "exchanging " + description.type;
+    await from.setLocalDescription(description);
     const response = await fetch("/signal/" + side + "/" + description.type, {
-        method: "POST", body: JSON.stringify(from.localDescription)
+        method: "POST", body: JSON.stringify(description)
     });
     if (!response.ok) throw new Error("Remote description unavailable");
     await to.setRemoteDescription(await response.json());
+    readRemoteCandidates(to, remoteCandidates).catch(error => finish(String(error)));
 }
 async function call() {
     const receivedFrame = new Promise(resolve => {
