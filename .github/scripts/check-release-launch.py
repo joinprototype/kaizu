@@ -6,8 +6,10 @@ import json
 import os
 import plistlib
 import secrets
+import shutil
 import subprocess
 import time
+import uuid
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
@@ -34,6 +36,13 @@ class Page(BaseHTTPRequestHandler):
             self.send_response(204)
             self.end_headers()
             server.rendered = True
+        elif self.path.startswith("/extension-test/"):
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html")
+            self.end_headers()
+            self.wfile.write(b"<!doctype html><title>Extension window check</title>")
+            if self.path.startswith("/extension-test/failure?"):
+                server.extension_failure = self.path
         else:
             self.send_response(404)
             self.end_headers()
@@ -42,6 +51,7 @@ class Page(BaseHTTPRequestHandler):
 def launch(server, app, *urls):
     server.rendered = False
     server.missing_cookie = False
+    server.extension_failure = None
     server.challenge = secrets.token_hex(12)
     process = subprocess.Popen(["open", "-W", "-n", "-a", str(app), *urls])
     deadline = time.monotonic() + 90
@@ -50,6 +60,8 @@ def launch(server, app, *urls):
             raise SystemExit(f"{app} exited before rendering the page")
         if server.missing_cookie:
             raise SystemExit("The page loaded without the expected login cookie")
+        if server.extension_failure:
+            raise SystemExit(server.extension_failure)
         if time.monotonic() >= deadline:
             raise SystemExit("Timed out waiting for Kaizu to render the page")
         server.handle_request()
@@ -133,12 +145,26 @@ def install_signed_update(server, app, url):
     print(f"The candidate's updater installed signed release {version} (build {build}) on quit.")
 
 
+def install_test_extension():
+    extension_id = str(uuid.uuid4()).upper()
+    folder = Path.home() / "Library/Application Support/Kaizu/Extensions" / extension_id
+    folder.mkdir(parents=True)
+    manifest = {"manifest_version": 2, "name": "Window selection check", "version": "1.0",
+                "permissions": ["tabs", "http://127.0.0.1/*"], "background": {"scripts": ["background.js"]}}
+    (folder / "manifest.json").write_text(json.dumps(manifest))
+    shutil.copyfile(Path(__file__).with_name("check-extension-windows.js"), folder / "background.js")
+    records = [{"id": extension_id, "kind": "folder", "path": str(folder)}]
+    subprocess.run(["defaults", "write", "com.joinprototype.kaizu", "installedExtensions", "-data",
+                    json.dumps(records).encode().hex()], check=True)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("candidate", type=Path)
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("previous", type=Path, nargs="?")
     mode.add_argument("--signed-update", action="store_true")
+    mode.add_argument("--extension-windows", action="store_true")
     args = parser.parse_args()
     candidate = args.candidate.resolve(strict=True)
     with HTTPServer(("127.0.0.1", 0), Page) as server:
@@ -146,16 +172,21 @@ def main():
         server.issue_cookie = True
         server.cookie = "kaizu_login=" + secrets.token_hex(16)
         url = f"http://127.0.0.1:{server.server_port}/start"
-        if args.previous is None and not args.signed_update:
+        if args.previous is None and not (args.signed_update or args.extension_windows):
             launch(server, candidate, url)
             print("Release app opened the external link and WebKit executed the page with cookies.")
             return
 
         if os.environ.get("RUNNER_ENVIRONMENT") != "github-hosted":
-            raise SystemExit("The upgrade test requires a disposable GitHub-hosted runner account")
+            raise SystemExit("This test requires a disposable GitHub-hosted runner account")
         # Open the test link as a saved tab using the app's current-space setting.
         settings = json.dumps({"externalLinks": "currentSpace"}).encode().hex()
         subprocess.run(["defaults", "write", "com.joinprototype.kaizu", "settings", "-data", settings], check=True)
+        if args.extension_windows:
+            install_test_extension()
+            quit_app(launch(server, candidate, f"http://127.0.0.1:{server.server_port}/extension-test/first"))
+            print("The extension activated a background tab in its owning window and preserved the other selection.")
+            return
         if args.signed_update:
             install_signed_update(server, candidate, url)
             installed = candidate
