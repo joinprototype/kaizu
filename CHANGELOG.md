@@ -26,7 +26,7 @@ Arc imports preserve custom tab names and keep independent Arc profiles separate
 
 Kaizu can recover a damaged session from its last successfully opened copy and keeps the damaged file for inspection.
 
-Quitting now finishes earlier tab-history saves before writing the final Back and Forward history for open tabs.
+Quitting now finishes earlier tab-history saves before writing the final Back and Forward history for open tabs. Open web pages also get time to save their last draft edit when you quit or restart for an update.
 
 Choose **History → Recently Archived Tabs** to browse by day, search by page or space name, and restore a tab to its original space.
 

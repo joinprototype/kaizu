@@ -6,6 +6,7 @@ import CoreSpotlight
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let app: AppModel
     private let recoveredSession: Bool
+    private var closingPages: QuitPages?
 
     init(session: SessionFiles.Opened?) {
         app = AppModel(session: session)
@@ -67,6 +68,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
         true
+    }
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        if closingPages != nil { return .terminateLater }
+        let tabs = Set(app.spaces.flatMap(\.allTabs) + app.stores.compactMap(\.peek) + app.littleWindows.map(\.tab))
+        let views = tabs.compactMap { $0.preparePageForQuit() }
+        guard !views.isEmpty else { return .terminateNow }
+        let pages = QuitPages()
+        closingPages = pages
+        pages.start(views) { sender.reply(toApplicationShouldTerminate: true) }
+        return .terminateLater
     }
 
     func applicationWillTerminate(_ notification: Notification) {
