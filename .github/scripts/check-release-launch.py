@@ -7,9 +7,11 @@ import os
 import plistlib
 import secrets
 import shutil
+import sqlite3
 import subprocess
 import time
 import uuid
+from contextlib import closing
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
@@ -221,6 +223,28 @@ def report_cookie_checkpoint(server, path, phase):
     print(f"Cookie checkpoint {phase}: {status}", flush=True)
 
 
+def storage_checkpoint(profile_directory, marker):
+    # Query the committed row, including its WAL. Deleted rows can still leave marker bytes on disk.
+    if not profile_directory.is_dir():
+        return "profile directory unavailable"
+    expected = (marker, marker.encode("ascii"), marker.encode("utf-16-le"), marker.encode("utf-16-be"))
+    results = []
+    for database in sorted(profile_directory.rglob("localstorage.sqlite3")):
+        try:
+            with closing(sqlite3.connect(database.as_uri() + "?mode=ro", uri=True, timeout=0)) as connection:
+                row = connection.execute("SELECT value FROM ItemTable WHERE key = ?", ("upgrade-test",)).fetchone()
+        except sqlite3.Error as error:
+            results.append(f"unreadable ({type(error).__name__})")
+            continue
+        if row is None:
+            results.append("key absent")
+        elif row[0] in expected:
+            results.append("value matches")
+        else:
+            results.append("value differs")
+    return ", ".join(results) if results else "no local storage database found"
+
+
 def install_signed_update(server, app, url):
     # Only this disposable bundle advertises build zero. The updater, feed
     # URL and embedded verification key are from the candidate release binary.
@@ -327,9 +351,15 @@ def main():
             candidate.rename(installed)
 
         before = saved_tab(url)
+        stores = Path.home() / "Library/WebKit/com.joinprototype.kaizu/WebsiteDataStore"
+        profile_directory = stores / str(uuid.UUID(before[0]))
+        print("Before restored launch:", storage_checkpoint(profile_directory, server.storage_token), flush=True)
         server.issue_cookie = False
         # No URL is passed. Only the restored tab can request the new challenge.
-        quit_app(launch(server, installed))
+        try:
+            quit_app(launch(server, installed))
+        finally:
+            print("After restore attempt:", storage_checkpoint(profile_directory, server.storage_token), flush=True)
         if saved_tab(url) != before:
             raise SystemExit("The profile, space or tab identity changed across the upgrade")
         print("Restored the tab in its original space and profile with its login cookie and local storage.")
