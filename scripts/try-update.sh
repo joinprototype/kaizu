@@ -36,7 +36,7 @@ fi
 clean
 mkdir -p "$root/Applications" "$root/next" "$root/feed"
 
-# Debug builds only: a release build ignores these settings and would use your real data.
+# The throwaway session and update feed are debug-only settings.
 # They sit in Info.plist because Restart relaunches through `open`, which drops shell variables.
 prepare() { # <app> <version> <build>
     local plist="$1/Contents/Info.plist"
@@ -47,7 +47,7 @@ prepare() { # <app> <version> <build>
     codesign --force --sign - "$1" 2>/dev/null
 }
 
-make app APP="$app" >/dev/null
+make app CONFIG=debug APP="$app" >/dev/null
 prepare "$app" 0.1.0 1
 ditto "$app" "$root/next/Kaizu.app"
 prepare "$root/next/Kaizu.app" 0.1.1 2

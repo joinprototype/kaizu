@@ -69,7 +69,7 @@ private struct ExtensionButton: View {
             if let options = item.context.optionsPageURL {
                 Button("Options") { store.openTab(options) }
             }
-            Button("Remove “\(item.name)”") { store.extensions.uninstall(item) }
+            Button("Remove “\(item.name)”") { store.extensions.uninstall(item.id) }
         }
     }
 }
@@ -83,16 +83,28 @@ struct ExtensionSettings: View {
         let host = store.extensions
         Form {
             Section {
-                if host.installed.isEmpty {
+                if !host.hasRegistrations {
                     Text("No extensions yet.")
                         .foregroundStyle(.secondary)
                 }
                 ForEach(host.installed) { item in
-                    InstalledExtensionRow(item: item) { host.uninstall(item) }
+                    InstalledExtensionRow(item: item) { host.uninstall(item.id) }
                     ForEach(host.additionalSites(for: item), id: \.self) { site in
                         LabeledContent(site) {
                             Button("Remove Access") { host.removeSite(site, for: item) }
                         }
+                    }
+                }
+                ForEach(host.unavailable) { item in
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text(item.name)
+                            Text(item.detail).font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button("Retry") { Task { await host.load(item.id) } }
+                            .disabled(host.loading.contains(item.id))
+                        Button("Remove") { host.uninstall(item.id) }
                     }
                 }
                 HStack {
@@ -109,7 +121,12 @@ struct ExtensionSettings: View {
                 }
                 ForEach(safariApps, id: \.self) { app in
                     LabeledContent(app.deletingPathExtension().lastPathComponent) {
-                        Button("Add") { Task { await host.install(from: app) } }
+                        let added = host.hasSafariApp(app)
+                        let adding = host.isAddingSafariApp(app)
+                        Button(added ? "Added" : adding ? "Adding…" : "Add") {
+                            Task { await host.install(from: app) }
+                        }
+                        .disabled(added || adding)
                     }
                 }
             } header: {

@@ -41,6 +41,7 @@ final class BrowserTab: NSObject, Identifiable {
     /// Back/forward list, scroll position and form data to restore when the
     /// web view is next created (after a relaunch or waking from hibernation).
     @ObservationIgnored var savedState: Data?
+    @ObservationIgnored private var leavingForQuit = false
     @ObservationIgnored private var pendingConfiguration: WKWebViewConfiguration?
     @ObservationIgnored private var observations: [NSKeyValueObservation] = []
     /// Bumped when the web view is replaced, so views showing `webView` pick
@@ -258,7 +259,20 @@ final class BrowserTab: NSObject, Identifiable {
 
     /// The live page's back/forward list and scroll position, or what's waiting to be restored.
     var currentState: Data? {
-        (_webView?.interactionState as? Data) ?? savedState
+        if leavingForQuit { return savedState }
+        return (_webView?.interactionState as? Data) ?? savedState
+    }
+
+    /// Capture the real page before WebKit navigates away to deliver pagehide.
+    func preparePageForQuit() -> WKWebView? {
+        guard !profile.isPrivate, !leavingForQuit, let view = _webView,
+              let scheme = view.url?.scheme, scheme == "https" || scheme == "http" else { return nil }
+        savedState = currentState
+        leavingForQuit = true
+        observations.forEach { $0.invalidate() }
+        observations.removeAll()
+        view.uiDelegate = nil
+        return view
     }
 
     /// Frees the web view's memory; the tab wakes up where it was when shown again.
@@ -479,12 +493,18 @@ final class BrowserTab: NSObject, Identifiable {
         activate()
     }
 
+    /// A muted capture session can resume. Reading this must not wake an unloaded tab.
+    var isCapturingMedia: Bool {
+        guard let _webView else { return false }
+        return _webView.cameraCaptureState != .none || _webView.microphoneCaptureState != .none
+    }
+
     /// Whether the page is playing sound or using the camera/microphone,
     /// so it must not be hibernated.
     var isBusy: Bool {
         get async {
             guard let _webView else { return false }
-            if _webView.cameraCaptureState != .none || _webView.microphoneCaptureState != .none { return true }
+            if isCapturingMedia { return true }
             return await isPlayingSound(in: _webView)
         }
     }

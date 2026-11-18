@@ -2,10 +2,10 @@
 <meta charset="utf-8">
 <title>Kaizu WebRTC call check</title>
 <canvas width="160" height="90"></canvas>
-<video autoplay muted playsinline></video>
+<video width="160" height="90" autoplay muted playsinline></video>
 <script>
-function reportFailure(message) {
-    location.replace("/media-call/failure?message=" + encodeURIComponent(message));
+function reportFailure(message, route = "failure") {
+    location.replace("/media-call/" + route + "?message=" + encodeURIComponent(message));
 }
 window.addEventListener("error", event => reportFailure(event.message));
 window.addEventListener("unhandledrejection", event => reportFailure(String(event.reason)));
@@ -13,19 +13,45 @@ window.addEventListener("unhandledrejection", event => reportFailure(String(even
 <script type="module">
 // The two local peers exchange a canvas video and a synthesized audio track.
 let stage = "creating peers";
-const caller = new RTCPeerConnection({iceServers: []});
-const receiver = new RTCPeerConnection({iceServers: []});
+const compareVP8 = new URLSearchParams(location.search).get("codec") === "vp8";
+const config = await (await fetch("/media-call/ice")).json();
+const caller = new RTCPeerConnection(config);
+const receiver = new RTCPeerConnection(config);
 const canvas = document.querySelector("canvas");
 const context = canvas.getContext("2d");
 const video = document.querySelector("video");
-const stream = canvas.captureStream(10);
+const fromWorker = new URLSearchParams(location.search).get("source") === "frames";
+// The hosted Mac's low-latency H.264 encoder can reject 160×90 worker frames (issue #54).
+const width = fromWorker ? 640 : canvas.width;
+const height = fromWorker ? 480 : canvas.height;
+let firstRendered;
+let worker;
+let generated = 0;
+function generatedStream() {
+    worker = new Worker("/media-call/video-source.js");
+    return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error("The video worker did not provide a track")), 5000);
+        worker.onerror = event => reportFailure("Video source worker: " + event.message);
+        worker.onmessage = ({data}) => {
+            if (data.track) {
+                clearTimeout(timeout);
+                resolve(new MediaStream([data.track]));
+            }
+            if (data.number) generated = data.number;
+            if (data.error) reportFailure("Video frame generation: " + data.error);
+        };
+        worker.postMessage({width, height});
+    });
+}
+const stream = fromWorker ? await generatedStream() : canvas.captureStream(10);
 const audio = new AudioContext();
 const microphone = audio.createMediaStreamDestination();
 const tone = audio.createOscillator();
 tone.connect(microphone);
 tone.start();
 let frame = 0;
-const draw = setInterval(() => {
+let echoed = false;
+const draw = fromWorker ? null : setInterval(() => {
     context.fillStyle = ++frame % 2 ? "tomato" : "navy";
     context.fillRect(0, 0, canvas.width, canvas.height);
 }, 100);
@@ -51,7 +77,12 @@ async function call() {
         receiver.ontrack = event => {
             if (event.track.kind !== "video") return;
             video.srcObject = event.streams[0];
-            video.requestVideoFrameCallback((_, metadata) => resolve(metadata));
+            function checkFrame(_, metadata) {
+                firstRendered ??= [metadata.width, metadata.height];
+                if (metadata.width === width && metadata.height === height) resolve();
+                else video.requestVideoFrameCallback(checkFrame);
+            }
+            video.requestVideoFrameCallback(checkFrame);
         };
     });
     const channel = caller.createDataChannel("call");
@@ -60,9 +91,18 @@ async function call() {
             channel.onmessage = ({data}) => channel.send("received " + data);
         };
         channel.onopen = () => channel.send("hello");
-        channel.onmessage = ({data}) => resolve(data);
+        channel.onmessage = ({data}) => {
+            echoed = data === "received hello";
+            resolve(data);
+        };
     });
-    caller.addTrack(stream.getVideoTracks()[0], stream);
+    stage = "adding video and audio tracks";
+    const videoSender = caller.addTrack(stream.getVideoTracks()[0], stream);
+    if (compareVP8) {
+        const codecs = RTCRtpSender.getCapabilities("video").codecs.filter(codec => codec.mimeType.toLowerCase() === "video/vp8");
+        if (!codecs.length) throw new Error("The sender did not advertise VP8");
+        caller.getTransceivers().find(transceiver => transceiver.sender === videoSender).setCodecPreferences(codecs);
+    }
     const audioTrack = microphone.stream.getAudioTracks()[0];
     caller.addTrack(audioTrack, microphone.stream);
     stage = "starting synthesized audio";
@@ -70,32 +110,119 @@ async function call() {
     await connect(caller, receiver, await caller.createOffer());
     await connect(receiver, caller, await receiver.createAnswer());
     stage = "waiting for video and data";
-    const [metadata, echo] = await Promise.all([receivedFrame, reply]);
-    if (metadata.width !== canvas.width || metadata.height !== canvas.height || echo !== "received hello") {
-        throw new Error("The receiving peer did not render the expected video and echo the call message");
+    const [, echo] = await Promise.all([receivedFrame, reply]);
+    if (echo !== "received hello") throw new Error("The receiving peer did not echo the call message");
+    if (fromWorker) {
+        stage = "reading the rendered video frame";
+        while (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+            await new Promise(resolve => setTimeout(resolve, 50));
+        }
+        // Read pixels from the decoded video frame without requiring a second canvas backing store.
+        const snapshot = new VideoFrame(video, {timestamp: 0});
+        try {
+            if (snapshot.displayWidth !== width || snapshot.displayHeight !== height) {
+                throw new Error(`Expected a ${width}×${height} decoded frame, got ${snapshot.displayWidth}×${snapshot.displayHeight}`);
+            }
+            const region = {rect: {x: 0, y: 0, width: 2, height: 2}};
+            const pixels = new Uint8Array(snapshot.allocationSize(region));
+            const planes = await snapshot.copyTo(pixels, region);
+            let hasColor;
+            if (snapshot.format === "NV12" || snapshot.format === "I420" || snapshot.format === "I420A") {
+                // A red or blue patch has one high chroma component. Green and neutral patches do not.
+                const u = pixels[planes[1].offset];
+                const v = pixels[snapshot.format === "NV12" ? planes[1].offset + 1 : planes[2].offset];
+                hasColor = Math.max(u, v) > 175 && Math.min(u, v) < 150;
+            } else if (["RGBA", "RGBX", "BGRA", "BGRX"].includes(snapshot.format)) {
+                const [first, green, third] = pixels.subarray(planes[0].offset);
+                hasColor = Math.max(first, third) >= 150 && Math.abs(first - third) >= 80 && green <= 110;
+            } else {
+                throw new Error(`Unrecognized decoded frame format: ${snapshot.format}`);
+            }
+            if (!hasColor) throw new Error(`The rendered frame did not contain the generated color (${snapshot.format})`);
+        } finally { snapshot.close(); }
     }
-    stage = "waiting for decoded audio";
+    stage = "waiting for decoded audio and video statistics";
+    const expectedCodec = compareVP8 ? "video/vp8" : "video/h264";
     while (true) {
         const stats = await receiver.getStats();
+        const videoVerified = !(fromWorker || compareVP8) || [...stats.values()].some(report =>
+            report.type === "inbound-rtp" && report.kind === "video" && report.framesDecoded > 0 &&
+            stats.get(report.codecId)?.mimeType.toLowerCase() === expectedCodec);
+        if (config.iceTransportPolicy === "relay") {
+            if (!usesRelay(stats)) throw new Error("The receiving peer did not report a nominated relay candidate pair");
+        }
         for (const report of stats.values()) {
             if (report.type === "inbound-rtp" && report.kind === "audio" &&
-                report.totalAudioEnergy > 0 && report.totalSamplesDuration > 0) return;
+                report.totalAudioEnergy > 0 && report.totalSamplesDuration > 0 && videoVerified) return;
         }
         await new Promise(resolve => setTimeout(resolve, 100));
     }
 }
 
-const timeout = setTimeout(() => {
-    reportFailure(`Timeout during ${stage}. Caller ${caller.connectionState}, receiver ${receiver.connectionState}, video readyState ${video.readyState}`);
-}, 30000);
+function usesRelay(stats) {
+    return [...stats.values()].some(report =>
+        report.type === "candidate-pair" && report.state === "succeeded" && report.nominated &&
+        stats.get(report.localCandidateId)?.candidateType === "relay");
+}
+
+// The hosted Mac sometimes draws the canvas without delivering any frames to the video source.
+function stalledCanvasSource(sender, recipient, page) {
+    const sendsNothing = sender.media.some(m => m.direction === "outbound-rtp" && m.kind === "video" && m.frames === 0 && m.bytes === 0);
+    const receivesNothing = recipient.media.some(m => m.direction === "inbound-rtp" && m.kind === "video" && m.frames === 0 && m.bytes === 0);
+    const emptySource = sender.media.some(m => m.source === "video" && m.frames === 0);
+    const heardAudio = recipient.media.some(m => m.direction === "inbound-rtp" && m.kind === "audio" && m.samples > 0 && m.energy > 0);
+    return sender.connection === "connected" && recipient.connection === "connected" && sender.relay && recipient.relay &&
+        sendsNothing && receivesNothing && emptySource && heardAudio && page.echoed && page.visibility === "visible" &&
+        page.drawn >= 200 && page.generated === 0 && page.width === 0 && page.height === 0 && page.videoReady === 0 &&
+        page.remoteVideo?.some(track => track.state === "live" && !track.muted);
+}
+
+async function describePeer(peer) {
+    const stats = await peer.getStats();
+    const counts = {};
+    const media = [];
+    for (const stat of stats.values()) {
+        if (stat.type === "outbound-rtp" || stat.type === "inbound-rtp") {
+            media.push({
+                direction: stat.type, kind: stat.kind, codec: stats.get(stat.codecId)?.mimeType,
+                bytes: stat.bytesSent ?? stat.bytesReceived,
+                frames: stat.framesEncoded ?? stat.framesDecoded,
+                samples: stat.totalSamplesReceived, energy: stat.totalAudioEnergy
+            });
+        }
+        if (stat.type === "media-source") {
+            media.push({source: stat.kind, frames: stat.frames, energy: stat.totalAudioEnergy});
+        }
+        if (!["local-candidate", "remote-candidate", "candidate-pair"].includes(stat.type)) continue;
+        const key = stat.type + "/" + (stat.candidateType || stat.state);
+        counts[key] = (counts[key] || 0) + 1;
+    }
+    return {connection: peer.connectionState, gathering: peer.iceGatheringState, ice: peer.iceConnectionState,
+        relay: usesRelay(stats), counts, media};
+}
+
+async function reportState(reason) {
+    const summary = await Promise.all([describePeer(caller), describePeer(receiver)]);
+    const page = {
+        visibility: document.visibilityState, drawn: frame, generated, echoed, firstRendered, expected: [width, height], audio: audio.state,
+        videoReady: video.readyState, videoPaused: video.paused, width: video.videoWidth, height: video.videoHeight,
+        remoteVideo: video.srcObject?.getVideoTracks().map(track => ({state: track.readyState, muted: track.muted}))
+    };
+    const canvasStalled = !fromWorker && config.iceTransportPolicy === "relay" && reason === "Timeout" &&
+        stage === "waiting for video and data" && stalledCanvasSource(summary[0], summary[1], page);
+    reportFailure(`${reason} during ${stage}: ${JSON.stringify({caller: summary[0], receiver: summary[1], page})}`,
+        canvasStalled ? "canvas-stall" : "failure");
+}
+const timeout = setTimeout(() => reportState("Timeout"), 30000);
 try {
     await call();
     location.replace("/start");
 } catch (error) {
-    reportFailure(error.message);
+    await reportState(`${error.name}: ${error.message}`);
 } finally {
     clearTimeout(timeout);
     clearInterval(draw);
+    worker?.terminate();
     tone.stop();
     microphone.stream.getTracks().forEach(track => track.stop());
     audio.close();

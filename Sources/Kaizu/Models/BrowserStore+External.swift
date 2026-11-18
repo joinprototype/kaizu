@@ -16,7 +16,7 @@ extension BrowserStore {
         if let route = routes.first(matching: url),
            let space = spaces.first(where: { $0.id == route.spaceID }) {
             // In this window if it's on that space, else in one that is.
-            let store = activeSpaceID == space.id ? self : app.stores.first { $0.activeSpaceID == space.id } ?? self
+            let store = windowForOpening(in: space)
             store.openTab(url, in: space)
             app.front = store
             return true
@@ -32,12 +32,17 @@ extension BrowserStore {
         }
     }
 
+    /// Prefer this window if it shows the destination, then any regular window already there.
+    func windowForOpening(in space: Space) -> BrowserStore {
+        activeSpaceID == space.id ? self : app.stores.first { $0.activeSpaceID == space.id } ?? self
+    }
+
     /// A private window's profile doesn't leave it, so there it's a tab instead.
     @discardableResult
     func openLittleWindow(_ url: URL? = nil) -> BrowserTab {
         guard !isPrivate else { return openTab(url) }
         let tab = BrowserTab(profile: activeSpace.profile, app: app, url: url)
-        let controller = LittleWindowController(tab: tab, app: app)
+        let controller = LittleWindowController(tab: tab, openedFrom: self)
         app.littleWindows.append(controller)
         controller.showWindow(nil)
         tab.activate()
@@ -45,8 +50,7 @@ extension BrowserStore {
     }
 
     /// Moves a little window's page into the main window, live (no reload).
-    func adopt(_ tab: BrowserTab) {
-        let space = spaces.first { $0.profile === tab.profile } ?? activeSpace
+    func adopt(_ tab: BrowserTab, in space: Space) {
         withAnimation(Motion.snap) {
             space.today.insert(tab, at: 0)
         }

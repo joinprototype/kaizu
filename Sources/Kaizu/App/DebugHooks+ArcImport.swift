@@ -31,6 +31,9 @@ extension DebugHooks {
         second.newFolder(with: later)
         let favorite = second.openTab(URL(string: "about:blank#favorite")!)
         second.move(favorite, to: .favorites(before: nil))
+        second.split(later, with: favorite.id, at: .pane(later.id, .right))
+        second.split(favorite, with: imported.id, at: .pane(favorite.id, .bottom))
+        precondition(second.shownTabs == [later, favorite, imported] && second.selectedTab === imported)
 
         let hidden = store.app.openPrivateWindow()
         let privateTab = hidden.openTab(URL(string: "about:blank#private")!)
@@ -43,6 +46,10 @@ extension DebugHooks {
         await cookies.setCookie(cookie)
         undo()
 
+        guard second.shownTabs == [later, favorite] && second.selectedTab === favorite else {
+            FileHandle.standardError.write(Data("Undo hid the surviving split panes\n".utf8))
+            exit(1)
+        }
         precondition(hidden.activeSpace.today.contains(privateTab) && !privateTab.isDiscarded)
         precondition(home.pinned.tabs.contains(original) && !original.isDiscarded)
         precondition(design.pinned.tabs.contains(later) && !later.isDiscarded)
@@ -91,6 +98,9 @@ extension DebugHooks {
         precondition(personal.pinned.tabs.map(\.pinnedURL?.fragment) == ["original"])
         precondition(design.pinned.tabs.map(\.pinnedURL?.fragment) == ["later"])
         precondition(design.profile.favorites.map(\.pinnedURL?.fragment) == ["favorite"])
+        let restoredWindow = store.app.stores.first { $0.activeSpace === design }
+        precondition(restoredWindow?.shownTabs.map(\.pinnedURL?.fragment) == ["later", "favorite"])
+        precondition(restoredWindow?.selectedTab === design.profile.favorites.first)
         precondition(store.app.privateStores.isEmpty && signedIn.allTabs.isEmpty)
         let cookies = await signedIn.profile.dataStore.httpCookieStore.allCookies()
         precondition(cookies.contains { $0.domain == "qa.invalid" && $0.name == "session" && $0.value == "test" })

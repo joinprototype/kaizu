@@ -57,8 +57,8 @@ extension AppModel {
         for record in session?.record.windows ?? [WindowRecord()] {
             addWindow(record)
         }
-        if session?.migrated == true {
-            scheduleSave()  // write the upgraded format right away
+        if session?.needsSave == true {
+            scheduleSave()
         }
         do {
             archive = try session?.record.archivedTabs ?? Self.sessionFiles.readLegacyArchive()
@@ -73,7 +73,7 @@ extension AppModel {
             id: record.id, profile: profile, app: self, url: record.url, title: record.title,
             pinnedURL: record.pinnedURL, lastActiveAt: record.lastActiveAt
         )
-        tab.savedState = savedTabState(for: record.id)
+        tab.savedState = tabStateFiles.read(record.id)
         tab.customTitle = record.customTitle
         return tab
     }
