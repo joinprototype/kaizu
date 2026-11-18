@@ -257,8 +257,23 @@ final class BrowserTab: NSObject, Identifiable {
     // MARK: - Lifecycle
 
     /// The live page's back/forward list and scroll position, or what's waiting to be restored.
+    private var leavingForQuit = false
+
     var currentState: Data? {
-        (_webView?.interactionState as? Data) ?? savedState
+        if leavingForQuit { return savedState }
+        return (_webView?.interactionState as? Data) ?? savedState
+    }
+
+    /// Capture the real page before WebKit navigates away to deliver pagehide.
+    func preparePageForQuit() -> WKWebView? {
+        guard !profile.isPrivate, !leavingForQuit, let view = _webView,
+              let scheme = view.url?.scheme, scheme == "https" || scheme == "http" else { return nil }
+        savedState = currentState
+        leavingForQuit = true
+        observations.forEach { $0.invalidate() }
+        observations.removeAll()
+        view.uiDelegate = nil
+        return view
     }
 
     /// Frees the web view's memory; the tab wakes up where it was when shown again.
