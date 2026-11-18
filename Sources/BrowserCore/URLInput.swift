@@ -1,4 +1,5 @@
 import Foundation
+import Network
 
 /// Turns whatever the user typed into the command bar into a URL.
 public enum URLInput {
@@ -12,15 +13,19 @@ public enum URLInput {
             return url
         }
 
-        let lower = text.lowercased()
-        let hostAndPort = lower.split(separator: "/", maxSplits: 1).first.map(String.init) ?? lower
-        let host = hostAndPort.split(separator: ":").first.map(String.init) ?? hostAndPort
-
+        // A query or fragment can start immediately after the host. Let Foundation
+        // separate the authority from the rest, including ports and bracketed IPv6.
+        guard var components = URLComponents(string: "http://" + text),
+              let host = components.host?.lowercased(), !host.isEmpty else { return nil }
         if host == "localhost" || host.wholeMatch(of: /\d{1,3}(\.\d{1,3}){3}/) != nil {
-            return URL(string: "http://" + text)
+            return components.url
+        }
+        if host.hasPrefix("["), host.hasSuffix("]"), IPv6Address(String(host.dropFirst().dropLast())) != nil {
+            return components.url
         }
         if let tld = host.split(separator: ".").last, host.contains("."), tld.count >= 2, tld.allSatisfy(\.isLetter) {
-            return URL(string: "https://" + text)
+            components.scheme = "https"
+            return components.url
         }
         return nil
     }
