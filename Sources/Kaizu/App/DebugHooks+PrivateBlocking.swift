@@ -3,7 +3,7 @@ import AppKit
 import WebKit
 
 extension DebugHooks {
-    @MainActor static func checkPrivateBlocking(in store: BrowserStore) async {
+    @MainActor static func checkPrivateBlocking(in store: BrowserStore) async throws {
         precondition(ProcessInfo.processInfo.environment["KAIZU_SUPPORT"] != nil)
         let app = store.app
         let blocker = store.contentBlocker
@@ -20,30 +20,43 @@ extension DebugHooks {
         func toggle(_ url: URL, _ tab: BrowserTab) {
             blocker.togglePause(on: url, privateID: tab.profile.privateID)
         }
-        func check(_ label: String, _ tab: BrowserTab, hidden: Bool) async {
+        func check(_ label: String, _ tab: BrowserTab, hidden: Bool, listEnabled: Bool = true) async {
             let token = UUID().uuidString
-            let html = "<!doctype html><p id='control' data-token='\(token)'>Ordinary</p><div class='ADBox'>Ad</div>"
+            let html = "<!doctype html><p id='control' data-token='\(token)'>Ordinary</p><div class='ADBox'>Ad</div><div class='kaizu-custom-fixture'>Custom</div>"
             tab.webView.loadSimulatedRequest(URLRequest(url: site), responseHTML: html)
             let script = """
                 document.querySelector('#control')?.dataset.token === '\(token)' &&
                 [getComputedStyle(document.querySelector('#control')).display,
-                 getComputedStyle(document.querySelector('.ADBox')).display]
+                 getComputedStyle(document.querySelector('.ADBox')).display,
+                 getComputedStyle(document.querySelector('.kaizu-custom-fixture')).display]
                 """
-            let expected = ["block", hidden ? "none" : "block"]
+            let expected = ["block", hidden ? "none" : "block", hidden && listEnabled ? "none" : "block"]
             for _ in 0..<100 {
                 if let styles = try? await tab.webView.evaluateJavaScript(script) as? [String], styles == expected { return }
                 try? await Task.sleep(for: .milliseconds(50))
             }
-            print("FAILED: \(label), expected control and ad display \(expected)")
+            print("FAILED: \(label), expected control, bundled and imported display \(expected)")
             exit(1)
         }
         await withCheckedContinuation { continuation in
             blocker.whenReady(for: site) { continuation.resume() }
         }
+        let lists = blocker.importedLists
+        let rules = FileManager.default.temporaryDirectory.appending(path: "\(UUID().uuidString).json")
+        let json = #"[{"trigger":{"url-filter":".*"},"action":{"type":"css-display-none","selector":".kaizu-custom-fixture"}}]"#
+        defer { try? FileManager.default.removeItem(at: rules) }
+        try json.write(to: rules, atomically: true, encoding: .utf8)
+        try await lists.add(rules)
+        let listID = lists.entries.first { $0.name == rules.lastPathComponent }!.id
         toggle(parent, one)
         await check("private pause leaves regular protected", regular, hidden: true)
         await check("private pause covers its subdomain", one, hidden: false)
         await check("another private window stays protected", two, hidden: true)
+        try await lists.setEnabled(false, id: listID)
+        await check("disabling the list leaves bundled rules active", regular, hidden: true, listEnabled: false)
+        try await lists.setEnabled(true, id: listID)
+        await check("reinstall keeps the private pause", one, hidden: false)
+        await check("reinstall keeps the other private window protected", two, hidden: true)
         precondition(blocker.pausedSites == previousPauses)
         toggle(parent, one)
         toggle(parent, regular)
@@ -59,8 +72,8 @@ extension DebugHooks {
         first.window?.performClose(nil)
         let replacement = app.openPrivateWindow()
         await check("a new private window starts clean", replacement.openTab(nil), hidden: true)
-        print("Verified regular and two private windows with independently rendered blocker rules")
-        NSApp.terminate(nil)
+        try await lists.remove(listID)
+        print("Verified regular and two private windows with independently rendered bundled and imported rules")
     }
 }
 #endif

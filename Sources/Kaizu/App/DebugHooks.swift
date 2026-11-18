@@ -1640,7 +1640,15 @@ enum DebugHooks {
     static func apply(to store: BrowserStore) {
         switch ProcessInfo.processInfo.environment["KAIZU_DEBUG"] {
         case "private-blocking":
-            Task { await checkPrivateBlocking(in: store) }
+            Task {
+                do {
+                    try await checkPrivateBlocking(in: store)
+                    NSApp.terminate(nil)
+                } catch {
+                    FileHandle.standardError.write(Data("Private-window blocking check failed: \(error)\n".utf8))
+                    exit(1)
+                }
+            }
         case "notification-routing", "notification-routing-restored":
             Task { await qaNotificationRouting(store) }
         case "open":
