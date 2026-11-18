@@ -40,6 +40,12 @@ extension DebugHooks {
         require(store.paletteCommands.contains { $0.id == "tab.split" }, "Standalone tab did not offer the palette command")
         NSApp.sendAction(menuItem.action!, to: menuItem.target, from: menuItem)
         require(space.splitTabs == [tabs[4], tabs[3]], "A single tab could not start a fresh split with a recent pane")
+        store.closeSplit()
+        store.move(tabs[4], to: .favorites(before: nil))
+        store.split(tabs[4], with: tabs[3].id, at: .pane(tabs[4].id, .bottom))
+        require(store.selectedTab === tabs[3] && space.splitTabs.count == 2, "Expected a focused Today pane beside a favorite")
+        store.close(tabs[3])
+        require(store.selectedTab === tabs[4] && space.splitLayout == nil, "Closing the selected pane hid the surviving favorite")
         print("Full split kept its four panes and selection; a standalone tab started a new split.")
         NSApp.terminate(nil)
     }
