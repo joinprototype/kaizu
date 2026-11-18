@@ -7,6 +7,7 @@ public struct ArcSidebar: Equatable, Sendable {
     public struct Tab: Equatable, Sendable {
         public var title: String
         public var url: URL
+        public var customTitle: String? = nil
     }
 
     public indirect enum Item: Equatable, Sendable {
@@ -226,7 +227,8 @@ extension ArcSidebar {
                   let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https",
                   let host = url.host(), !host.isEmpty
             else { return nil }
-            return Tab(title: clean(item["title"]) ?? clean(tab["savedTitle"]) ?? host, url: url)
+            let customTitle = clean(item["title"])
+            return Tab(title: customTitle ?? clean(tab["savedTitle"]) ?? host, url: url, customTitle: customTitle)
         }
     }
 }

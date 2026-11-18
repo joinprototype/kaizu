@@ -143,7 +143,7 @@ struct Command: Identifiable {
 ## Persistence
 
 - The session records carry a schema version. `SessionRecord.decode` reads the current format or migrates a v1 file. On migration the app attempts to preserve the old bytes before writing the new format.
-- The app throttles session saves and performs atomic writes on a serial queue. On decode failure it attempts to keep a copy at `session.unreadable.json` and starts with a fresh session. Automatic restoration from a last-known-good backup is still outstanding.
+- The app throttles session saves and performs atomic writes on a serial queue. Before starting browser services, `SessionFiles` backs up the successfully decoded session. If the primary is malformed, it preserves the damaged bytes under a unique name and restores a decodable backup. A newer schema or an unrecoverable error stops startup before a save can replace the session.
 - History uses SQLite with FTS5 behind an actor. The archive is a separate JSON file with a limit of 500 tabs.
 - Locations: `~/Library/Application Support/Kaizu/` (ours),
   `~/Library/WebKit/com.joinprototype.kaizu/WebsiteDataStore/<profile-uuid>/` (WebKit's).
@@ -189,7 +189,7 @@ struct Command: Identifiable {
   tab/space operations).
 - Visual checks: debug builds read `KAIZU_DEBUG=<state>` to boot into a UI
   state; `scripts/snapshot.sh` screenshots the window for review.
-- CI (GitHub Actions, macOS runner): build, test, `swift format lint`.
+- GitHub Actions runs the Swift tests, builds the release app and verifies its code signature on the Xcode 27 runner.
 - Logging with `os.Logger`, one subsystem per module.
 
 ## Where things live today

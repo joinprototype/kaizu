@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+Arc imports preserve custom tab names and keep independent Arc profiles separate when existing Kaizu spaces share a profile.
+
+Kaizu can recover a damaged session from its last successfully opened copy and keeps the damaged file for inspection.
+
 Choose **History → Recently Archived Tabs** to browse by day, search by page or space name, and restore a tab to its original space.
 
 Press ⌘T and type a title or part of an address to find open tabs across spaces in your current profile. Each match names its space. Selecting it takes you back to the existing tab, including tabs in collapsed folders. Archived tab suggestions are now scoped to the current profile too.
