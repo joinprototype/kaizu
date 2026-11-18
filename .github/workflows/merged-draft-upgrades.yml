@@ -1,0 +1,47 @@
+name: Verify the merged draft candidate on macOS 27
+on:
+  push:
+    branches: [qa/merged-draft-upgrades]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  restore:
+    runs-on: xcode-27
+    timeout-minutes: 7
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: [upgrade-from-0.2.5, signed-update]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: db287da140558ba4b6b27a495ef9fb8cd1fdd17b
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          github-token: ${{ github.token }}
+          run-id: 44405191699
+          name: kaizu-runtime-check
+          path: ${{ runner.temp }}
+      - name: Verify the packaged candidate
+        run: |
+          sw_vers
+          ditto -x -k "$RUNNER_TEMP/Kaizu.zip" "$RUNNER_TEMP/launch"
+          codesign --verify --deep --strict "$RUNNER_TEMP/launch/Kaizu.app"
+      - name: Upgrade the published app with a saved tab and login cookie
+        if: matrix.scenario == 'upgrade-from-0.2.5'
+        env:
+          RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        working-directory: ${{ runner.temp }}
+        run: |
+          curl --fail --location --retry 3 --output previous.zip https://github.com/joinprototype/kaizu/releases/download/v0.2.5/Kaizu-0.2.5.zip
+          echo '709b3ecacfd26e73c7b8eb77d958e3ad57317833420b1f0d6d4698f5101ebc08  previous.zip' | shasum -a 256 --check
+          ditto -x -k previous.zip installed
+          codesign --verify --strict installed/Kaizu.app
+          python3 "$GITHUB_WORKSPACE/.github/scripts/check-release-launch.py" launch/Kaizu.app installed/Kaizu.app
+      - name: Install the production feed update on quit and restore the test login
+        if: matrix.scenario == 'signed-update'
+        env:
+          RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        run: python3 .github/scripts/check-release-launch.py "$RUNNER_TEMP/launch/Kaizu.app" --signed-update
