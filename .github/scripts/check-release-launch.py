@@ -129,7 +129,13 @@ class Page(BaseHTTPRequestHandler):
             self.send_response(204)
             self.end_headers()
             server.rendered = True
-        elif self.path.startswith("/media-call/decoded?"):
+        elif self.path == "/media-call/request-click":
+            result = subprocess.run([os.environ["KAIZU_TEST_CLICK_HELPER"]], timeout=15)
+            if result.returncode:
+                server.page_failure = f"Native click helper failed ({result.returncode})"
+            self.send_response(204)
+            self.end_headers()
+        elif self.path.startswith(("/media-call/decoded?", "/media-call/start-state?")):
             self.send_response(204)
             self.end_headers()
         elif self.path == "/media-call/video-source.js":
@@ -361,6 +367,7 @@ def main():
         media_url = f"http://127.0.0.1:{server.server_port}/media-call"
         if os.environ.get("KAIZU_TEST_VIDEO_SOURCE") == "frames":
             media_url += "?source=frames"
+            media_url += "&start=" + os.environ["KAIZU_TEST_CALL_START"]
             if os.environ.get("KAIZU_TEST_PIXEL_FORMAT") == "NV12":
                 media_url += "&pixels=NV12"
         if os.environ.get("KAIZU_TEST_VIDEO_CODEC") == "vp8":

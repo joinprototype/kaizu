@@ -28,46 +28,29 @@ done
 nc -z 127.0.0.1 3478
 
 fixture="$(dirname "$0")/check-release-launch.py"
-swiftc -parse-as-library "$(dirname "$0")/check-webkit-call.swift" -o "$scratch/webkit-control"
+export KAIZU_TEST_CLICK_HELPER="$scratch/click-test-call"
+swiftc "$(dirname "$0")/click-test-call.swift" -o "$KAIZU_TEST_CLICK_HELPER"
 export KAIZU_TEST_VIDEO_SOURCE=frames
-failures=0
 session="$HOME/Library/Application Support/Kaizu"
-install="$RUNNER_TEMP/matched-install"
-mkdir "$install"
 [[ ! -e "$session" ]]
-trial() {
-    local client="$1" pixels="$2" round="$3" binary option outcome
-    if [[ "$client" == webkit ]]; then
-        binary="$scratch/webkit-control"
-        option=--webkit-control
-    else
-        ditto -x -k "$RUNNER_TEMP/$client.zip" "$install"
-        binary="$install/Kaizu.app"
-        codesign --verify --deep --strict "$binary"
-        shasum -a 256 "$binary/Contents/MacOS/Kaizu"
-        option=--media-call
-    fi
-    echo "Starting round=$round client=$client pixels=$pixels"
-    outcome=0
-    KAIZU_TEST_PIXEL_FORMAT="$pixels" python3 "$fixture" "$binary" "$option" || outcome=$?
-    echo "Result round=$round client=$client pixels=$pixels status=$outcome"
-    if [[ "$outcome" != 0 ]]; then failures=$((failures + 1)); fi
-    if [[ "$client" != webkit ]]; then
+failures=0
+round=0
+for order in "immediate delay click" "click immediate delay" "delay click immediate"; do
+    round=$((round + 1))
+    for mode in $order; do
+        result=0
+        echo "Starting round=$round mode=$mode"
+        KAIZU_TEST_CALL_START="$mode" python3 "$fixture" "$1" --media-call || result=$?
+        echo "Result round=$round mode=$mode status=$result"
+        if [[ "$result" != 0 ]]; then failures=$((failures + 1)); fi
         osascript -e 'if application id "com.joinprototype.kaizu" is running then tell application id "com.joinprototype.kaizu" to quit'
         for attempt in {1..60}; do
             if ! pgrep -x Kaizu >/dev/null; then break; fi
             sleep .25
         done
         if pgrep -x Kaizu >/dev/null; then exit 1; fi
-        mv "$binary" "$scratch/retired-$round-$client-$pixels.app"
-        if [[ -d "$session" ]]; then mv "$session" "$scratch/session-$round-$client-$pixels"; fi
-    fi
-}
-for pixels in RGBA NV12; do
-    for client in parent candidate webkit; do trial "$client" "$pixels" 1; done
+        if [[ -d "$session" ]]; then mv "$session" "$scratch/session-$round-$mode"; fi
+    done
 done
-for pixels in NV12 RGBA; do
-    for client in webkit candidate parent; do trial "$client" "$pixels" 2; done
-done
-echo "$failures of twelve H.264 checks failed"
+echo "$failures of nine H.264 checks failed"
 [[ "$failures" == 0 ]]

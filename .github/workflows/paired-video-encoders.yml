@@ -1,39 +1,30 @@
-name: Isolate release source and pixel format in H.264 calls
+name: Compare automatic and user-initiated relayed H.264 calls
 on:
   push:
-    branches: [qa/isolated-release-video]
+    branches: [qa/relay-start-gesture]
 permissions:
   contents: read
+  actions: read
 jobs:
   compare:
     runs-on: xcode-27
-    timeout-minutes: 32
+    timeout-minutes: 16
     steps:
       - uses: actions/checkout@v7
         with:
-          fetch-depth: 6
           persist-credentials: false
-      - name: Package parent and candidate with the same signing and release path
-        run: |
-          export KAIZU_UPDATE_KEY="$RUNNER_TEMP/disposable.key"
-          public_key=$(swift scripts/update-sign.swift new "$KAIZU_UPDATE_KEY")
-          for version in parent candidate; do
-            case "$version" in
-              parent) commit=13baaf47323ae265a201d9b581a8138e05d5a9c6 ;;
-              candidate) commit=7c362974a6f1de7ff64b7a7f8419a16e51ba844a ;;
-            esac
-            source_path="$RUNNER_TEMP/rehearsal-$version"
-            mkdir "$source_path"
-            git archive "$commit" | tar -x -C "$source_path"
-            printf 'public enum ReleaseUpdateKey { public static let base64 = "%s" }\n' "$public_key" > "$source_path/Sources/BrowserCore/ReleaseUpdateKey.swift"
-            release=$(plutil -extract CFBundleShortVersionString raw "$source_path/Resources/Info.plist")
-            "$source_path/scripts/release.sh" "$release"
-            cp "$source_path/site/updates/Kaizu-$release.zip" "$RUNNER_TEMP/$version.zip"
-          done
+      - uses: actions/download-artifact@v8
+        with:
+          github-token: ${{ github.token }}
+          run-id: 44395517220
+          name: kaizu-runtime-check
+          path: ${{ runner.temp }}/candidate
       - name: Install the loopback TURN relay
         run: HOMEBREW_NO_AUTO_UPDATE=1 brew install coturn
-      - name: Check both packages at one install location and compare plain WebKit
-        timeout-minutes: 18
+      - name: Start the same call immediately, after a delay, and from a real click
         env:
           RUNNER_ENVIRONMENT: ${{ runner.environment }}
-        run: .github/scripts/check-relayed-call.sh
+        run: |
+          ditto -x -k "$RUNNER_TEMP/candidate/Kaizu.zip" "$RUNNER_TEMP/install"
+          codesign --verify --deep --strict "$RUNNER_TEMP/install/Kaizu.app"
+          .github/scripts/check-relayed-call.sh "$RUNNER_TEMP/install/Kaizu.app"

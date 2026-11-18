@@ -13,6 +13,7 @@ window.addEventListener("unhandledrejection", event => reportFailure(String(even
 <script type="module">
 // The two local peers exchange a canvas video and a synthesized audio track.
 let stage = "creating peers";
+let firstFrame;
 const compareVP8 = new URLSearchParams(location.search).get("codec") === "vp8";
 const config = await (await fetch("/media-call/ice")).json();
 const caller = new RTCPeerConnection(config);
@@ -74,7 +75,10 @@ async function call() {
         receiver.ontrack = event => {
             if (event.track.kind !== "video") return;
             video.srcObject = event.streams[0];
-            video.requestVideoFrameCallback((_, metadata) => resolve(metadata));
+            video.requestVideoFrameCallback((_, metadata) => {
+                firstFrame = [metadata.width, metadata.height];
+                resolve(metadata);
+            });
         };
     });
     const channel = caller.createDataChannel("call");
@@ -178,6 +182,8 @@ async function describePeer(peer) {
                 direction: stat.type, kind: stat.kind, codec: stats.get(stat.codecId)?.mimeType,
                 bytes: stat.bytesSent ?? stat.bytesReceived,
                 frames: stat.framesEncoded ?? stat.framesDecoded,
+                quality: stat.qualityLimitationReason, keyFrames: stat.keyFramesEncoded,
+                implementation: stat.encoderImplementation ?? stat.decoderImplementation,
                 samples: stat.totalSamplesReceived, energy: stat.totalAudioEnergy
             });
         }
@@ -195,7 +201,7 @@ async function describePeer(peer) {
 async function reportState(reason) {
     const summary = await Promise.all([describePeer(caller), describePeer(receiver)]);
     const page = {
-        visibility: document.visibilityState, drawn: frame, generated, echoed, audio: audio.state,
+        visibility: document.visibilityState, focus: document.hasFocus(), firstFrame, drawn: frame, generated, echoed, audio: audio.state,
         videoReady: video.readyState, videoPaused: video.paused, width: video.videoWidth, height: video.videoHeight,
         remoteVideo: video.srcObject?.getVideoTracks().map(track => ({state: track.readyState, muted: track.muted}))
     };
@@ -204,9 +210,35 @@ async function reportState(reason) {
     reportFailure(`${reason} during ${stage}: ${JSON.stringify({caller: summary[0], receiver: summary[1], page})}`,
         canvasStalled ? "canvas-stall" : "failure");
 }
-const timeout = setTimeout(() => reportState("Timeout"), 30000);
-try {
+let timeout;
+async function start(event) {
+    const mode = new URLSearchParams(location.search).get("start");
+    if (mode === "click" && !(event?.isTrusted && navigator.userActivation.isActive)) {
+        throw new Error("The call did not receive a trusted user gesture");
+    }
+    void fetch("/media-call/start-state?" + new URLSearchParams({mode, trusted: !!event?.isTrusted,
+        active: navigator.userActivation.isActive, focus: document.hasFocus(), width: innerWidth, height: innerHeight}));
+    timeout = setTimeout(() => reportState("Timeout"), 30000);
     await call();
+}
+try {
+    const mode = new URLSearchParams(location.search).get("start");
+    if (mode !== "immediate") await new Promise(resolve => setTimeout(resolve, 2000));
+    if (mode === "click") {
+        await new Promise((resolve, reject) => {
+            const button = document.createElement("button");
+            button.textContent = "Start Kaizu test call";
+            document.body.prepend(button);
+            const missingClick = setTimeout(() => reject(new Error("No native click reached the button")), 15000);
+            button.onclick = event => {
+                clearTimeout(missingClick);
+                start(event).then(resolve, reject);
+            };
+            fetch("/media-call/request-click").catch(reject);
+        });
+    } else {
+        await start();
+    }
     const stats = await receiver.getStats();
     const incoming = [...stats.values()].find(item => item.type === "inbound-rtp" && item.kind === "video");
     const codec = stats.get(incoming.codecId)?.mimeType;
