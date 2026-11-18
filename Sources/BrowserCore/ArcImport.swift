@@ -150,3 +150,29 @@ extension [SidebarItemRecord] {
 
     var tabCount: Int { tabs.count }
 }
+
+extension ArcImport {
+    /// The sidebar identities owned by this import, including folders and profile favorites.
+    public var addedItemIDs: Set<UUID> {
+        var ids = Set<UUID>()
+        func include(_ items: [SidebarItemRecord]) {
+            for item in items {
+                switch item {
+                case .tab(let tab): ids.insert(tab.id)
+                case .folder(let folder):
+                    ids.insert(folder.id)
+                    include(folder.children)
+                }
+            }
+        }
+        for items in pinned.values { include(items) }
+        for space in newSpaces {
+            include(space.pinned)
+            ids.formUnion(space.today.map(\.id))
+        }
+        for tabs in today.values { ids.formUnion(tabs.map(\.id)) }
+        for tabs in favorites.values { ids.formUnion(tabs.map(\.id)) }
+        for profile in newProfiles { ids.formUnion(profile.favorites.map(\.id)) }
+        return ids
+    }
+}
