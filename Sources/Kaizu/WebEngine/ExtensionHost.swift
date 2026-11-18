@@ -57,6 +57,7 @@ final class ExtensionHost: NSObject {
     /// Bumped when an extension updates its toolbar action (badge, icon), so views refresh.
     private(set) var actionRevision = 0
 
+    private var pendingSafariPaths: Set<String> = []
     private var records: [Record]
     private var failures: [UUID: String] = [:]
     private(set) var loading: Set<UUID> = []
@@ -152,6 +153,17 @@ final class ExtensionHost: NSObject {
     /// Asks the user, then installs: a folder or `.zip` is copied into
     /// Application Support; a Safari extension app is used in place.
     func install(from url: URL, askFirst: Bool = true, source: String? = nil) async {
+        let safariPath = url.pathExtension == "app" ? Self.safariPath(url) : nil
+        if let safariPath {
+            if let existing = registeredSafariApp(at: safariPath) {
+                await load(existing.id)
+                return
+            }
+            guard pendingSafariPaths.insert(safariPath).inserted else { return }
+        }
+        defer {
+            if let safariPath { pendingSafariPaths.remove(safariPath) }
+        }
         var stagedFolder: URL?
         defer {
             if let stagedFolder { try? FileManager.default.removeItem(at: stagedFolder) }
@@ -159,7 +171,7 @@ final class ExtensionHost: NSObject {
         do {
             let id = UUID()
             var record: Record
-            if url.pathExtension == "app" {
+            if safariPath != nil {
                 record = Record(id: id, kind: .safariApp, path: url.path)
             } else {
                 let directory = self.directory
@@ -204,6 +216,18 @@ final class ExtensionHost: NSObject {
         records.removeAll { $0.id == id }
         persist()
     }
+
+    private static func safariPath(_ url: URL) -> String {
+        url.resolvingSymlinksInPath().standardizedFileURL.path
+    }
+
+    private func registeredSafariApp(at path: String) -> Record? {
+        records.first { $0.kind == .safariApp && Self.safariPath(URL(fileURLWithPath: $0.path)) == path }
+    }
+
+    func hasSafariApp(_ url: URL) -> Bool { registeredSafariApp(at: Self.safariPath(url)) != nil }
+
+    func isAddingSafariApp(_ url: URL) -> Bool { pendingSafariPaths.contains(Self.safariPath(url)) }
 
     /// Safari web extensions bundled in apps under /Applications.
     nonisolated static func safariExtensionApps() -> [URL] {

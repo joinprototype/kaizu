@@ -121,7 +121,12 @@ struct ExtensionSettings: View {
                 }
                 ForEach(safariApps, id: \.self) { app in
                     LabeledContent(app.deletingPathExtension().lastPathComponent) {
-                        Button("Add") { Task { await host.install(from: app) } }
+                        let added = host.hasSafariApp(app)
+                        let adding = host.isAddingSafariApp(app)
+                        Button(added ? "Added" : adding ? "Adding…" : "Add") {
+                            Task { await host.install(from: app) }
+                        }
+                        .disabled(added || adding)
                     }
                 }
             } header: {
