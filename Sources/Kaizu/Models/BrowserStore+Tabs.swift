@@ -131,6 +131,7 @@ extension BrowserStore {
         for store in app.allStores where store.hidingItemsTabID == tab.id {
             store.endHidingItems()
         }
+        let previousSplit = space.split
         var neighborIndex = 0
         space.removeFromSplit(tab.id)
         if let index = space.today.firstIndex(of: tab) {
@@ -145,15 +146,14 @@ extension BrowserStore {
             tab.unload()
         }
         for store in showing {
-            store.selectNeighbor(of: neighborIndex, in: space)
+            store.selectNeighbor(of: neighborIndex, in: space, previousSplit: previousSplit)
         }
         scheduleSave()
     }
 
-    /// `tab` has stopped being this window's: the nearest today tab at or
-    /// after `index` takes over, unless another window is showing it. Only
-    /// remembered if the window is on another space right now.
-    func selectNeighbor(of index: Int, in space: Space, excluding tab: BrowserTab? = nil) {
+    /// Prefer a remaining pane of the visible split, then a nearby Today tab.
+    /// In an inactive space, only update the remembered selection.
+    func selectNeighbor(of index: Int, in space: Space, excluding tab: BrowserTab? = nil, previousSplit: [UUID] = []) {
         // A tab that's going somewhere isn't going to the background, so
         // it's no one's "previous" page, to float in picture in picture.
         if tab != nil {
@@ -161,7 +161,13 @@ extension BrowserStore {
         }
         let elsewhere = tabsElsewhere
         let free = space.today.enumerated().filter { $0.element !== tab && !elsewhere.contains($0.element) }
-        let next = (free.first { $0.offset >= index } ?? free.last)?.element
+        var next = (free.first { $0.offset >= index } ?? free.last)?.element
+        if let selected = selectedTabIDs[space.id], let pane = previousSplit.firstIndex(of: selected) {
+            let neighbors = Array(previousSplit.dropFirst(pane + 1)) + previousSplit.prefix(pane).reversed()
+            if let survivor = neighbors.lazy.compactMap(space.tab(id:)).first(where: { !elsewhere.contains($0) }) {
+                next = survivor
+            }
+        }
         if let next, space.id == activeSpaceID {
             select(next, in: space)
         } else {
