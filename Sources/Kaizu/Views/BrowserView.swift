@@ -63,6 +63,10 @@ struct BrowserView: View {
         .fontDesign(.serif)
         .tint(space.theme.accent(scheme))
         .ignoresSafeArea()
+        .sheet(isPresented: $store.showingArchive) {
+            ArchiveView()
+                .environment(store)
+        }
         .sheet(item: $store.spaceDraft) { draft in
             SpaceEditor(draft: draft)
                 .environment(store)

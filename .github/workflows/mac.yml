@@ -1,0 +1,25 @@
+name: Mac build and tests
+
+on:
+  pull_request:
+    branches: [develop, master]
+  push:
+    branches: [develop, master]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: xcode-27
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Run Swift tests
+        run: swift test
+      - name: Build release app
+        run: make app CONFIG=release
+      - name: Verify app bundle
+        run: codesign --verify --strict build/Kaizu.app

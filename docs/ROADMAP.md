@@ -18,6 +18,19 @@ Effort: **S** = an evening, **M** = a few sessions, **L** = a project.
 
 See the [changelog](../CHANGELOG.md) for version-by-version changes. The phases below track implementation details.
 
+## Path to 1.0 on Mac
+
+The first release should carry an Arc user from importing a sidebar through a week of browsing, a restart and an update with their tabs and logins intact. These are the checks we use to judge readiness.
+
+| Priority | Work | Evidence to collect |
+| --- | --- | --- |
+| Recover a workspace | Offer a browsable, searchable archive per profile. Exercise session recovery, import undo and upgrades with existing data. | Reopen the intended page in its original space and recover pinned folders after a restart. Check with two profiles and a private window. |
+| Trust it for daily work | Test extension installation, password filling, media calls, permissions and notifications on representative sites. | Record versions and observed outcomes for 1Password and Bitwarden, including desktop integration separately. Publish known limitations. |
+| Ship safely | Add repeatable build and test checks. Sign with Developer ID, notarize and verify a clean install and a signed upgrade. Document what the browser sends off-device. | Test the downloadable release on the minimum supported macOS and a current Mac. Apple enrollment or a Developer ID certificate is pending. |
+| Match the switching workflow | Preserve sidebar organization, Peek, little windows, routing and split layouts. Verify real Arc and Safari imports with consented or redacted samples. | Compare the preview with the resulting spaces, folders and tabs. Repeat the import and check Undo. |
+
+Kaizu’s advantages to demonstrate are built-in tracking protection, a local sidebar with no account requirement, and mixed row-and-column splits. Performance comparisons require the same pages, hardware and measurement procedure in both browsers. Sync, Boosts, Easels and an AI panel are outside this proposed 1.0 scope. Cross-device sync remains a significant gap for people who use Arc on multiple devices.
+
 ## Strategy (Oct 2026)
 
 **Arc stops working on Dec 22, 2026** (announced Oct 22 on [arc.net](https://arc.net/);
@@ -241,7 +254,7 @@ What makes someone keep it as their default browser.
 
 - [x] Favorites row + pinned folders (nested, drag in/out, inline rename) **M**
 - [x] Rename a tab, and Move to Space (live within a profile, reopened across profiles) **S**
-- [x] Today tabs auto-archive + searchable Archive (12 h fixed; setting later) **M**
+- [x] Today tabs auto-archive + searchable Archive (configurable, 12 h by default) **M**
 - [x] Split view (2–4 panes; context menu "Open in Split View", click to focus, saved per space) **L**
 - [x] Split view: resizable dividers (double-click to even out), widths remembered across launches **S**
 - [x] Split view: drag a sidebar tab onto a side of the page to split there **M**
