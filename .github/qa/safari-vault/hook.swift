@@ -62,7 +62,7 @@
                     const wait = ms => new Promise(r => setTimeout(r,ms));
                     for (let i=0; i<50; i++) {
                         const text = document.body.innerText;
-                        if (/no (matching|autofill suggestions)|no items to autofill/i.test(text)) return true;
+                        if (/Autofill suggestions\\s+0\\b/i.test(text) || /no (matching items|autofill suggestions)|no items to autofill/i.test(text)) return true;
                         await wait(200);
                     }
                     return document.body.innerText.slice(0,500);
@@ -71,7 +71,7 @@
                     document.querySelector('[name=username]')?.value === '' && document.querySelector('[name=password]')?.value === ''
                     """)
                 guard negative as? Bool == true, empty as? Bool == true else {
-                    print("Unrelated-site check inconclusive:", String(describing: negative)); exit(7)
+                    print("Unrelated-site check inconclusive. Fields empty:", empty as? Bool == true, "suggestions:", String(describing: negative)); exit(7)
                 }
                 print("No matching suggestion or filled fields on the unrelated site.")
                 NSApp.terminate(nil)
