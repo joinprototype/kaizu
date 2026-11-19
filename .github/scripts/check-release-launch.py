@@ -238,20 +238,44 @@ def staged_release(process):
     raise SystemExit("The app did not stage a signed release from the production feed")
 
 
-def report_cookie_checkpoint(server, path, phase):
+def cookies_on_disk(server, path):
     # This file belongs to the generated profile in a disposable hosted account.
-    # Report only whether the fixture's random value appears in WebKit's on-disk file.
+    # Report only whether the fixture's random values appear in WebKit's on-disk file.
     try:
         data = path.read_bytes()
     except FileNotFoundError:
-        status = "no cookie file"
+        return False, "no cookie file"
     except OSError as error:
-        status = f"file unavailable ({error.errno})"
-    else:
-        strict = server.cookie.partition("=")[2].encode() in data
-        lax = server.navigation_cookie.partition("=")[2].encode() in data
-        status = f"Strict={strict}, Lax={lax}, {len(data)} bytes"
+        return False, f"file unavailable ({error.errno})"
+    strict = server.cookie.partition("=")[2].encode() in data
+    lax = server.navigation_cookie.partition("=")[2].encode() in data
+    return strict and lax, f"Strict={strict}, Lax={lax}, {len(data)} bytes"
+
+
+def report_cookie_checkpoint(server, path, phase):
+    print(f"Cookie checkpoint {phase}: {cookies_on_disk(server, path)[1]}", flush=True)
+
+
+def require_cookies_committed(server, path, phase):
+    # Kaizu flushes WebKit's cookies before its process exits, so an update that relaunches
+    # immediately must find them. WebKit alone writes them only after the app has gone.
+    committed, status = cookies_on_disk(server, path)
     print(f"Cookie checkpoint {phase}: {status}", flush=True)
+    if not committed:
+        raise SystemExit(f"Kaizu exited before its login cookies were on disk ({phase}): {status}")
+
+
+def wait_for_legacy_cookies(server, path):
+    # v0.2.5 leaves the cookie write to WebKit's network process after it exits.
+    # Its own update relaunch can race that write; the reader test needs the committed profile.
+    started = time.monotonic()
+    while time.monotonic() - started < 15:
+        committed, status = cookies_on_disk(server, path)
+        if committed:
+            print(f"v0.2.5 cookies reached disk {time.monotonic() - started:.2f} s after its process exited.", flush=True)
+            return
+        time.sleep(0.01)
+    raise SystemExit(f"v0.2.5 never committed its login cookies after quitting: {status}")
 
 
 def storage_checkpoint(profile_directory, marker):
@@ -304,9 +328,10 @@ def seed_legacy_session(server, app, url, stores):
             quit_app(process)
         if cookie_file:
             report_cookie_checkpoint(server, cookie_file, "after v0.2.5 quit")
+            wait_for_legacy_cookies(server, cookie_file)
 
 
-def check_restored_session(server, installed, url, identity, profile_directory):
+def check_restored_session(server, installed, url, identity, profile_directory, reader_is_candidate):
     before_launch = storage_checkpoint(profile_directory, server.storage_token)
     cookie_file = profile_directory / "Cookies/Cookies.binarycookies"
     report_cookie_checkpoint(server, cookie_file, "before restored launch")
@@ -320,6 +345,8 @@ def check_restored_session(server, installed, url, identity, profile_directory):
             print("Shutdown edit after restore attempt:", storage_checkpoint(profile_directory, server.last_edit), flush=True)
         else:
             print("Original draft after restore attempt:", storage_checkpoint(profile_directory, server.storage_token), flush=True)
+    if reader_is_candidate:
+        require_cookies_committed(server, cookie_file, "when the restored candidate exited")
     if "value matches" not in before_launch.split(", "):
         raise SystemExit(f"Expected draft was absent before the reader launched: {before_launch}")
     if saved_tab(url) != identity:
@@ -351,7 +378,7 @@ def install_signed_update(server, app, url):
     quit_app(process)
     profile_id = str(uuid.UUID(saved_tab(url)[0]))
     cookie_file = cookie_root / profile_id / "Cookies/Cookies.binarycookies"
-    report_cookie_checkpoint(server, cookie_file, "after quit")
+    require_cookies_committed(server, cookie_file, "when the candidate exited to install the update")
 
     # The detached install helper replaces the bundle after the original PID exits.
     deadline = time.monotonic() + 30
@@ -457,12 +484,13 @@ def main():
         before = saved_tab(url)
         profile_directory = stores / str(uuid.UUID(before[0]))
         server.issue_cookie = False
-        check_restored_session(server, installed, url, before, profile_directory)
+        # After a signed update the reader is the published release, which doesn't flush cookies itself.
+        check_restored_session(server, installed, url, before, profile_directory, reader_is_candidate=bool(args.previous))
         print("Restored the tab in its original space and profile with its login cookie and local storage.")
         if args.previous:
             server.storage_token = server.last_edit
             server.last_edit = None
-            check_restored_session(server, installed, url, before, profile_directory)
+            check_restored_session(server, installed, url, before, profile_directory, reader_is_candidate=True)
             print("The candidate restored its final pagehide edit on the first read after an ordinary quit.")
 
 

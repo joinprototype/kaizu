@@ -134,7 +134,11 @@ enum Updates {
     static func installIfReady() {
         guard let staged = preparation.staged else { return }
         do {
-            try UpdateSwap.launch(pid: getpid(), app: Bundle.main.bundleURL, staged: staged.app, relaunch: relaunchAfterQuit)
+            let websiteData = Bundle.main.bundleIdentifier.map {
+                FileManager.default.homeDirectoryForCurrentUser.appending(path: "Library/WebKit/\($0)/WebsiteDataStore")
+            }
+            try UpdateSwap.launch(pid: getpid(), app: Bundle.main.bundleURL, staged: staged.app,
+                                  relaunch: relaunchAfterQuit, websiteData: websiteData)
             log.notice("Installing update \(staged.build) on quit")
         } catch {
             log.error("Couldn't start the update: \(String(describing: error), privacy: .public)")

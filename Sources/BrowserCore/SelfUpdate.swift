@@ -132,16 +132,26 @@ public enum UpdateSwap {
     /// Runs on after Kaizu quits. The new app first moves beside the old one,
     /// so a copy that fails (another volume) leaves the old one untouched, and
     /// the renames that follow are as near to one step as a shell gets.
-    /// Arguments: pid, app path, staged path, relaunch flag.
+    /// Arguments: pid, app path, staged path, relaunch flag, website data folder (may be empty).
     public static let script = #"""
     trap '' HUP INT TERM
-    pid=$1 app=$2 staged=$3 relaunch=$4
+    pid=$1 app=$2 staged=$3 relaunch=$4 data=$5
     waited=0
     while kill -0 "$pid" 2>/dev/null; do
       waited=$((waited + 1))
       if [ "$waited" -gt 1200 ]; then exit 1; fi
       sleep 0.05
     done
+    # WebKit's network process writes cookies and site storage after the app has exited.
+    # A relaunch that opens those files first can lose the last writes, so give it ten seconds.
+    if [ -n "$data" ] && [ -d "$data" ]; then
+      waited=0
+      while [ -n "$(/usr/sbin/lsof -t +D "$data" 2>/dev/null)" ]; do
+        waited=$((waited + 1))
+        if [ "$waited" -gt 100 ]; then break; fi
+        sleep 0.1
+      done
+    fi
     incoming="$app.incoming.$$"
     outgoing="$app.outgoing.$$"
     if mv "$staged" "$incoming"; then
@@ -158,10 +168,13 @@ public enum UpdateSwap {
     """#
 
     /// Leaves a helper running that swaps `staged` in for `app` once `pid` exits.
-    public static func launch(pid: Int32, app: URL, staged: URL, relaunch: Bool) throws {
+    /// `websiteData` is WebKit's folder for the app, which the swap waits for WebKit to release.
+    public static func launch(pid: Int32, app: URL, staged: URL, relaunch: Bool, websiteData: URL? = nil) throws {
         let helper = Process()
         helper.executableURL = URL(fileURLWithPath: "/bin/sh")
-        helper.arguments = ["-c", script, "kaizu-update", String(pid), app.path, staged.path, relaunch ? "1" : "0"]
+        helper.arguments = [
+            "-c", script, "kaizu-update", String(pid), app.path, staged.path, relaunch ? "1" : "0", websiteData?.path ?? "",
+        ]
         helper.standardInput = FileHandle.nullDevice
         helper.standardOutput = FileHandle.nullDevice
         helper.standardError = FileHandle.nullDevice
