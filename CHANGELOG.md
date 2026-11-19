@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+Kaizu can fill logins from Apple’s Passwords app. Click into a login field and press the key at its right end, or choose **Edit → Fill from Passwords…** (⌥⌘\\). In the picker, choose **Passwords…**, unlock with Touch ID and pick a login: Kaizu fills it into the page and forgets it. Kaizu never reads your saved passwords; macOS hands over only the login you pick. A login goes only to the site it was picked on. On sign-ins that ask for the username first, the password waits up to two minutes for that site’s password page. The key appears on fields in the page itself, not in embedded frames, where the menu command works instead.
+
 Kaizu can play soft paper sounds: turn on **Settings → General → Play soft sounds**. They’re off by default. Opening the command bar unfolds a sheet, opening and closing tabs lays down and draws away a card, pinning presses the paper, switching spaces turns a page and splitting folds a crease. They play only for your own actions while Kaizu is in front, follow the macOS “Play user interface sound effects” setting and alert volume, and a held key or a quick run plays once.
 
 Cookie pop-up rejection now runs out of the page's reach. Kaizu loads DuckDuckGo's autoconsent library in a separate script world that pages can't see or change. Each frame receives only the rules that apply to its address, instead of the full 600 KB script and rule set. Across ten busy news and shopping sites, the pages used about 30% less CPU while loading. Memory use stayed about the same. Rejection worked as before on Cookiebot, CookieYes, Didomi, OneTrust, Sourcepoint and Usercentrics sites. The old in-page script is no longer bundled, so the app is about 600 KB smaller.

@@ -85,6 +85,7 @@ enum DebugHooks {
         case "hide": qaHide(store)
         case "brokensite": qaBrokenSite(store)
         case "bugreport": qaBugReport(store)
+        case "passwords": qaPasswords(store)
         case "spotlight": qaSpotlight(store)
         case "spotlightreset": clearSpotlight()
         case "hotkeys": qaHotKeys(store)

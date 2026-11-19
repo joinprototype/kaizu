@@ -182,6 +182,8 @@ struct CommandRegistryTests {
       Delete
       Select All | ⌘A
       ---
+      Fill from Passwords… | ⌥⌘\\
+      ---
       Spelling and Grammar ▸
         Show Spelling and Grammar | ⌘:
         Check Document Now | ⌘;
