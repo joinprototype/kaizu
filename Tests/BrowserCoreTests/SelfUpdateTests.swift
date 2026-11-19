@@ -173,16 +173,22 @@ struct SelfUpdateTests {
         let cookies = data.appending(path: "Cookies.binarycookies")
         try Data().write(to: cookies)
         // Stands in for WebKit's network process, still writing after the app has gone.
+        // It holds the file until the test removes `holding`, so slow machines can't end it early.
+        let holding = root.appending(path: "holding")
+        try Data().write(to: holding)
         let writer = Process()
         writer.executableURL = URL(fileURLWithPath: "/bin/sh")
-        writer.arguments = ["-c", "exec 3>>\"$0\"; sleep 1.5", cookies.path]
+        writer.arguments = ["-c", "exec 3>>\"$0\"; while [ -e \"$1\" ]; do sleep 0.05; done", cookies.path, holding.path]
         try writer.run()
         try UpdateSwap.launch(pid: 999_999, app: current, staged: staged, relaunch: false,
                               websiteData: data.deletingLastPathComponent())
-        try await Task.sleep(for: .seconds(1))
+        try await Task.sleep(for: .seconds(1.5))
         #expect(marker(current) == "old", "nothing moves while WebKit still holds the website data")
+        try FileManager.default.removeItem(at: holding)
         writer.waitUntilExit()
-        try await Task.sleep(for: .seconds(1))
+        for _ in 0..<50 where marker(current) != "new" {
+            try await Task.sleep(for: .milliseconds(100))
+        }
         #expect(marker(current) == "new")
     }
 
