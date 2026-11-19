@@ -25,7 +25,7 @@ struct SelfUpdateTests {
         process.executableURL = URL(fileURLWithPath: tool)
         process.arguments = arguments
         try process.run()
-        process.waitUntilExit()
+        process.waitForExit()
         try #require(process.terminationStatus == 0)
     }
 
@@ -160,7 +160,7 @@ struct SelfUpdateTests {
         try quitting.run()
         try UpdateSwap.launch(pid: quitting.processIdentifier, app: app, staged: staged, relaunch: false)
         #expect(marker(app) == "old", "nothing moves while the app still runs")
-        quitting.waitUntilExit()
+        quitting.waitForExit()
         try await Task.sleep(for: .seconds(1))
     }
 
@@ -185,7 +185,7 @@ struct SelfUpdateTests {
         try await Task.sleep(for: .seconds(1.5))
         #expect(marker(current) == "old", "nothing moves while WebKit still holds the website data")
         try FileManager.default.removeItem(at: holding)
-        writer.waitUntilExit()
+        writer.waitForExit()
         for _ in 0..<50 where marker(current) != "new" {
             try await Task.sleep(for: .milliseconds(100))
         }
@@ -226,7 +226,7 @@ struct SelfUpdateTests {
         let failing = "mv() { if [ \"$2\" = \"$app\" ] && [ \"$1\" = \"$incoming\" ]; then return 1; fi; command mv \"$@\"; }\n" + UpdateSwap.script
         helper.arguments = ["-c", failing, "test", "999999", current.path, staged.path, "0"]
         try helper.run()
-        helper.waitUntilExit()
+        helper.waitForExit()
         #expect(marker(current) == "old")
         #expect(try neighbours(of: current) == ["Kaizu.app"])
     }

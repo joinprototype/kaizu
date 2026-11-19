@@ -200,7 +200,7 @@ import Testing
         let output = try folder()
         let archive = output.appending(path: "Export.zip")
         let zip = try Process.run(URL(fileURLWithPath: "/usr/bin/zip"), arguments: ["-j", "-q", archive.path] + FileManager.default.contentsOfDirectory(atPath: files.path).map { files.appending(path: $0).path })
-        zip.waitUntilExit()
+        zip.waitForExit()
 
         let data = try SafariExport.read(archive)
         #expect(data.visits.map(\.url) == [Self.docs, Self.docs, Self.example, Self.example])
@@ -225,7 +225,7 @@ import Testing
         zip.currentDirectoryURL = root
         zip.arguments = ["-q", "-r", archive.path, "Personal", "Work"]
         try zip.run()
-        zip.waitUntilExit()
+        zip.waitForExit()
         try #require(zip.terminationStatus == 0)
 
         let files = try SafariExport.readArchive(archive)
