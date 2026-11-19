@@ -28,6 +28,9 @@ struct SplitContent: View {
                         SplitPane(tab: pane, isFocused: pane === focused, isSplit: panes.count > 1, theme: space.theme) { point in
                             shape.place(at: point, on: pane.id)
                         } onDropHover: { hover in
+                            if let hover, hover.tab != drop?.tab || hover.place != drop?.place {
+                                Haptics.tick()
+                            }
                             withAnimation(Motion.snap) { drop = hover }
                         }
                         .frame(width: frame.width, height: frame.height)
@@ -84,6 +87,11 @@ private struct SplitDivider: View {
     let onEnd: () -> Void
     let onReset: () -> Void
     @GestureState private var dragStart: SplitNode?
+    /// Held at the even split: the drag sticks there for a few points.
+    @State private var isAtEven: Bool?
+
+    /// How close to even, in points, a drag snaps to it.
+    private static let detent = 8.0
 
     private var isStacked: Bool { divider.direction == .stacked }
 
@@ -97,9 +105,24 @@ private struct SplitDivider: View {
                 DragGesture(minimumDistance: 1, coordinateSpace: .global)
                     .updating($dragStart) { _, start, _ in start = start ?? layout }
                     .onChanged { value in
-                        onDrag(dragStart ?? layout, isStacked ? value.translation.height : value.translation.width)
+                        let start = dragStart ?? layout
+                        var distance = isStacked ? value.translation.height : value.translation.width
+                        if let even = start.distanceToEvenPair(divider) {
+                            // Starting from even doesn't count as arriving there.
+                            let wasAtEven = isAtEven ?? (abs(even) < 1)
+                            let atEven = abs(distance - even) < Self.detent
+                            if atEven {
+                                distance = even
+                                if !wasAtEven { Haptics.tick() }
+                            }
+                            isAtEven = atEven
+                        }
+                        onDrag(start, distance)
                     }
-                    .onEnded { _ in onEnd() }
+                    .onEnded { _ in
+                        isAtEven = nil
+                        onEnd()
+                    }
             )
             .onTapGesture(count: 2) { withAnimation(Motion.snap) { onReset() } }
     }
