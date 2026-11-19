@@ -58,6 +58,8 @@ Choose **History → Recently Archived Tabs** to browse by day, search by page o
 
 Press ⌘T and type a title or part of an address to find open tabs across spaces in your current profile. Each match names its space. Selecting it takes you back to the existing tab, including tabs in collapsed folders. Archived tab suggestions are now scoped to the current profile too.
 
+Ad and cookie-banner blocking now covers 155 more hiding filters from EasyList and the Cookie List, the ones that target class names with brackets or colons such as `.h-[90px]`. A tracker block marked `$important` now stays blocked even when another filter allows it.
+
 ## 0.2.5 · November 2, 2026 · Build 10
 
 Kaizu now refreshes its ad and tracker lists daily even if you leave the browser open. After an offline check it retries within an hour. New pages use the updated rules, and open pages pick them up when you reload.

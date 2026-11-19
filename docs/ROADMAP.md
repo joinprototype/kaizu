@@ -183,7 +183,7 @@ Pulled forward from the phases below, in order:
    - [x] per-site "pause blocking" (shield in address pill, per-tab controllers, no recompiles)
    - [x] broken-site reporting (site popover, Help menu, the toast after pausing): a Mail draft with the site's name, never the page unless asked; records whether turning blocking off fixed it
    - [x] strip tracking parameters (utm_*, fbclid, gclid…) on navigation and Copy Link
-   - [ ] evaluate Brave's adblock-rust converter vs ours (coverage, scriptlets)
+   - [x] evaluate Brave's adblock-rust converter vs ours (coverage, scriptlets): keep ours, adopt escaped selectors and `$object` handling; see research/adblock-converter-comparison.md
 7. [x] Find in page, history, Peek, split view **L** total
 8. [x] Phase 1 motion pass on the core interactions **M**
 9. [x] Arc importer from `StorableSidebar.json` with a preview + one-click import (format documented in research/arc-sidebar-format.md; fixture in Tests) **M**
