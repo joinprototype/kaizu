@@ -46,7 +46,10 @@ jobs:
           KAIZU_SUPPORT: ${{ runner.temp }}/little-window-profile
         run: |
           log="$RUNNER_TEMP/little-window.log"
-          open -n -W --env KAIZU_DEBUG=little-window-promotion --env "KAIZU_SUPPORT=$KAIZU_SUPPORT" --stderr "$log" -a "$GITHUB_WORKSPACE/build/Kaizu.app"
+          app="$GITHUB_WORKSPACE/build/Kaizu.app"
+          open -n --env KAIZU_DEBUG=little-window-promotion --env "KAIZU_SUPPORT=$KAIZU_SUPPORT" --stderr "$log" -a "$app"
+          # `open -W` fails with "No such process" when the app exits before open starts waiting.
+          while pgrep -qf "$app/Contents/MacOS/Kaizu"; do sleep 0.5; done
           cat "$log"
           grep -Fxq 'Little-window promotion preserved the live page and its profile.' "$log"
       - name: Keep all four split panes when an extra pane is requested
