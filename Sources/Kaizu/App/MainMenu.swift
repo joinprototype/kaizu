@@ -49,228 +49,129 @@ extension ActionMenuItem: NSMenuItemValidation {
     }
 }
 
+
+/// Builds the menu bar from `CommandRegistry`.
 @MainActor
 enum MainMenu {
-    static func make(app: AppModel) -> NSMenu {
+    /// `app` is nil only in tests, which look at the menu's shape: items
+    /// then do nothing and are disabled.
+    static func make(app: AppModel?) -> NSMenu {
         let menu = NSMenu()
-        menu.addSubmenu(appMenu(app))
-        menu.addSubmenu(fileMenu(app))
-        menu.addSubmenu(editMenu(app))
-        menu.addSubmenu(viewMenu(app))
-        menu.addSubmenu(historyMenu(app))
-        menu.addSubmenu(tabsMenu(app))
-        menu.addSubmenu(SpacesMenu(app: app))
-        let window = windowMenu()
-        menu.addSubmenu(window)
-        NSApp.windowsMenu = window
-        #if DEBUG
-        menu.addSubmenu(debugMenu(app))
-        #endif
-        let help = helpMenu(app)
-        menu.addSubmenu(help)
-        NSApp.helpMenu = help
-        return menu
-    }
-
-    private static func appMenu(_ app: AppModel) -> NSMenu {
-        let menu = NSMenu(title: "Kaizu")
-        menu.addItem(ActionMenuItem("About Kaizu") { UtilityWindows.showAbout(app: app) })
-        menu.addItem(ActionMenuItem("Check for Updates…") { Updates.checkNow(app: app) })
-        menu.addItem(.separator())
-        menu.addItem(ActionMenuItem("Settings…", key: ",") { UtilityWindows.showSettings(app: app) })
-        menu.addItem(.separator())
-        menu.addItem(withTitle: "Hide Kaizu", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
-        let hideOthers = menu.addItem(withTitle: "Hide Others", action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h")
-        hideOthers.keyEquivalentModifierMask = [.command, .option]
-        menu.addItem(withTitle: "Show All", action: #selector(NSApplication.unhideAllApplications(_:)), keyEquivalent: "")
-        menu.addItem(.separator())
-        menu.addItem(withTitle: "Quit Kaizu", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
-        return menu
-    }
-
-    private static func fileMenu(_ app: AppModel) -> NSMenu {
-        let menu = NSMenu(title: "File")
-        menu.addItem(ActionMenuItem("New Tab", key: "t") { app.front.showCommandBar(.newTab) })
-        menu.addItem(ActionMenuItem("New Window", key: "n") { app.front.openNewWindow() })
-        menu.addItem(ActionMenuItem("Open Location…", key: "l") { app.front.showCommandBar(.currentTab) })
-        menu.addItem(ActionMenuItem("Reopen Closed Tab", key: "t", modifiers: [.command, .shift]) { app.front.reopenClosedTab() })
-        menu.addItem(ActionMenuItem("New Little Window", key: "n", modifiers: [.command, .option]) { app.front.openLittleWindow() })
-        menu.addItem(ActionMenuItem("New Private Window", key: "p", modifiers: [.command, .shift]) { app.front.openPrivateWindow() })
-        menu.addItem(ActionMenuItem("Open Little Window in Kaizu", key: "o", available: { app.keyLittleWindow != nil }) {
-            app.keyLittleWindow?.promote()
-        })
-        menu.addItem(.separator())
-        menu.addItem(ActionMenuItem("New Space…", key: "n", modifiers: [.command, .shift]) { app.front.beginNewSpace() })
-        menu.addItem(ActionMenuItem("Import from Arc…") { UtilityWindows.showArcImport(app: app) })
-        menu.addItem(ActionMenuItem("Import Browsing Data…") { UtilityWindows.showBrowsingDataImport(app: app) })
-        menu.addItem(.separator())
-        menu.addItem(ActionMenuItem("Capture…", key: "2", modifiers: [.command, .shift]) {
-            app.front.commandTab.map { app.front.beginCapture(of: $0) }
-        })
-        menu.addItem(ActionMenuItem("Export as PDF…") { app.front.commandTab?.exportPDF() })
-        menu.addItem(ActionMenuItem("Print…", key: "p") { app.front.commandTab?.printPage() })
-        menu.addItem(.separator())
-        menu.addItem(ActionMenuItem("Close Tab", key: "w") { app.front.closeSelectedTab() })
-        let closeWindow = menu.addItem(withTitle: "Close Window", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
-        closeWindow.keyEquivalentModifierMask = [.command, .shift]
-        return menu
-    }
-
-    /// The standard items: whichever text view or web view has focus answers them.
-    private static func spellingMenu() -> NSMenu {
-        let menu = NSMenu(title: "Spelling and Grammar")
-        menu.addItem(withTitle: "Show Spelling and Grammar", action: #selector(NSText.showGuessPanel(_:)), keyEquivalent: ":")
-        menu.addItem(withTitle: "Check Document Now", action: #selector(NSText.checkSpelling(_:)), keyEquivalent: ";")
-        menu.addItem(.separator())
-        menu.addItem(withTitle: "Check Spelling While Typing", action: #selector(NSTextView.toggleContinuousSpellChecking(_:)), keyEquivalent: "")
-        menu.addItem(withTitle: "Check Grammar With Spelling", action: #selector(NSTextView.toggleGrammarChecking(_:)), keyEquivalent: "")
-        menu.addItem(withTitle: "Correct Spelling Automatically", action: #selector(NSTextView.toggleAutomaticSpellingCorrection(_:)), keyEquivalent: "")
-        return menu
-    }
-
-    private static func editMenu(_ app: AppModel) -> NSMenu {
-        let menu = NSMenu(title: "Edit")
-        menu.addItem(withTitle: "Undo", action: Selector(("undo:")), keyEquivalent: "z")
-        let redo = menu.addItem(withTitle: "Redo", action: Selector(("redo:")), keyEquivalent: "z")
-        redo.keyEquivalentModifierMask = [.command, .shift]
-        menu.addItem(.separator())
-        menu.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
-        menu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
-        menu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
-        let pastePlain = menu.addItem(withTitle: "Paste and Match Style", action: #selector(NSTextView.pasteAsPlainText(_:)), keyEquivalent: "v")
-        pastePlain.keyEquivalentModifierMask = [.command, .option, .shift]
-        menu.addItem(withTitle: "Delete", action: #selector(NSText.delete(_:)), keyEquivalent: "")
-        menu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
-        menu.addItem(.separator())
-        menu.addSubmenu(spellingMenu())
-        menu.addItem(.separator())
-        // The find bar is the main window's: not for a little window's page.
-        let inMainWindow = { app.front.window?.isKeyWindow == true }
-        menu.addItem(ActionMenuItem("Find…", key: "f") { if inMainWindow() { app.front.showFindBar() } })
-        menu.addItem(ActionMenuItem("Find Next", key: "g") { if inMainWindow() { app.front.findNext() } })
-        menu.addItem(ActionMenuItem("Find Previous", key: "g", modifiers: [.command, .shift]) { if inMainWindow() { app.front.findNext(backwards: true) } })
-        return menu
-    }
-
-    private static func viewMenu(_ app: AppModel) -> NSMenu {
-        let menu = NSMenu(title: "View")
-        menu.addItem(ActionMenuItem("Toggle Sidebar", key: "s") { app.front.toggleSidebar() })
-        // Reader shows in the main window, for its tab only.
-        menu.addItem(ActionMenuItem("Show Reader", key: "r", modifiers: [.command, .shift], isOn: { app.front.reader != nil }) {
-            if app.front.window?.isKeyWindow == true { app.front.toggleReader() }
-        })
-        menu.addItem(ActionMenuItem("Split with Recent Tab", key: "=", modifiers: [.control, .shift],
-                                    available: { app.front.recentSplitPartner != nil }) { app.front.splitWithRecentTab() })
-        menu.addItem(ActionMenuItem("Close Split View") { app.front.closeSplit() })
-        menu.addItem(.separator())
-        menu.addItem(ActionMenuItem("Block Ads & Trackers", isOn: { app.front.contentBlocker.isEnabled }) {
-            app.front.toggleContentBlocking()
-        })
-        menu.addItem(ActionMenuItem("Pause Blocking on This Site", isOn: {
-            let tab = app.front.commandTab
-            return app.front.contentBlocker.isPaused(on: tab?.url, privateID: tab?.profile.privateID)
-        }) {
-            app.front.toggleBlockingOnCurrentSite(app.front.commandTab)
-        })
-        menu.addItem(ActionMenuItem("Auto-Reject Cookie Pop-ups", isOn: { app.front.contentBlocker.isCookieRejectionEnabled }) {
-            app.front.toggleCookieRejection()
-        })
-        menu.addItem(ActionMenuItem("Hide Distracting Items…") {
-            if let tab = app.front.commandTab { app.front.beginHidingItems(on: tab) }
-        })
-        menu.addItem(.separator())
-        menu.addItem(ActionMenuItem("Reload Page", key: "r") { app.front.commandTab?.reload() })
-        menu.addItem(ActionMenuItem("Reload Ignoring Cache", key: "r", modifiers: [.command, .option]) { app.front.commandTab?.reload(fromOrigin: true) })
-        menu.addItem(ActionMenuItem("Stop", key: ".") { app.front.commandTab?.stopLoading() })
-        menu.addItem(.separator())
-        menu.addItem(ActionMenuItem("Zoom In", key: "=") { app.front.commandTab?.zoom(by: 0.1) })
-        menu.addItem(ActionMenuItem("Zoom Out", key: "-") { app.front.commandTab?.zoom(by: -0.1) })
-        menu.addItem(ActionMenuItem("Actual Size", key: "0") { app.front.commandTab?.resetZoom() })
-        menu.addItem(.separator())
-        let fullScreen = menu.addItem(withTitle: "Enter Full Screen", action: #selector(NSWindow.toggleFullScreen(_:)), keyEquivalent: "f")
-        fullScreen.keyEquivalentModifierMask = [.command, .control]
-        return menu
-    }
-
-    private static func historyMenu(_ app: AppModel) -> NSMenu {
-        let menu = NSMenu(title: "History")
-        menu.addItem(ActionMenuItem("Back", key: "[") { app.front.commandTab?.goBack() })
-        menu.addItem(ActionMenuItem("Forward", key: "]") { app.front.commandTab?.goForward() })
-        menu.addItem(.separator())
-        menu.addItem(ActionMenuItem("Show All History", key: "y") { UtilityWindows.showHistory(app: app) })
-        menu.addItem(ActionMenuItem("Recently Archived Tabs…", available: { !app.front.isPrivate }) {
-            let store = app.front
-            guard !store.isPrivate else { return }
-            store.window?.makeKeyAndOrderFront(nil)
-            store.showingArchive = true
-        })
-        menu.addItem(ActionMenuItem("Clear History…") { app.front.clearHistory() })
-        return menu
-    }
-
-    private static func tabsMenu(_ app: AppModel) -> NSMenu {
-        let menu = NSMenu(title: "Tabs")
-        // ⌃Tab in the main window is the switcher's key monitor; this is
-        // the menu path. Clicked, there's no ⌃ to release: switch at once.
-        menu.addItem(ActionMenuItem("Recent Tabs", key: "\t", modifiers: .control) {
-            guard app.front.window?.isKeyWindow == true else { return }
-            app.front.advanceTabSwitcher(backwards: false)
-            if !NSEvent.modifierFlags.contains(.control) { app.front.commitTabSwitcher() }
-        })
-        menu.addItem(ActionMenuItem("Next Tab", key: arrow(NSDownArrowFunctionKey), modifiers: [.command, .option]) { app.front.selectAdjacentTab(1) })
-        menu.addItem(ActionMenuItem("Previous Tab", key: arrow(NSUpArrowFunctionKey), modifiers: [.command, .option]) { app.front.selectAdjacentTab(-1) })
-        menu.addItem(.separator())
-        menu.addItem(ActionMenuItem("Pin / Unpin Tab", key: "d") {
-            if let tab = app.front.commandTab { app.front.togglePin(tab) }
-        })
-        menu.addItem(ActionMenuItem("Copy Link", key: "c", modifiers: [.command, .shift]) { app.front.commandTab.map { app.front.copyLink(of: $0) } })
-        menu.addItem(ActionMenuItem("Copy as Markdown Link", key: "c", modifiers: [.command, .shift, .option]) { app.front.commandTab.map { app.front.copyLink(of: $0, asMarkdown: true) } })
-        for number in 1...9 {
-            let title = number == 9 ? "Select Last Tab" : "Select Tab \(number)"
-            menu.addItem(ActionMenuItem(title, key: "\(number)", hidden: true) { app.front.selectTab(number: number) })
+        for spec in CommandRegistry.mainMenu {
+            let submenu = build(spec, app: app)
+            menu.addSubmenu(submenu)
+            switch spec.role {
+            case .windows: NSApp.windowsMenu = submenu
+            case .help: NSApp.helpMenu = submenu
+            case .standard: break
+            }
         }
         return menu
     }
 
-    #if DEBUG
-    private static func debugMenu(_ app: AppModel) -> NSMenu {
-        let menu = NSMenu(title: "Debug")
-        menu.addItem(ActionMenuItem("Cookie Pop-up Result") { app.front.showCookiePopupResult() })
-        return menu
-    }
-    #endif
-
-    private static func windowMenu() -> NSMenu {
-        let menu = NSMenu(title: "Window")
-        menu.addItem(withTitle: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
-        menu.addItem(withTitle: "Zoom", action: #selector(NSWindow.performZoom(_:)), keyEquivalent: "")
-        menu.addItem(.separator())
-        menu.addItem(withTitle: "Bring All to Front", action: #selector(NSApplication.arrangeInFront(_:)), keyEquivalent: "")
-        return menu
+    private static func build(_ spec: MenuSpec, app: AppModel?) -> NSMenu {
+        switch spec.content {
+        case .items(let entries):
+            let menu = NSMenu(title: spec.title)
+            add(entries, to: menu, app: app)
+            return menu
+        case .dynamic(let entries):
+            return DynamicMenu(title: spec.title, app: app, entries: entries)
+        }
     }
 
-    private static func helpMenu(_ app: AppModel) -> NSMenu {
-        let menu = NSMenu(title: "Help")
-        menu.addItem(ActionMenuItem("Keyboard Shortcuts", key: "/") { UtilityWindows.showKeyboardShortcuts(app: app) })
-        menu.addItem(.separator())
-        menu.addItem(ActionMenuItem("Report a Bug…") { UtilityWindows.showBugReport(app: app) })
-        menu.addItem(ActionMenuItem("Report a Broken Site…") { app.front.reportBrokenSite() })
-        return menu
+    fileprivate static func add(_ entries: [MenuEntry], to menu: NSMenu, app: AppModel?) {
+        for entry in entries {
+            switch entry {
+            case .command(let command): menu.addItem(item(for: command, app: app))
+            case .separator: menu.addItem(.separator())
+            case .submenu(let spec): menu.addSubmenu(build(spec, app: app))
+            }
+        }
     }
 
-    private static func arrow(_ key: Int) -> String {
-        String(Character(UnicodeScalar(UInt16(key))!))
+    /// AppKit's actions get a plain item, as AppKit expects: it copies some
+    /// (Enter Full Screen's ⌃⌘F alternate), which a subclass can't survive.
+    private static func item(for command: Command, app: AppModel?) -> NSMenuItem {
+        let item = switch command.action {
+        case .run: CommandMenuItem(command, app: app)
+        case .send(let selector): NSMenuItem(title: command.title, action: selector, keyEquivalent: "")
+        }
+        item.keyEquivalent = command.key?.character ?? ""
+        item.keyEquivalentModifierMask = command.key?.modifiers ?? .command
+        item.identifier = NSUserInterfaceItemIdentifier(command.id)
+        if command.isHidden {
+            item.isHidden = true
+            item.allowsKeyEquivalentWhenHidden = true
+        }
+        return item
     }
 }
 
-/// Rebuilt every time it opens (or a key equivalent is checked) so it tracks the space list.
+/// A main-menu item that runs a `Command`'s own code.
 @MainActor
-final class SpacesMenu: NSMenu, NSMenuDelegate {
-    private let app: AppModel
+final class CommandMenuItem: NSMenuItem {
+    let command: Command
+    private weak var app: AppModel?
 
-    init(app: AppModel) {
+    init(_ command: Command, app: AppModel?) {
+        self.command = command
         self.app = app
-        super.init(title: "Spaces")
+        super.init(title: command.title, action: #selector(fire), keyEquivalent: "")
+        target = self
+    }
+
+    @available(*, unavailable)
+    required init(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    /// AppKit only sends this once `validateMenuItem` said yes.
+    @objc private func fire() {
+        guard let app, case .run(let run) = command.action else { return }
+        run(app)
+    }
+}
+
+extension CommandMenuItem: NSMenuItemValidation {
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        guard let app else { return false }
+        if let isOn = command.isOn {
+            state = isOn(app) ? .on : .off
+        }
+        return command.canRun(in: app)
+    }
+}
+
+extension NSMenuItem {
+    /// The registry command this item runs, when it's our own code. AppKit's
+    /// items have none and are read as they stand: the responder actions it
+    /// validates and may retitle or give another key (Enter Full Screen), and
+    /// those it adds itself (Close All, Start Dictation, Emoji & Symbols,
+    /// AutoFill, the window list).
+    var ownCommand: Command? {
+        (self as? CommandMenuItem)?.command
+    }
+
+    /// "⇧⌘T" for its key equivalent, if it has one.
+    var shortcutLabel: String? {
+        if let command = ownCommand { return command.key?.label }
+        guard !keyEquivalent.isEmpty else { return nil }
+        return Command.Key.label(character: keyEquivalent, modifiers: keyEquivalentModifierMask)
+    }
+}
+
+/// A menu rebuilt from its entries every time it opens (or a key equivalent
+/// is checked), so it tracks the space list.
+@MainActor
+final class DynamicMenu: NSMenu, NSMenuDelegate {
+    private weak var app: AppModel?
+    private let entries: @MainActor (AppModel) -> [MenuEntry]
+
+    init(title: String, app: AppModel?, entries: @escaping @MainActor (AppModel) -> [MenuEntry]) {
+        self.app = app
+        self.entries = entries
+        super.init(title: title)
         delegate = self
     }
 
@@ -281,18 +182,8 @@ final class SpacesMenu: NSMenu, NSMenuDelegate {
 
     func menuNeedsUpdate(_ menu: NSMenu) {
         removeAllItems()
-        for (index, space) in app.spaces.enumerated() {
-            let key = index < 9 ? "\(index + 1)" : ""
-            let item = ActionMenuItem(space.name, key: key, modifiers: .control) { [app] in
-                app.regularFront.window?.makeKeyAndOrderFront(nil)
-                app.regularFront.switchTo(space)
-            }
-            item.state = space.id == app.regularFront.activeSpaceID ? .on : .off
-            addItem(item)
-        }
-        addItem(.separator())
-        addItem(ActionMenuItem("New Space…") { [app] in app.front.beginNewSpace() })
-        addItem(ActionMenuItem("Edit Current Space…") { [app] in app.regularFront.beginEditing(app.regularFront.activeSpace) })
+        guard let app else { return }
+        MainMenu.add(entries(app), to: self, app: app)
     }
 }
 
