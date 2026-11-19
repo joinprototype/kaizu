@@ -26,6 +26,31 @@ struct IconButton: View {
         .opacity(isEnabled ? 1 : 0.4)
         .onHoverFade($isHovering)
         .help(help)
+        .accessibilityLabel(spokenName(help))
+    }
+}
+
+/// What VoiceOver calls an icon button: its tooltip, without the keyboard
+/// shortcut ("Close Tab (⌘W)" → "Close Tab"), which VoiceOver reads out
+/// letter by letter.
+nonisolated func spokenName(_ help: String) -> String {
+    guard let open = help.lastIndex(of: "("), help.hasSuffix(")"),
+          help[open...].contains(where: { "⌘⌃⌥⇧".contains($0) })
+    else { return help }
+    return help[..<open].trimmingCharacters(in: .whitespaces)
+}
+
+extension View {
+    /// A row that's clicked rather than a Button (tab, folder, favorite):
+    /// VoiceOver reads it as one button by its name, and pressing it does
+    /// what a click does. While it's being renamed, its text field is left
+    /// to VoiceOver as it is.
+    func accessibleRow(_ name: String, isSelected: Bool = false, isEditing: Bool = false,
+                       action: @escaping () -> Void) -> some View {
+        accessibilityElement(children: isEditing ? .contain : .combine)
+            .accessibilityLabel(name)
+            .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+            .accessibilityAction(.default, action)
     }
 }
 
@@ -182,6 +207,9 @@ private struct TabDropTarget: ViewModifier {
             guard let tab = drags.first.flatMap(store.tab) else { return false }
             store.move(tab, to: destination)
             return true
-        } isTargeted: { isTargeted = $0 }
+        } isTargeted: {
+            if $0, !isTargeted { Haptics.tick() }
+            isTargeted = $0
+        }
     }
 }

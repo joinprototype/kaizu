@@ -95,6 +95,7 @@ struct AddressPill: View {
                     }
                     .buttonStyle(.plain)
                     .help(isPaused ? "Blocking paused on this site. Click to resume." : "Pause blocking on this site")
+                    .accessibilityLabel(isPaused ? "Resume Blocking on This Site" : "Pause Blocking on This Site")
                 }
             }
 
@@ -108,6 +109,7 @@ struct AddressPill: View {
                 }
                 .buttonStyle(.plain)
                 .help("Copy Link (⇧⌘C)")
+                .accessibilityLabel("Copy Link")
             }
         }
         .font(.system(size: 13.5))

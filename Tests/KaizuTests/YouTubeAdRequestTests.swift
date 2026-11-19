@@ -47,13 +47,51 @@ struct YouTubeAdRequestTests {
         return result as? String
     }
 
-    private func youTubePage() async throws -> WKWebView {
+    // A page opened directly with an ad booked: the player loads the same
+    // video again (through a request that asks without an ad), at the
+    // link's start time.
+    @Test func directlyOpenedBookedVideosLoadAgain() async throws {
+        let view = try await youTubePage(at: "/watch?v=abc&t=1m5s", body: Self.player(booked: true))
+        #expect(try await loaded(in: view) == "abc@65")
+        // The ad data is gone from what YouTube's code reads.
+        let left = try await view.evaluateJavaScript("'adPlacements' in window.ytInitialPlayerResponse") as? Bool
+        #expect(left == false)
+    }
+
+    @Test func unbookedVideosAndOtherPagesStayAsTheyAre() async throws {
+        let plain = try await youTubePage(at: "/watch?v=abc", body: Self.player(booked: false))
+        #expect(try await loaded(in: plain) == nil)
+        let embed = try await youTubePage(at: "/embed/abc", body: Self.player(booked: true))
+        #expect(try await loaded(in: embed) == nil)
+    }
+
+    /// A stand-in player that notes what it's asked to load, then the page's
+    /// player data, as YouTube embeds it.
+    private static func player(booked: Bool) -> String {
+        let ads = booked ? "adPlacements: [{}], " : ""
+        return """
+            <div id=movie_player></div>
+            <script>
+            document.getElementById('movie_player').loadVideoById = (video) => {
+              window.loadedVideo = video.videoId + '@' + video.startSeconds;
+            };
+            window.ytInitialPlayerResponse = {\(ads)videoDetails: {videoId: 'abc'}};
+            </script>
+            """
+    }
+
+    private func loaded(in view: WKWebView) async throws -> String? {
+        try await Task.sleep(for: .milliseconds(300))
+        return try await view.evaluateJavaScript("window.loadedVideo ?? null") as? String
+    }
+
+    private func youTubePage(at path: String = "/watch?v=abc", body: String = "") async throws -> WKWebView {
         let script = try #require(ContentBlocker.youTubeScript)
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .nonPersistent()
         config.userContentController.addUserScript(script)
         let view = WKWebView(frame: NSRect(x: 0, y: 0, width: 320, height: 240), configuration: config)
-        view.loadHTMLString("<!doctype html><title>t</title>", baseURL: URL(string: "https://www.youtube.com/watch?v=abc"))
+        view.loadHTMLString("<!doctype html><title>t</title><body>\(body)</body>", baseURL: URL(string: "https://www.youtube.com" + path))
         for _ in 0..<100 {
             let ready = "location.hostname === 'www.youtube.com' && document.readyState === 'complete'"
             if (try? await view.evaluateJavaScript(ready) as? Bool) == true { return view }

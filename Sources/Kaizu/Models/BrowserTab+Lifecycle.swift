@@ -40,6 +40,8 @@ extension BrowserTab {
         markNotificationsRead()
         teardown()
         savedState = nil
+        crossedBack = []
+        crossedForward = []
         if let pinnedURL { url = pinnedURL }
     }
 }
