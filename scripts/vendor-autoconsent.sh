@@ -14,11 +14,9 @@ tar -xzf "$work"/duckduckgo-autoconsent-*.tgz -C "$work"
 package="$work/package"
 scripts=Resources/Scripts
 
-# v1: the standalone build, rules included, for the page's own world.
-cp "$package/dist/autoconsent.standalone.js" "$scripts/autoconsent.js"
 cp "$package/LICENSE" "$scripts/autoconsent-LICENSE.txt"
-# v2: the library alone plus our glue, for the isolated world. The app keeps
-# the rules and the eval snippets and hands each frame only what it needs.
+# The library alone plus our glue, for the isolated world. The app keeps the
+# rules and the eval snippets and hands each frame only what it needs.
 cp scripts/autoconsent/content.js "$work/content.js"
 npx --yes "esbuild@$esbuild" "$work/content.js" --bundle --format=iife --target=es2021 \
     --minify-whitespace --minify-syntax --legal-comments=none --log-level=warning \

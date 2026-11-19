@@ -5,27 +5,21 @@ import WebKit
 /// Rejects cookie pop-ups with DuckDuckGo's autoconsent, the way DuckDuckGo's
 /// own browsers and extension run it.
 ///
-/// v2 (the default) puts the library alone, 110 KB, in WebKit's isolated
-/// client world in every frame, the world Kaizu's media script already
+/// The library alone, 110 KB, runs in WebKit's isolated client world in
+/// every frame, the world Kaizu's media script already
 /// creates there, so it costs no extra world. Pages can't see or tamper with
 /// it. Each frame asks this handler for its rules, and gets only those that
 /// can apply to its address (`Autoconsent.Rules`). Checks that must read the
 /// page's own globals are run here, in the page's world, by snippet id only:
 /// see `Autoconsent.Snippets` for the trust boundary.
-///
-/// v1, the 600 KB standalone build with every rule in it, ran in the page's
-/// world of every frame. It stays as a fallback until v2 has more mileage
-/// on real consent platforms: launch with KAIZU_AUTOCONSENT=v1.
 final class AutoconsentBridge: NSObject, WKScriptMessageHandlerWithReply {
     static let handlerName = "kaizuAutoconsent"
-    nonisolated static let usesPageWorld = ProcessInfo.processInfo.environment["KAIZU_AUTOCONSENT"] == "v1"
     /// Where the script runs, and where debug builds read what it did.
-    static var world: WKContentWorld { usesPageWorld ? .page : .defaultClient }
+    static var world: WKContentWorld { .defaultClient }
 
     /// Runs in every frame: many consent pop-ups live in iframes.
     static let script: WKUserScript? = {
-        let name = usesPageWorld ? "autoconsent" : "autoconsent-isolated"
-        guard let url = BundledResource.url(named: name, extension: "js", in: "Scripts"),
+        guard let url = BundledResource.url(named: "autoconsent-isolated", extension: "js", in: "Scripts"),
               let source = try? String(contentsOf: url, encoding: .utf8)
         else { return nil }
         return WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: false, in: world)
@@ -60,7 +54,6 @@ final class AutoconsentBridge: NSObject, WKScriptMessageHandlerWithReply {
 
     /// Reads the rules in the background, before the first page asks.
     static func warmUp() {
-        guard !usesPageWorld else { return }
         Task.detached(priority: .utility) {
             _ = rules
             _ = snippets
@@ -70,8 +63,7 @@ final class AutoconsentBridge: NSObject, WKScriptMessageHandlerWithReply {
     /// Once per content controller; the script itself comes and goes with
     /// the setting, through the content blocker.
     static func install(on controller: WKUserContentController) {
-        guard !usesPageWorld else { return }
-        controller.addScriptMessageHandler(shared, contentWorld: .defaultClient, name: handlerName)
+        controller.addScriptMessageHandler(shared, contentWorld: world, name: handlerName)
     }
 
     func userContentController(

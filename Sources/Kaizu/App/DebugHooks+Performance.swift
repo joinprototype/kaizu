@@ -30,9 +30,7 @@ extension DebugHooks {
                     }
                     FileHandle.standardError.write(Data("QA memory load: \(url.host() ?? "") \(started.duration(to: .now))\n".utf8))
                 }
-                if !AutoconsentBridge.usesPageWorld {
-                    FileHandle.standardError.write(Data("QA memory autoconsent: \(AutoconsentBridge.framesServed) frames (\(AutoconsentBridge.mainFramesServed) main), \(AutoconsentBridge.bytesServed) B of rules, \(AutoconsentBridge.evaluations) page checks so far\n".utf8))
-                }
+                FileHandle.standardError.write(Data("QA memory autoconsent: \(AutoconsentBridge.framesServed) frames (\(AutoconsentBridge.mainFramesServed) main), \(AutoconsentBridge.bytesServed) B of rules, \(AutoconsentBridge.evaluations) page checks so far\n".utf8))
                 await step("round \(round) loaded")
                 if environment["KAIZU_HIBERNATE"] != nil {
                     await store.app.hibernateIdleTabs(olderThan: 0)
@@ -121,7 +119,7 @@ extension DebugHooks {
             JSON.stringify({text: document.body ? document.body.innerText.trim().length : -1,
               nodes: document.querySelectorAll('*').length, images: document.images.length,
               height: document.documentElement.scrollHeight,
-              consent: ((window.kaizuAutoconsent ?? window.autoconsentStandalone)?.messages ?? []).filter(m => m.type != 'eval').map(m => m.type + (m.cmp ? ':' + m.cmp : '') + (m.result !== undefined ? '=' + m.result : '')).slice(-6),
+              consent: (window.kaizuAutoconsent?.messages ?? []).filter(m => m.type != 'eval').map(m => m.type + (m.cmp ? ':' + m.cmp : '') + (m.result !== undefined ? '=' + m.result : '')).slice(-6),
               oneTap: !!document.querySelector('iframe[src*="accounts.google.com/gsi/iframe/select"]') && getComputedStyle(document.querySelector('iframe[src*="accounts.google.com/gsi/iframe/select"]')).display != 'none'})
             """
         let settling = environment["KAIZU_SITE_WAIT"].flatMap(Double.init) ?? 2.5
