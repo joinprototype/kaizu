@@ -18,7 +18,7 @@ final class BrowserTab: NSObject, Identifiable {
     var favicon: NSImage?
     var isLoading = false
     var progress = 0.0
-    private(set) var isDiscarded = false
+    var isDiscarded = false
     var canGoBack = false
     var canGoForward = false
     /// Last captured picture of the page, for the ⌃Tab switcher.
@@ -36,30 +36,30 @@ final class BrowserTab: NSObject, Identifiable {
     /// screen. Never simply the one in front: a private page's popup could
     /// land outside its window, with its cookies and into the session.
     var store: BrowserStore? { app.map { $0.store(showing: self) ?? $0.store(for: profile) } }
-    @ObservationIgnored private var _webView: WKWebView?
+    @ObservationIgnored private(set) var _webView: WKWebView?
     /// This tab's own controller, so content blocking can differ per site.
-    @ObservationIgnored private var contentController: WKUserContentController?
+    @ObservationIgnored private(set) var contentController: WKUserContentController?
     /// Back/forward list, scroll position and form data to restore when the
     /// web view is next created (after a relaunch or waking from hibernation).
     @ObservationIgnored var savedState: Data?
-    @ObservationIgnored private var leavingForQuit = false
+    @ObservationIgnored var leavingForQuit = false
     @ObservationIgnored private var pendingConfiguration: WKWebViewConfiguration?
-    @ObservationIgnored private var observations: [NSKeyValueObservation] = []
+    @ObservationIgnored var observations: [NSKeyValueObservation] = []
     /// Bumped when the web view is replaced, so views showing `webView` pick
     /// up the new one.
-    private var webViewRevision = 0
+    var webViewRevision = 0
     /// Set when the web view was built for an extension's pages.
-    @ObservationIgnored private var extensionBaseURL: URL?
+    @ObservationIgnored private(set) var extensionBaseURL: URL?
     /// The last URL we cleaned of tracking parameters; a redirect straight
     /// back to it with the parameters is let through, so servers that add
     /// them back can't make us loop. Cleared once a page finishes.
-    @ObservationIgnored private var lastStrippedURL: URL?
+    @ObservationIgnored var lastStrippedURL: URL?
     /// When the page's web content process last died, to stop reload loops.
-    @ObservationIgnored private var lastCrash: Date?
+    @ObservationIgnored var lastCrash: Date?
     /// Iframes that have played media on this page, so mute reaches them.
-    @ObservationIgnored private var mediaFrames: [WKFrameInfo] = []
+    @ObservationIgnored var mediaFrames: [WKFrameInfo] = []
     /// Its video was floated automatically on switching away.
-    @ObservationIgnored private var isInAutoPictureInPicture = false
+    @ObservationIgnored var isInAutoPictureInPicture = false
 
     init(
         id: UUID = UUID(),
@@ -114,10 +114,10 @@ final class BrowserTab: NSObject, Identifiable {
     @ObservationIgnored var linkDestination: LinkDestination?
     /// Made from WebKit's configuration for `window.open`. It's left alone:
     /// rebuilding it would cut it off from the page that opened it.
-    private var isPopupPage = false
+    private(set) var isPopupPage = false
 
     /// Notifications from this page you haven't looked at. Not saved.
-    private(set) var unreadNotifications = 0 {
+    var unreadNotifications = 0 {
         didSet { app?.updateDockBadge() }
     }
 
@@ -200,331 +200,12 @@ final class BrowserTab: NSObject, Identifiable {
     }
 
     /// Replaces the web view and loads `target` in the new one.
-    private func reopen(at target: URL) {
+    func reopen(at target: URL) {
         teardown()
         savedState = nil
         url = target
         activate()
         webViewRevision += 1
-    }
-
-    // MARK: - Navigation
-
-    func load(_ url: URL) {
-        self.url = url
-        if let _webView {
-            _webView.load(URLRequest(url: url))
-        } else {
-            savedState = nil
-            activate()
-        }
-    }
-
-    func goBack() { _webView?.goBack() }
-    func goForward() { _webView?.goForward() }
-    func stopLoading() { _webView?.stopLoading() }
-
-    func reload(fromOrigin: Bool = false) {
-        guard !isDiscarded else { return }
-        guard let _webView else { return activate() }
-        if fromOrigin {
-            _webView.reloadFromOrigin()
-        } else {
-            _webView.reload()
-        }
-    }
-
-    func zoom(by delta: Double) {
-        guard let _webView else { return }
-        setZoom(min(max(_webView.pageZoom + delta, 0.5), 3))
-    }
-
-    func resetZoom() {
-        setZoom(1)
-    }
-
-    /// Applies and remembers the zoom for this site (not from private windows).
-    private func setZoom(_ zoom: Double) {
-        _webView?.pageZoom = zoom
-        if !profile.isPrivate {
-            app?.settings.setZoom(zoom, for: url)
-        }
-        if self === store?.selectedTab {
-            store?.showToast("\(Int((zoom * 100).rounded()))%", symbol: "magnifyingglass")
-        }
-    }
-
-    /// Selects the next (or previous) match, wrapping around. Returns whether there was one.
-    func find(_ query: String, backwards: Bool) async -> Bool {
-        guard let _webView else { return false }
-        let configuration = WKFindConfiguration()
-        configuration.backwards = backwards
-        configuration.caseSensitive = false
-        configuration.wraps = true
-        return (try? await _webView.find(query, configuration: configuration))?.matchFound ?? false
-    }
-
-    // MARK: - Lifecycle
-
-    /// The live page's back/forward list and scroll position, or what's waiting to be restored.
-    var currentState: Data? {
-        if leavingForQuit { return savedState }
-        return (_webView?.interactionState as? Data) ?? savedState
-    }
-
-    /// Capture the real page before WebKit navigates away to deliver pagehide.
-    func preparePageForQuit() -> WKWebView? {
-        guard !profile.isPrivate, !leavingForQuit, let view = _webView,
-              let scheme = view.url?.scheme, scheme == "https" || scheme == "http" else { return nil }
-        savedState = currentState
-        leavingForQuit = true
-        observations.forEach { $0.invalidate() }
-        observations.removeAll()
-        view.uiDelegate = nil
-        return view
-    }
-
-    /// Frees the web view's memory; the tab wakes up where it was when shown again.
-    func hibernate() {
-        guard isLoaded else { return }
-        savedState = currentState
-        teardown()
-    }
-
-    /// Closed for good: torn down, and never given a new web view, even by
-    /// a view still fading out with it (which would load the page again).
-    func discard() {
-        isDiscarded = true
-        markNotificationsRead()
-        teardown()
-    }
-
-    func printPage() {
-        guard let _webView, let window = _webView.window else { return }
-        let operation = _webView.printOperation(with: .shared)
-        // WKWebView's print view starts with a zero frame and prints blank pages otherwise.
-        operation.view?.frame = _webView.bounds
-        operation.runModal(for: window, delegate: nil, didRun: nil, contextInfo: nil)
-    }
-
-    /// Saves the whole page as one PDF, asking where (Safari's Export as PDF).
-    func exportPDF() {
-        guard let _webView, let window = _webView.window else { return }
-        let panel = NSSavePanel()
-        panel.allowedContentTypes = [.pdf]
-        panel.nameFieldStringValue = displayTitle.replacingOccurrences(of: "/", with: "-") + ".pdf"
-        panel.beginSheetModal(for: window) { response in
-            guard response == .OK, let destination = panel.url else { return }
-            Task { @MainActor in
-                do {
-                    try await _webView.pdf().write(to: destination, options: .atomic)
-                } catch {
-                    let alert = NSAlert(error: error)
-                    alert.messageText = "Couldn't export the page as PDF"
-                    alert.beginSheetModal(for: window, completionHandler: nil)
-                }
-            }
-        }
-    }
-
-    /// The visible part of the page (or `rect` of it, in the view's
-    /// top-left-origin points), as an image.
-    func screenshot(of rect: CGRect? = nil) async -> NSImage? {
-        guard let _webView, _webView.window != nil else { return nil }
-        let configuration = WKSnapshotConfiguration()
-        if let rect {
-            configuration.rect = rect
-        }
-        return try? await _webView.takeSnapshot(configuration: configuration)
-    }
-
-    /// Snapshots the page for the ⌃Tab switcher. Call while it's on screen.
-    func captureThumbnail() {
-        guard let _webView, _webView.window != nil else { return }
-        let configuration = WKSnapshotConfiguration()
-        configuration.snapshotWidth = 360
-        Task {
-            if let image = try? await _webView.takeSnapshot(configuration: configuration) {
-                thumbnail = image
-            }
-        }
-    }
-
-    /// Media in `frame` started or stopped (from `MediaEvents`).
-    func mediaDidChange(in frame: WKFrameInfo) {
-        if !frame.isMainFrame {
-            mediaFrames = Array((mediaFrames + [frame]).suffix(8))
-        }
-        if isMuted {
-            applyMute(in: frame)
-        }
-        Task {
-            // Let the page's player settle (a pause can briefly still report playing).
-            try? await Task.sleep(for: .milliseconds(300))
-            await refreshMediaState()
-        }
-    }
-
-    /// Floats the page's main playing video (audible, the largest) in picture
-    /// in picture. Scripts the app runs count as a user gesture, which the
-    /// Picture-in-Picture API requires. Call before switching away, while
-    /// the page is still on screen: the script is sent right away.
-    func enterPictureInPicture() {
-        let script = """
-        (() => {
-          if (document.pictureInPictureElement) return false;
-          const video = [...document.querySelectorAll('video')]
-            .filter((v) => !v.paused && !v.ended && !v.muted && v.readyState > 2)
-            .sort((a, b) => b.clientWidth * b.clientHeight - a.clientWidth * a.clientHeight)[0];
-          if (!video) return false;
-          if (video.webkitSupportsPresentationMode?.('picture-in-picture')) {
-            video.webkitSetPresentationMode('picture-in-picture');
-          } else {
-            video.requestPictureInPicture();
-          }
-          return true;
-        })()
-        """
-        _webView?.evaluateJavaScript(script, in: nil, in: .defaultClient) { [weak self] result in
-            self?.isInAutoPictureInPicture = (try? result.get()) as? Bool == true
-        }
-    }
-
-    /// Puts a video floated by `enterPictureInPicture` back in its page.
-    func exitPictureInPicture() {
-        guard isInAutoPictureInPicture else { return }
-        isInAutoPictureInPicture = false
-        let script = """
-        (() => {
-          const video = document.pictureInPictureElement;
-          if (!video) return;
-          if (video.webkitPresentationMode === 'picture-in-picture') video.webkitSetPresentationMode('inline');
-          else document.exitPictureInPicture();
-        })()
-        """
-        _webView?.evaluateJavaScript(script, in: nil, in: .defaultClient)
-    }
-
-    func toggleMute() {
-        isMuted.toggle()
-        applyMute(in: nil)
-        mediaFrames.forEach { applyMute(in: $0) }
-    }
-
-    private func applyMute(in frame: WKFrameInfo?) {
-        _webView?.evaluateJavaScript("window.kaizuSetMuted?.(\(isMuted))", in: frame, in: .defaultClient)
-    }
-
-    func refreshMediaState() async {
-        guard let _webView else { return }
-        let playing = await isPlayingSound(in: _webView)
-        if playing != isPlayingMedia { isPlayingMedia = playing }
-    }
-
-    /// Sound, or what would be if you hadn't muted the tab. WebKit calls a
-    /// silent video playing too, and pages autoplay those: NYT, YouTube and
-    /// Amazon's home pages kept half of ten tabs' memory from hibernating.
-    private func isPlayingSound(in webView: WKWebView) async -> Bool {
-        await webView.requestMediaPlaybackState() == .playing && (isMuted || webView.isAudible)
-    }
-
-    func pauseMedia() {
-        _webView?.pauseAllMediaPlayback(completionHandler: nil)
-        isPlayingMedia = false
-    }
-
-    /// Your answer about a site's notifications. Private windows don't read
-    /// any: every site there is one that hasn't been asked.
-    func notificationAnswer(for host: String) -> Bool? {
-        profile.isPrivate ? nil : app?.settings.sitePermissions[host]?[SiteNotifications.permission]
-    }
-
-    /// The site this tab could hear from in the background, if it's allowed
-    /// to notify you. See `AppModel.notifyingTabs`.
-    var notifyingHost: String? {
-        // The web view knows a new page before `url` catches up.
-        guard !isPopupPage, let host = (_webView?.url ?? url)?.host(), notificationAnswer(for: host) == true
-        else { return nil }
-        return host
-    }
-
-    /// A site's answer about notifications, from the page's question or the
-    /// site popover. macOS is asked too, the first time one is allowed.
-    func setNotifications(_ allowed: Bool?, for host: String) {
-        app?.settings.setPermission(SiteNotifications.permission, to: allowed, on: host)
-        guard allowed == true else { return }
-        Task {
-            let macOS = await SiteNotifications.requestDelivery()
-            if macOS == false {
-                store?.showToast("Turn on notifications for Kaizu in System Settings", symbol: "bell.slash")
-            } else if needsRebuildToNotify {
-                store?.showToast(
-                    "Reload so this site can reach you from the background",
-                    symbol: "bell",
-                    undo: { self.rebuildToNotify() },
-                    actionTitle: "Reload",
-                    lasts: .seconds(8)
-                )
-            } else if macOS == nil {
-                store?.showToast("They’ll show on this tab and in the Dock", symbol: "bell")
-            }
-        }
-    }
-
-    /// Marks a notification on the tab until you look at it, unless you
-    /// already are. When macOS wouldn't take it, the Dock icon asks instead.
-    func noteNotification(deliveredByMacOS delivered: Bool) {
-        guard let app, !(NSApp.isActive && app.store(showing: self) != nil) else { return }
-        unreadNotifications += 1
-        if !delivered {
-            NSApp.requestUserAttention(.informationalRequest)
-        }
-    }
-
-    func markNotificationsRead() {
-        if unreadNotifications > 0 {
-            unreadNotifications = 0
-        }
-    }
-
-    /// Allowed since its web view was made, or arrived here by a link, so
-    /// it would still be paused in the background: WebKit only reads that
-    /// setting at creation.
-    var needsRebuildToNotify: Bool {
-        guard let _webView, notifyingHost != nil else { return false }
-        return _webView.configuration.preferences.inactiveSchedulingPolicy != .throttle
-    }
-
-    /// Reloads the page in a web view that keeps running, back/forward intact.
-    func rebuildToNotify() {
-        hibernate()
-        webViewRevision += 1
-        activate()
-    }
-
-    /// A muted capture session can resume. Reading this must not wake an unloaded tab.
-    var isCapturingMedia: Bool {
-        guard let _webView else { return false }
-        return _webView.cameraCaptureState != .none || _webView.microphoneCaptureState != .none
-    }
-
-    /// Whether the page is playing sound or using the camera/microphone,
-    /// so it must not be hibernated.
-    var isBusy: Bool {
-        get async {
-            guard let _webView else { return false }
-            if isCapturingMedia { return true }
-            return await isPlayingSound(in: _webView)
-        }
-    }
-
-    /// Drops the web view but keeps the tab around (used for pinned tabs):
-    /// a fresh start at its pinned address.
-    func unload() {
-        markNotificationsRead()
-        teardown()
-        savedState = nil
-        if let pinnedURL { url = pinnedURL }
     }
 
     func teardown() {
@@ -550,271 +231,5 @@ final class BrowserTab: NSObject, Identifiable {
 
     var record: TabRecord {
         TabRecord(id: id, title: title, url: url, pinnedURL: pinnedURL, lastActiveAt: lastActiveAt, customTitle: customTitle, arcItemID: arcItemID)
-    }
-
-    // MARK: - State sync
-
-    private func watch<Value>(_ webView: WKWebView, _ keyPath: KeyPath<WKWebView, Value>) -> NSKeyValueObservation {
-        webView.observe(keyPath) { [weak self] webView, _ in
-            MainActor.assumeIsolated {
-                self?.sync(with: webView)
-            }
-        }
-    }
-
-    private func sync(with webView: WKWebView) {
-        if let newTitle = webView.title, !newTitle.isEmpty, newTitle != title {
-            title = newTitle
-            app?.scheduleSave()
-            app?.extensions.didChange(.title, for: self)
-        }
-        if let newURL = webView.url, newURL != url {
-            if newURL.host() != url?.host() {
-                favicon = newURL.host().flatMap { FaviconStore.shared.cachedImage(for: $0) }
-            }
-            url = newURL
-            app?.scheduleSave()
-            app?.extensions.didChange(.URL, for: self)
-        }
-        update(\.isLoading, webView.isLoading)
-        update(\.progress, webView.estimatedProgress)
-        update(\.canGoBack, webView.canGoBack)
-        update(\.canGoForward, webView.canGoForward)
-    }
-
-    /// Avoids invalidating SwiftUI views when KVO reports an unchanged value.
-    private func update<T: Equatable>(_ keyPath: ReferenceWritableKeyPath<BrowserTab, T>, _ value: T) {
-        if self[keyPath: keyPath] != value {
-            self[keyPath: keyPath] = value
-        }
-    }
-
-    private func loadFavicon(from webView: WKWebView) async {
-        guard let pageURL = webView.url, let host = pageURL.host() else { return }
-        // Not in the page's world, where a script of ours counts as a click:
-        // a page hooking the DOM could spend it on asking for permissions.
-        let href = (try? await webView.evaluateJavaScript(FaviconStore.discoveryScript, contentWorld: .defaultClient)) as? String
-        let candidates = [
-            href.flatMap { $0.isEmpty ? nil : URL(string: $0, relativeTo: pageURL) },
-            URL(string: "/favicon.ico", relativeTo: pageURL),
-        ].compactMap { $0 }
-        for candidate in candidates {
-            if let image = await FaviconStore.shared.fetch(candidate, host: host, remember: !profile.isPrivate) {
-                if url?.host() == host { favicon = image }
-                return
-            }
-        }
-    }
-
-    static func makeConfiguration(for profile: Profile) -> WKWebViewConfiguration {
-        let configuration = WKWebViewConfiguration()
-        configuration.websiteDataStore = profile.dataStore
-        configuration.applicationNameForUserAgent = UserAgent.safariSuffix
-        configuration.preferences.isElementFullscreenEnabled = true
-        // HTTPS-first: upgrade every navigation, fall back to HTTP only if it fails.
-        configuration.upgradeKnownHostsToHTTPS = true
-        configuration.defaultWebpagePreferences.preferredHTTPSNavigationPolicy = .automaticFallbackToHTTP
-        if #available(macOS 27.0, *) {
-            // "Do not sell or share my data" signal (Sec-GPC header + navigator.globalPrivacyControl).
-            configuration.defaultWebpagePreferences.globalPrivacyControlEnabled = true
-        }
-        return configuration
-    }
-}
-
-// MARK: - WKNavigationDelegate
-
-extension BrowserTab: WKNavigationDelegate {
-    /// WebKit gives buttons as bit flags, not the usual numbers: 2 here is
-    /// the right button, as with any link opened from the page's menu.
-    private static let middleButton = 4
-
-    func webView(
-        _ webView: WKWebView,
-        decidePolicyFor navigationAction: WKNavigationAction,
-        decisionHandler: @escaping @MainActor @Sendable (WKNavigationActionPolicy) -> Void
-    ) {
-        if navigationAction.shouldPerformDownload {
-            return decisionHandler(.download)
-        }
-        guard let target = navigationAction.request.url else {
-            return decisionHandler(.allow)
-        }
-
-        // mailto:, zoommtg:, etc. go to whatever app handles them.
-        let webSchemes: Set = ["http", "https", "about", "blob", "data", "file", "javascript", "webkit-extension"]
-        if let scheme = target.scheme?.lowercased(), !webSchemes.contains(scheme) {
-            decisionHandler(.cancel)
-            // A click on the page opens the app; a script asks first (like
-            // Safari); a click in an iframe (ads) can't open apps at all.
-            // (A click always has a source frame.)
-            if navigationAction.navigationType == .linkActivated {
-                if navigationAction.sourceFrame.isMainFrame {
-                    NSWorkspace.shared.open(target)
-                }
-            } else if navigationAction.targetFrame?.isMainFrame != false {
-                confirmOpeningApp(for: target)
-            }
-            return
-        }
-
-        if navigationAction.targetFrame?.isMainFrame == true {
-            // Crossing between web pages and extension pages needs a web view
-            // built for the other side (WebKit cancels the load otherwise).
-            let targetExtension = app?.extensions.controller.extensionContext(for: target)?.baseURL
-            // An extension page restored before its extension has loaded:
-            // wait (`reopenExtensionPage()` runs once extensions are in).
-            if target.scheme == "webkit-extension", targetExtension == nil {
-                return decisionHandler(.cancel)
-            }
-            if targetExtension != extensionBaseURL {
-                decisionHandler(.cancel)
-                if !profile.isPrivate {
-                    Task { self.reopen(at: target) }
-                }
-                return
-            }
-            // Favorites and pinned tabs peek links to other sites instead of leaving.
-            // (⌘-click and middle-click still mean "background tab", handled below.)
-            // Shift-click peeks any link, from any tab.
-            let opensElsewhere = navigationAction.modifierFlags.contains(.command) || navigationAction.buttonNumber == Self.middleButton
-            let wantsPeek = navigationAction.modifierFlags.contains(.shift)
-            if navigationAction.navigationType == .linkActivated, !opensElsewhere, let store, store.peek !== self,
-               wantsPeek || (store.peeksLinks(from: self) && target.siteKey != webView.url?.siteKey) {
-                store.peek(TrackingParameters.stripped(target) ?? target, from: self)
-                return decisionHandler(.cancel)
-            }
-            // Strip click-tracking parameters (utm_*, fbclid…) from links and typed URLs.
-            if [.linkActivated, .other].contains(navigationAction.navigationType), !opensElsewhere,
-               (navigationAction.request.httpMethod ?? "GET") == "GET",
-               let cleaned = TrackingParameters.stripped(target),
-               !(navigationAction.navigationType == .other && cleaned == lastStrippedURL) {
-                lastStrippedURL = cleaned
-                decisionHandler(.cancel)
-                webView.load(URLRequest(url: cleaned))
-                return
-            }
-        }
-
-        // ⌘-click / middle-click opens in a background tab.
-        let flags = navigationAction.modifierFlags
-        if navigationAction.navigationType == .linkActivated,
-           flags.contains(.command) || navigationAction.buttonNumber == Self.middleButton {
-            store?.openTab(TrackingParameters.stripped(target) ?? target, after: self, select: flags.contains(.shift))
-            return decisionHandler(.cancel)
-        }
-
-        if navigationAction.targetFrame?.isMainFrame == true, let contentController, let blocker = app?.contentBlocker {
-            blocker.whenReady(for: target, privateID: profile.privateID) {
-                blocker.prepare(contentController, for: target)
-                decisionHandler(.allow)
-            }
-            return
-        }
-        decisionHandler(.allow)
-    }
-
-    func webView(
-        _ webView: WKWebView,
-        decidePolicyFor navigationResponse: WKNavigationResponse,
-        decisionHandler: @escaping @MainActor @Sendable (WKNavigationResponsePolicy) -> Void
-    ) {
-        let disposition = (navigationResponse.response as? HTTPURLResponse)?
-            .value(forHTTPHeaderField: "Content-Disposition")?
-            .lowercased() ?? ""
-        if navigationResponse.isForMainFrame,
-           !navigationResponse.canShowMIMEType || disposition.hasPrefix("attachment") {
-            return decisionHandler(.download)
-        }
-        decisionHandler(.allow)
-    }
-
-    func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
-        download.delegate = DownloadManager.shared
-    }
-
-    func webView(_ webView: WKWebView, navigationResponse: WKNavigationResponse, didBecome download: WKDownload) {
-        download.delegate = DownloadManager.shared
-    }
-
-    func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
-        // Each site keeps its own zoom.
-        let zoom = app?.settings.zoom(for: webView.url) ?? 1
-        if webView.pageZoom != zoom { webView.pageZoom = zoom }
-        // A new page: forget the old one's frames, and stay muted.
-        mediaFrames = []
-        if isMuted {
-            applyMute(in: nil)
-        }
-        // Picking items belongs to the page it started on.
-        if store?.hidingItemsTabID == id {
-            store?.endHidingItems()
-        }
-        applyHiddenItems(in: webView)
-    }
-
-    /// The site's hidden items, as early as the page allows and again once
-    /// it's in (in case it replaced its head).
-    private func applyHiddenItems(in webView: WKWebView) {
-        let selectors = app?.settings.hiddenItems(on: webView.url) ?? []
-        if !selectors.isEmpty {
-            HiddenItems.apply(selectors, in: webView)
-        }
-    }
-
-    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        lastStrippedURL = nil
-        sync(with: webView)
-        applyHiddenItems(in: webView)
-        if let history = app?.history, let url = webView.url, !profile.isPrivate {
-            let (profileID, title) = (profile.id, webView.title ?? "")
-            Task { await history.recordVisit(profile: profileID, url: url, title: title) }
-        }
-        Task { await loadFavicon(from: webView) }
-    }
-
-    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: any Error) {
-        sync(with: webView)
-        let error = error as NSError
-        if error.code == NSURLErrorCancelled { return }
-        // 102: interrupted by a download / policy change. 204: handled by a media plug-in.
-        if error.domain == "WebKitErrorDomain", [102, 204].contains(error.code) { return }
-        let failingURL = (error.userInfo[NSURLErrorFailingURLErrorKey] as? URL) ?? url
-        let host = logHost(failingURL)
-        Log.navigation.error("Couldn't load \(host, privacy: .private(mask: .hash)): \(error.domain, privacy: .public) \(error.code)")
-        webView.loadHTMLString(ErrorPage.html(for: error, url: failingURL), baseURL: failingURL)
-    }
-
-    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
-        let host = logHost(url)
-        // Off screen this is usually macOS reclaiming memory: stay unloaded
-        // until the tab is shown again.
-        guard webView.window != nil else {
-            Log.navigation.info("Page process ended off screen (\(host, privacy: .private(mask: .hash))): unloading the tab")
-            return hibernate()
-        }
-        defer { lastCrash = Date() }
-        if let lastCrash, Date().timeIntervalSince(lastCrash) < 10 {
-            Log.navigation.error("Page keeps crashing (\(host, privacy: .private(mask: .hash))): showing the error page")
-            let error = NSError(domain: "Kaizu", code: 1, userInfo: [NSLocalizedDescriptionKey: "This page keeps crashing."])
-            webView.loadHTMLString(ErrorPage.html(for: error, url: url), baseURL: url)
-        } else {
-            Log.navigation.error("Page crashed (\(host, privacy: .private(mask: .hash))): reloading")
-            webView.reload()
-        }
-    }
-
-    /// A page's host for the log (hashed there), never a private window's.
-    private func logHost(_ url: URL?) -> String {
-        profile.isPrivate ? "private window" : url?.host() ?? "no host"
-    }
-}
-
-private extension WKWebView {
-    /// WebKit's own answer to whether the page can be heard. It has no public
-    /// name, so without it a tab goes by the playback state alone.
-    var isAudible: Bool {
-        let key = "_isPlayingAudio"
-        return responds(to: NSSelectorFromString(key)) ? value(forKey: key) as? Bool ?? true : true
     }
 }
