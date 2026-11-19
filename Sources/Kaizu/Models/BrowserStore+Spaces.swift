@@ -7,6 +7,7 @@ extension BrowserStore {
     /// (see SpacePager); `animation` is the swipe's spring when one ends it.
     func switchTo(_ space: Space, animation: Animation? = Motion.glide) {
         guard space.id != activeSpaceID else { return }
+        sounds.play(.switchSpace)
         let previousTab = selectedTab
         let from = spaces.firstIndex { $0.id == activeSpaceID } ?? 0
         let leaving = activeSpaceID

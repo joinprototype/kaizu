@@ -209,6 +209,7 @@ final class BrowserStore {
     }
 
     var settings: Settings { app.settings }
+    var sounds: SoundPlayer { app.sounds }
     var contentBlocker: ContentBlocker { app.contentBlocker }
     var extensions: ExtensionHost { app.extensions }
     var history: HistoryStore? { app.history }
@@ -290,6 +291,9 @@ final class BrowserStore {
 
     func showCommandBar(_ mode: CommandBarMode) {
         window?.makeKeyAndOrderFront(nil)
+        if commandBar == nil {
+            sounds.play(.commandBar)
+        }
         withAnimation(Motion.pop) {
             commandBar = mode
         }
@@ -359,6 +363,7 @@ final class BrowserStore {
             NSApp.activate()
         default:
             openTab(url)
+            sounds.play(.openTab)
         }
     }
 

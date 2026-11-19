@@ -124,6 +124,13 @@ extension BrowserStore {
 
     // MARK: - Closing
 
+    /// ⌘W, a row's close button or its menu. A page's `window.close()` and
+    /// extensions use `close` and stay silent, since they can repeat it.
+    func userClose(_ tab: BrowserTab) {
+        sounds.play(.closeTab)
+        close(tab)
+    }
+
     /// Today tabs close for good (⇧⌘T brings them back); favorites and pinned
     /// tabs stay and reset to their saved address, like Arc.
     func close(_ tab: BrowserTab) {
@@ -208,7 +215,7 @@ extension BrowserStore {
         } else if peek != nil {
             closePeek()
         } else if let selectedTab {
-            close(selectedTab)
+            userClose(selectedTab)
         } else {
             window?.performClose(nil)
         }
@@ -264,6 +271,7 @@ extension BrowserStore {
                 ?? spaces.first { $0.profile.id == closed.profileID }
             guard let space else { continue }
             reopen(closed.record, in: space, navigationState: closed.navigationState)
+            sounds.play(.openTab)
             return
         }
     }
@@ -279,6 +287,7 @@ extension BrowserStore {
         // Dropped on its own row: it's already there.
         guard destination.before != tab.id else { return }
         let space = space ?? activeSpace
+        let wasPinned = tab.pinnedURL != nil
         // The same curve as the gap that opened for it.
         withAnimation(Motion.glide) {
             detach(tab)
@@ -297,6 +306,10 @@ extension BrowserStore {
                 tab.pinnedURL = nil
                 space.today.insert(tab, before: before)
             }
+        }
+        // Only for a change of state: reordering is the rows' own business.
+        if wasPinned != (tab.pinnedURL != nil) {
+            sounds.play(wasPinned ? .unpin : .pin)
         }
         scheduleSave()
     }

@@ -30,6 +30,7 @@ extension BrowserStore {
             guard canAddSplitPane else { return }
             space.splitLayout = space.splitLayout?.appending(tab.id)
         }
+        sounds.play(.split)
         takeOver(tab)
         withAnimation(Motion.glide) {
             select(tab, in: space)
@@ -71,6 +72,7 @@ extension BrowserStore {
     func split(_ target: BrowserTab, with id: UUID, at place: SplitPlace) {
         guard canSplit(target, with: id), let tab = tab(TabDrag(id: id)) else { return }
         let space = activeSpace
+        sounds.play(.split)
         takeOver(tab)
         withAnimation(Motion.glide) {
             space.splitLayout = space.layout(of: space.panes(with: target)).placing(id, at: place)
