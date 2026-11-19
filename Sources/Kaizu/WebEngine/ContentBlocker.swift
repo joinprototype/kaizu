@@ -2,7 +2,8 @@ import OSLog
 import WebKit
 
 /// Built-in ad, tracker and cookie-banner blocking, YouTube ad removal, and
-/// automatic rejection of cookie consent pop-ups (DuckDuckGo's autoconsent).
+/// automatic rejection of cookie consent pop-ups (DuckDuckGo's autoconsent,
+/// see `AutoconsentBridge`).
 ///
 /// Filter lists are converted to WebKit content rules, compiled once (see
 /// `RuleListCompiler`) and cached by WebKit. Each tab gets its own user
@@ -66,6 +67,7 @@ final class ContentBlocker {
     func start() {
         guard state == .idle else { return }
         state = .preparing
+        AutoconsentBridge.warmUp()
         importedLists.didChange = { [weak self] in self?.rulesDidChange() }
         Task {
             await importedLists.restore()
@@ -182,6 +184,7 @@ final class ContentBlocker {
         installed[key] = nil
         pages[key] = Page(privateID: privateID)
         controllers.add(controller)
+        AutoconsentBridge.install(on: controller)
         install(on: controller)
         return controller
     }
@@ -217,7 +220,7 @@ final class ContentBlocker {
                 controller.addUserScript(script)
             }
         }
-        if wanted.cookieRejection, let script = Self.autoconsentScript {
+        if wanted.cookieRejection, let script = AutoconsentBridge.script {
             controller.addUserScript(script)
         }
     }
@@ -309,11 +312,9 @@ final class ContentBlocker {
     }
 
     private static let youTubeScript = pageScript(named: "youtube-ads")
-    /// Runs in every frame: many consent pop-ups live in iframes.
-    private static let autoconsentScript = pageScript(named: "autoconsent")
 
     /// A bundled script injected at document start into all frames, in the
-    /// page's own JavaScript world (both scripts need the page's globals).
+    /// page's own JavaScript world (it needs the page's globals).
     private static func pageScript(named name: String) -> WKUserScript? {
         guard let url = BundledResource.url(named: name, extension: "js", in: "Scripts"),
               let source = try? String(contentsOf: url, encoding: .utf8)
