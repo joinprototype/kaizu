@@ -79,6 +79,7 @@ enum DebugHooks {
         case "learn": qaLearn(store)
         case "reader": qaReader(store)
         case "pin": qaPin(store)
+        case "crossing": qaCrossing(store)
         case "split": qaSplit(store)
         case "splitdrop": qaSplitDrop(store)
         case "capture": qaCapture(store)
@@ -156,7 +157,7 @@ enum DebugHooks {
 
     /// Runs a CI check, then quits. A thrown error is logged under `name`
     /// and fails the run.
-    private static func runCheck(_ name: String = "", _ check: @escaping () async throws -> Void) {
+    static func runCheck(_ name: String = "", _ check: @escaping () async throws -> Void) {
         Task {
             do {
                 try await check()
