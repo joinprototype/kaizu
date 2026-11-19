@@ -117,6 +117,7 @@ private struct NewTabRow: View {
         .foregroundStyle(.secondary)
         .sidebarRow(isHovering: isHovering)
         .onTapGesture { store.showCommandBar(.newTab) }
+        .accessibleRow("New Tab") { store.showCommandBar(.newTab) }
         .onHoverFade($isHovering)
     }
 }
