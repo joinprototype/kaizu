@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+In the command bar, ⌘↩ opens the chosen page in a background tab and ⌥↩ opens it beside the current page in a split. The hints at the bottom of the bar show them while a page is selected.
+
 On a Force Touch trackpad, Kaizu taps lightly when a drag lands somewhere: a tab reaching a gap in the sidebar or a new place in a split, and a split divider reaching the point where its two panes are the same size, where it now also holds for a moment.
 
 Hold ⌘ for a moment and the sidebar shows which tab each of ⌘1–9 goes to: the first eight visible tabs, from Favorites down, and ⌘9 for the last. The numbers go away when you let go, press a key or click.
