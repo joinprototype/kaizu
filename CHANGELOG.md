@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+In the command bar, ⌘↩ opens the chosen page in a background tab and ⌥↩ opens it beside the current page in a split. The hints at the bottom of the bar show them while a page is selected.
+
+On a Force Touch trackpad, Kaizu taps lightly when a drag lands somewhere: a tab reaching a gap in the sidebar or a new place in a split, and a split divider reaching the point where its two panes are the same size, where it now also holds for a moment.
+
+Hold ⌘ for a moment and the sidebar shows which tab each of ⌘1–9 goes to: the first eight visible tabs, from Favorites down, and ⌘9 for the last. The numbers go away when you let go, press a key or click.
+
+VoiceOver can use the sidebar. Tabs, folders, favorites and New Tab read as buttons by name, say which one is selected, and open with VoiceOver's press; a tab's Close and Mute, which only show on hover, are in VoiceOver's actions (VO-⌘-Space), and folders say whether they're expanded. Icon buttons (Back, Reload, Copy Link, the shield, the space switcher, Remove in Settings, Show in Finder) are read by name instead of by icon, without their keyboard shortcut.
+
+Kaizu can watch part of a page for you, such as a price, a stock label or a score. Choose **View → Watch Part of Page…** (or "Watch" in the command bar, or from the site menu in the address bar) and click the part. About once an hour while Kaizu is running, it opens the page out of sight with that profile's sign-ins and the usual blocking, and tells you when the part's text changes: in a macOS notification where macOS allows it, otherwise with a message in the window, a bounce and a count on the Dock icon. Opening the page clears the count. **Settings → Watching** lists what's watched, what each part said before and when it changed, and parts Kaizu can no longer find. Only secure (https) pages in regular windows can be watched, up to 50 parts.
+
+Back and Forward now work between web pages and extension pages, such as an extension's settings. Each side needs its own kind of page view, so going from one to the other used to start the tab's history over. Kaizu now keeps the last 10 page views a tab left this way and steps into them when Back or Forward reaches the end. They're kept until you quit. The trackpad swipe still stops at the crossing.
+
+YouTube videos opened from a link outside YouTube, such as in Messages or Slack, now start in about the time a click inside YouTube takes. When YouTube had booked an ad for the page, Kaizu used to strip it but still had to wait out a black player for the ad’s length (5–15 s). Kaizu now has YouTube’s player load the same video again, asking for it without an ad, and keeps the link’s start time.
+
 Kaizu can play soft paper sounds: turn on **Settings → General → Play soft sounds**. They’re off by default. Opening the command bar unfolds a sheet, opening and closing tabs lays down and draws away a card, pinning presses the paper, switching spaces turns a page and splitting folds a crease. They play only for your own actions while Kaizu is in front, follow the macOS “Play user interface sound effects” setting and alert volume, and a held key or a quick run plays once.
 
 Cookie pop-up rejection now runs out of the page's reach. Kaizu loads DuckDuckGo's autoconsent library in a separate script world that pages can't see or change. Each frame receives only the rules that apply to its address, instead of the full 600 KB script and rule set. Across ten busy news and shopping sites, the pages used about 30% less CPU while loading. Memory use stayed about the same. Rejection worked as before on Cookiebot, CookieYes, Didomi, OneTrust, Sourcepoint and Usercentrics sites. The old in-page script is no longer bundled, so the app is about 600 KB smaller.

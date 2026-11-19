@@ -48,6 +48,9 @@ final class BrowserStore {
     var toast: Toast?
     /// Briefly true after Copy Link, so the address pill can flash "Copied".
     var didCopyLink = false
+    /// ⌘ held on its own: the sidebar shows each tab's ⌘1–9.
+    var showsTabNumbers = false
+    @ObservationIgnored var tabNumberTask: Task<Void, Never>?
 
     @ObservationIgnored weak var window: NSWindow?
     @ObservationIgnored var windowController: BrowserWindowController?
@@ -59,6 +62,12 @@ final class BrowserStore {
     var isPeekExpanding = false
     /// The tab whose items are being picked to hide.
     var hidingItemsTabID: UUID?
+    /// What the picker on `hidingItemsTabID` is choosing items for.
+    var pickingPurpose = HiddenItems.Purpose.hide
+    /// Bumped each time the picker opens, so a watch pick counts once and
+    /// its delayed close can't end a picker opened after it.
+    @ObservationIgnored var pickingSession = 0
+    @ObservationIgnored var watchPickedSession: Int?
     /// The color being tried in the space editor, shown on the window.
     var previewTheme: Theme?
     /// Likewise its light/dark choice.
@@ -93,6 +102,7 @@ final class BrowserStore {
         installEscapeMonitor()
         installSplitFocusMonitor()
         installSpaceSwipeMonitor()
+        installTabNumberMonitor()
         installTabSwitcherMonitor()
     }
 

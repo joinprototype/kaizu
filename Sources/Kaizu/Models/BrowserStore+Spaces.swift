@@ -254,6 +254,7 @@ extension BrowserStore {
         let id = profile.id
         Task { await history?.removeAll(profile: id) }
         app.forgetChoices(of: id)
+        app.watcher.forget(profile: id)
         Task {
             // WebKit refuses while the store is still in use; give it a moment to let go.
             for _ in 0..<5 {
