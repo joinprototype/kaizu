@@ -11,6 +11,8 @@ struct SettingsView: View {
                 .tabItem { Label("Privacy", systemImage: "hand.raised") }
             LinkSettings()
                 .tabItem { Label("Links", systemImage: "arrow.triangle.branch") }
+            WatchingSettings()
+                .tabItem { Label("Watching", systemImage: "eye") }
             ExtensionSettings()
                 .tabItem { Label("Extensions", systemImage: "puzzlepiece.extension") }
         }
