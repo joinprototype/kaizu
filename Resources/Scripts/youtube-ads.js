@@ -14,8 +14,11 @@
 //      an ad has run, YouTube books fewer for a while.
 //   2. Safety net for ads that do start, one or several in a row: hidden
 //      from the first frame (picture, badge, countdown, captions, controls),
-//      muted and run through quickly, pressing Skip when it's offered; then
-//      the user's sound, speed and place come back. Seeking an ad to its end
+//      muted and run through quickly; then the user's sound, speed and
+//      place come back. Speed alone gains little: YouTube holds the video
+//      back for the ad's real length (or until Skip). Skip, once offered, is
+//      pressed by Kaizu with a real click (youtube-skip.js), since YouTube
+//      ignores a press from script. Seeking an ad to its end
 //      no longer works: YouTube seeks it back and the player stays on the ad.
 //   3. Close the "Ad blockers violate YouTube's Terms" pop-up and resume the
 //      video it paused.
@@ -56,7 +59,10 @@
     '.html5-video-player .video-ads', '.html5-video-player [class*="ytp-ad-"]',
   ];
   const style = document.createElement('style');
-  style.textContent = `${hidden.join(',\n')} { opacity: 0 !important; pointer-events: none !important; }`;
+  // The Skip button stays see-through but takes clicks: YouTube ignores a
+  // press from script, so Kaizu sends it a real click (youtube-skip.js).
+  style.textContent = `${hidden.join(',\n')} { opacity: 0 !important; pointer-events: none !important; }\n`
+    + '.html5-video-player .ytp-skip-ad-button { pointer-events: auto !important; }';
   const addStyle = () => {
     if (style.isConnected) return;
     (document.head || document.documentElement)?.appendChild(style);

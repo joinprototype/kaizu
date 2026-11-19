@@ -186,6 +186,7 @@ final class ContentBlocker {
         pages[key] = Page(privateID: privateID)
         controllers.add(controller)
         AutoconsentBridge.install(on: controller)
+        YouTubeSkip.install(on: controller)
         install(on: controller)
         return controller
     }
@@ -218,6 +219,9 @@ final class ContentBlocker {
             }
             importedLists.install(on: controller)
             if let script = Self.youTubeScript {
+                controller.addUserScript(script)
+            }
+            if let script = YouTubeSkip.script {
                 controller.addUserScript(script)
             }
         }
