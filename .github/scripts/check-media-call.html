@@ -159,10 +159,11 @@ async function call() {
     }
 }
 
+// The controlled peer's pair can stay "in-progress" in its stats after media flows through it.
 function usesRelay(stats) {
     return [...stats.values()].some(report =>
-        report.type === "candidate-pair" && report.state === "succeeded" && report.nominated &&
-        stats.get(report.localCandidateId)?.candidateType === "relay");
+        report.type === "candidate-pair" && stats.get(report.localCandidateId)?.candidateType === "relay" &&
+        ((report.state === "succeeded" && report.nominated) || report.bytesReceived > 0));
 }
 
 // The hosted Mac sometimes draws the canvas without delivering any frames to the video source.
