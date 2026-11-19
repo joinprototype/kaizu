@@ -15,7 +15,7 @@ public enum FilterListConverter {
     }
 
     /// Bump when conversion output changes, so cached compiled lists are rebuilt.
-    public static let version = 3
+    public static let version = 4
 
     /// WebKit compiles far larger lists, but Safari caps content blockers at
     /// 150k rules and compile time grows with size.
@@ -36,6 +36,9 @@ private struct Parser {
     let includeCosmetic: Bool
     var blocking: [ContentRule] = []
     var exceptions: [ContentRule] = []
+    /// `$important` blocks: they go after the exceptions, which cancel only
+    /// the rules before them, so an `@@` filter can't override them.
+    var important: [ContentRule] = []
     var genericSelectors: [String] = []
     var seenGenericSelectors: Set<String> = []
     /// Selector → domains where an `#@#` exception turns it off.
@@ -75,6 +78,8 @@ private struct Parser {
             }
             if converted.isException {
                 exceptions += converted.rules
+            } else if converted.isImportant {
+                important += converted.rules
             } else {
                 blocking += converted.rules
             }
@@ -146,13 +151,14 @@ private struct Parser {
         let scopedDropped = max(0, scoped.count - Self.maxScopedCosmeticRules)
         cosmetic += scoped.prefix(Self.maxScopedCosmeticRules)
 
-        // Exceptions must always ship (and come last: ignore-previous-rules only
-        // cancels rules before it). Then network blocking, then cosmetic.
-        let budget = max(0, maxRules - exceptions.count)
+        // Exceptions must always ship (and come after the rules they cancel:
+        // ignore-previous-rules only cancels rules before it), then `$important`
+        // blocks, which must follow them. Then network blocking, then cosmetic.
+        let budget = max(0, maxRules - exceptions.count - important.count)
         let network = Array(blocking.prefix(budget))
         let hiding = Array(cosmetic.prefix(max(0, budget - network.count)))
         let dropped = (blocking.count - network.count) + (cosmetic.count - hiding.count) + scopedDropped
-        return .init(rules: network + hiding + exceptions, skipped: skipped + dropped + unexpressible)
+        return .init(rules: network + hiding + exceptions + important, skipped: skipped + dropped + unexpressible)
     }
 
     /// Whether two normalized domains (`*example.com`) cover some of the
@@ -204,7 +210,7 @@ private enum Selector {
         guard let first = selector.first, selector.utf8.count < 4_000 else { return false }
         // `+js(...)` scriptlets and `^` HTML filters aren't CSS.
         guard first != "+", first != "^" else { return false }
-        guard selector.unicodeScalars.allSatisfy({ $0.isASCII && $0 != "\\" }) else { return false }
+        guard selector.unicodeScalars.allSatisfy({ $0.isASCII }) else { return false }
 
         var brackets = 0
         var parens = 0
@@ -212,6 +218,13 @@ private enum Selector {
         var index = selector.startIndex
         while index < selector.endIndex {
             let character = selector[index]
+            if character == "\\" {
+                // CSS escape (Tailwind-style `.h-\[90px\]`, `#\30 _id`): skip it whole
+                // so an escaped bracket, quote or colon isn't read as syntax.
+                guard let next = escapeEnd(in: selector, backslashAt: index) else { return false }
+                index = next
+                continue
+            }
             if let open = quote {
                 if character == open { quote = nil }
             } else {
@@ -241,6 +254,22 @@ private enum Selector {
             index = selector.index(after: index)
         }
         return quote == nil && brackets == 0 && parens == 0
+    }
+
+    /// The index after the CSS escape starting at `backslashAt`: a backslash
+    /// plus one character, or plus up to six hex digits and one optional
+    /// space. Nil for a trailing backslash or an escaped line break (invalid).
+    private static func escapeEnd(in selector: String, backslashAt: String.Index) -> String.Index? {
+        var cursor = selector.index(after: backslashAt)
+        guard cursor < selector.endIndex, !selector[cursor].isNewline else { return nil }
+        guard selector[cursor].isHexDigit else { return selector.index(after: cursor) }
+        var digits = 0
+        while cursor < selector.endIndex, selector[cursor].isHexDigit, digits < 6 {
+            cursor = selector.index(after: cursor)
+            digits += 1
+        }
+        if cursor < selector.endIndex, selector[cursor] == " " { cursor = selector.index(after: cursor) }
+        return cursor
     }
 }
 
@@ -319,6 +348,10 @@ private enum NetworkFilter {
         var scope: DomainScope?
         var types: Set<String> = []
         var excludedTypes: Set<String> = []
+        var important = false
+        /// `$object` (plugins) has no WebKit type; fine beside other types, but
+        /// alone it must not widen into "every subresource".
+        var object = false
         var subdocument = false
         var excludesSubdocument = false
         var document = false
@@ -335,7 +368,11 @@ private enum NetworkFilter {
                 loadType = ["first-party"]
             case "match-case":
                 caseSensitive = true
-            case "important", "~object":
+            case "important":
+                important = true
+            case "object":
+                object = true
+            case "~object":
                 break
             case "domain", "from":
                 guard parts.count == 2, let parsed = DomainScope(parsing: parts[1], separator: "|"), !parsed.isEmpty else { return false }
@@ -359,7 +396,7 @@ private enum NetworkFilter {
         }
     }
 
-    static func rules(from line: String) -> (rules: [ContentRule], isException: Bool)? {
+    static func rules(from line: String) -> (rules: [ContentRule], isException: Bool, isImportant: Bool)? {
         var body = Substring(line)
         let isException = body.hasPrefix("@@")
         if isException { body = body.dropFirst(2) }
@@ -381,8 +418,9 @@ private enum NetworkFilter {
             // `@@||example.com^$document` turns blocking off on that site's
             // pages. Blocking whole pages isn't something we do silently.
             guard isException, let domain = plainDomain(body) else { return nil }
-            return ([ContentRule(trigger: .init(urlFilter: ".*", ifDomain: ["*" + domain]), action: action)], true)
+            return ([ContentRule(trigger: .init(urlFilter: ".*", ifDomain: ["*" + domain]), action: action)], true, false)
         }
+        if options.object, options.types.isEmpty, !options.subdocument { return nil }
 
         guard let urlFilter = urlFilter(for: body) else { return nil }
         // A match-anything pattern is only acceptable when scoped to sites;
@@ -415,7 +453,7 @@ private enum NetworkFilter {
             trigger.loadContext = ["child-frame"]
             rules.append(ContentRule(trigger: trigger, action: action))
         }
-        return rules.isEmpty ? nil : (rules, isException)
+        return rules.isEmpty ? nil : (rules, isException, options.important && !isException)
     }
 
     /// Filter options look like `script,third-party,domain=a.com|~b.com`.
