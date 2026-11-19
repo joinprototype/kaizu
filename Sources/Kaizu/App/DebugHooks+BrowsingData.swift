@@ -5,7 +5,7 @@ import BrowserCore
 extension DebugHooks {
     static func qaBrowsingData(_ store: BrowserStore) {
         func log(_ text: String) {
-            FileHandle.standardError.write(Data("QA browsing data: \(text)\n".utf8))
+            DebugHooks.log("QA browsing data: \(text)")
         }
         UtilityWindows.showBrowsingDataImport(app: store.app)
         log("browsers \(ChromiumProfile.installed().map(\.title))")

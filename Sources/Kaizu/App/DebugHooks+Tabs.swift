@@ -41,13 +41,13 @@ extension DebugHooks {
         store.perform(suggestion, mode: .newTab)
         precondition(store.activeSpace === work && store.selectedTab === target)
         precondition(work.pinned.tabs == [target] && work.today.isEmpty)
-        FileHandle.standardError.write(Data("QA tab search passed\n".utf8))
+        log("QA tab search passed")
         NSApp.terminate(nil)
     }
 
     static func qaTabMoves(_ store: BrowserStore) {
         func check(_ name: String, _ passed: Bool) {
-            FileHandle.standardError.write(Data("QA tabs \(passed ? "ok" : "FAILED"): \(name)\n".utf8))
+            log("QA tabs \(passed ? "ok" : "FAILED"): \(name)")
         }
         Task {
             if let named = store.spaces.flatMap(\.allTabs).first(where: { $0.customTitle != nil }) {
@@ -100,6 +100,36 @@ extension DebugHooks {
             check("Clear, reopen and Undo return every tab exactly once", home.today.map(\.displayTitle) == beforeClear)
             try? await Task.sleep(for: .seconds(1))
             NSApp.terminate(nil)
+        }
+    }
+
+    /// `pin`: ⌘D on the selected tab, undone again after 2.5 s (while the
+    /// toast, and so its Undo, is still up).
+    static func qaPin(_ store: BrowserStore) {
+        guard let tab = store.selectedTab else { return }
+        store.togglePin(tab)
+        Task {
+            try? await Task.sleep(for: .seconds(2.5))
+            store.undoToast()
+        }
+    }
+
+    /// `split`: splits with the most recent tab, stacks it after 2 s, closes
+    /// it after 6 s. Logs how many pages are in the window at each step.
+    static func qaSplit(_ store: BrowserStore) {
+        store.splitWithRecentTab()
+        Task {
+            try? await Task.sleep(for: .seconds(2))
+            logPageCount(store, "split")
+            if let tab = store.selectedTab, let other = store.activeSpace.splitTabs.first(where: { $0 !== tab }) {
+                store.split(other, with: tab.id, at: .pane(other.id, .bottom))
+            }
+            try? await Task.sleep(for: .seconds(2))
+            logPageCount(store, "stacked")
+            try? await Task.sleep(for: .seconds(2))
+            store.closeSplit()
+            try? await Task.sleep(for: .seconds(1))
+            logPageCount(store, "closed")
         }
     }
 }

@@ -7,7 +7,7 @@ extension DebugHooks {
         precondition(ProcessInfo.processInfo.environment["KAIZU_SUPPORT"] != nil)
         let space = store.activeSpace
         func require(_ condition: Bool, _ message: String) {
-            if !condition { FileHandle.standardError.write(Data((message + "\n").utf8)); exit(1) }
+            if !condition { log(message); exit(1) }
         }
         let tabs = (1...5).map { number in
             store.openTab(URL(string: "about:blank#pane-\(number)")!, select: number == 1)

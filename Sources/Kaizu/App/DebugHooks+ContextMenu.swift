@@ -8,7 +8,7 @@ extension DebugHooks {
     static func qaContextMenu(_ store: BrowserStore) {
         let app = store.app
         func say(_ text: String) {
-            FileHandle.standardError.write(Data("QA menu \(text)\n".utf8))
+            log("QA menu \(text)")
         }
         func check(_ name: String, _ passed: Bool) {
             say("\(passed ? "ok" : "FAILED"): \(name)")

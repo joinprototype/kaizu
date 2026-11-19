@@ -37,7 +37,7 @@ private final class StandInDrag: NSObject, NSDraggingInfo {
 extension DebugHooks {
     static func qaSplitDrop(_ store: BrowserStore) {
         func check(_ name: String, _ passed: Bool) {
-            FileHandle.standardError.write(Data("QA split \(passed ? "ok" : "FAILED"): \(name)\n".utf8))
+            log("QA split \(passed ? "ok" : "FAILED"): \(name)")
         }
         let space = store.activeSpace
         /// One pane across the top, two below, sized by hand.
@@ -112,7 +112,7 @@ extension DebugHooks {
             }
             if case .group(let direction, let children) = space.splitLayout, space.splitTabs.count > 1 {
                 check("a split from before trees stays a row", direction == .sideBySide)
-                FileHandle.standardError.write(Data("QA split kept: \(children.count) panes, widths \(children.map(\.share))\n".utf8))
+                log("QA split kept: \(children.count) panes, widths \(children.map(\.share))")
                 try? await Task.sleep(for: .seconds(2))
                 return NSApp.terminate(nil)
             }

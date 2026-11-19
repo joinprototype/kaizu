@@ -13,7 +13,7 @@ extension DebugHooks {
         let rounds = environment["KAIZU_ROUNDS"].flatMap(Int.init) ?? 1
         let settle = environment["KAIZU_SETTLE"].flatMap(Int.init) ?? 20
         func step(_ text: String) async {
-            FileHandle.standardError.write(Data("QA memory: \(text)\n".utf8))
+            DebugHooks.log("QA memory: \(text)")
             try? await Task.sleep(for: .seconds(settle))
         }
         Task {
@@ -28,15 +28,15 @@ extension DebugHooks {
                     for _ in 0..<190 where tab.isLoading {
                         try? await Task.sleep(for: .milliseconds(100))
                     }
-                    FileHandle.standardError.write(Data("QA memory load: \(url.host() ?? "") \(started.duration(to: .now))\n".utf8))
+                    DebugHooks.log("QA memory load: \(url.host() ?? "") \(started.duration(to: .now))")
                 }
-                FileHandle.standardError.write(Data("QA memory autoconsent: \(AutoconsentBridge.framesServed) frames (\(AutoconsentBridge.mainFramesServed) main), \(AutoconsentBridge.bytesServed) B of rules, \(AutoconsentBridge.evaluations) page checks so far\n".utf8))
+                DebugHooks.log("QA memory autoconsent: \(AutoconsentBridge.framesServed) frames (\(AutoconsentBridge.mainFramesServed) main), \(AutoconsentBridge.bytesServed) B of rules, \(AutoconsentBridge.evaluations) page checks so far")
                 await step("round \(round) loaded")
                 if environment["KAIZU_HIBERNATE"] != nil {
                     await store.app.hibernateIdleTabs(olderThan: 0)
                     for tab in tabs where tab.isLoaded {
                         let reason = store.isShowing(tab) ? "on screen" : await tab.isBusy ? "playing" : "unknown"
-                        FileHandle.standardError.write(Data("QA memory kept: \(tab.url?.host() ?? "") \(reason)\n".utf8))
+                        DebugHooks.log("QA memory kept: \(tab.url?.host() ?? "") \(reason)")
                     }
                     await step("round \(round) hibernated")
                 }
@@ -52,7 +52,7 @@ extension DebugHooks {
         let app = store.app
         let count = ProcessInfo.processInfo.environment["KAIZU_TABS"].flatMap(Int.init) ?? 2_000
         func log(_ text: String) {
-            FileHandle.standardError.write(Data("QA stress: \(text)\n".utf8))
+            DebugHooks.log("QA stress: \(text)")
         }
         func time(_ label: String, times: Int = 1, _ body: () -> Void) {
             let start = ContinuousClock.now
@@ -137,7 +137,7 @@ extension DebugHooks {
                 // Reads the page's DOM and what autoconsent did, from its world.
                 let result = (try? await tab.webView.evaluateJavaScript(probe, contentWorld: AutoconsentBridge.world)) as? String ?? "{}"
                 let name = url.host() ?? "site"
-                FileHandle.standardError.write(Data("QA site \(name) | \(tab.url?.host() ?? "none") | \(loaded)s\(tab.isLoading ? " still loading" : "") | \(result) | \(tab.title.prefix(50))\n".utf8))
+                DebugHooks.log("QA site \(name) | \(tab.url?.host() ?? "none") | \(loaded)s\(tab.isLoading ? " still loading" : "") | \(result) | \(tab.title.prefix(50))")
                 if let folder = environment["KAIZU_SHOTS"], let image = await tab.screenshot(of: nil), let data = image.tiffRepresentation {
                     let png = NSBitmapImageRep(data: data)?.representation(using: .png, properties: [:])
                     try? png?.write(to: URL(fileURLWithPath: folder).appending(path: "\(name).png"))

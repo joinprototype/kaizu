@@ -108,7 +108,7 @@ extension DebugHooks {
             try? await Task.sleep(for: .seconds(2))
             store.toggleReader()
             try? await Task.sleep(for: .seconds(4))
-            FileHandle.standardError.write(Data("QA reader shown: \(store.reader != nil)\n".utf8))
+            log("QA reader shown: \(store.reader != nil)")
             shoot("reader")
             store.closeReader()
             UtilityWindows.showAbout(app: store.app)

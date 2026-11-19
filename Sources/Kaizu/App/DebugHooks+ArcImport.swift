@@ -47,7 +47,7 @@ extension DebugHooks {
         undo()
 
         guard second.shownTabs == [later, favorite] && second.selectedTab === favorite else {
-            FileHandle.standardError.write(Data("Undo hid the surviving split panes\n".utf8))
+            log("Undo hid the surviving split panes")
             exit(1)
         }
         precondition(hidden.activeSpace.today.contains(privateTab) && !privateTab.isDiscarded)
@@ -105,6 +105,33 @@ extension DebugHooks {
         let cookies = await signedIn.profile.dataStore.httpCookieStore.allCookies()
         precondition(cookies.contains { $0.domain == "qa.invalid" && $0.name == "session" && $0.value == "test" })
         print("After restart, Kaizu restored the edited folders, favorite and persistent profile cookie.")
+    }
+
+    /// `arcimport`: opens Import from Arc and saves a picture of it.
+    static func qaArcImportWindow(_ store: BrowserStore) {
+        UtilityWindows.showArcImport(app: store.app, from: arcFile)
+        Task {
+            try? await Task.sleep(for: .seconds(2))
+            saveShot(ofWindow: "Import from Arc")
+        }
+    }
+
+    /// `arcimport-run`: imports without the window and logs the result;
+    /// with KAIZU_ARC_UNDO set, undoes it again.
+    static func qaArcImportRun(_ store: BrowserStore) {
+        do {
+            let plan = store.arcImport(of: try ArcSidebar.load(from: arcFile), includesToday: true)
+            store.importFromArc(plan)
+            store.app.save()
+            log("QA arc \(plan.tabCount) tabs, spaces \(store.spaces.map(\.name))")
+            if ProcessInfo.processInfo.environment["KAIZU_ARC_UNDO"] != nil {
+                store.toast?.undo?()
+                store.app.save()
+                log("QA arc undone, spaces \(store.spaces.map(\.name)), tabs \(store.spaces.map(\.allTabs.count))")
+            }
+        } catch {
+            log("QA arc failed: \(error)")
+        }
     }
 }
 #endif

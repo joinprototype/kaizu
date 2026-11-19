@@ -9,7 +9,7 @@ extension DebugHooks {
         let settings = store.settings
         let permission = SiteNotifications.permission
         func say(_ text: String) {
-            FileHandle.standardError.write(Data("QA notify \(text)\n".utf8))
+            log("QA notify \(text)")
         }
         func check(_ name: String, _ passed: Bool) {
             say("\(passed ? "ok" : "FAILED"): \(name)")
@@ -328,6 +328,19 @@ extension DebugHooks {
             app.save()
             await settle()
             say("done")
+            NSApp.terminate(nil)
+        }
+    }
+
+    /// `notifywake`, after a `notifications` run: its allowed tab comes back loaded.
+    static func qaNotifyWake(_ store: BrowserStore) {
+        Task {
+            try? await Task.sleep(for: .seconds(6))
+            let tabs = store.app.spaces.flatMap(\.allTabs)
+            let allowed = tabs.first { $0.url?.host() == "example.com" }
+            let other = tabs.first { $0.url?.host() == "example.org" }
+            let passed = allowed?.isLoaded == true && allowed !== store.selectedTab && other?.isLoaded == false
+            log("QA notify \(passed ? "ok" : "FAILED"): allowed tab woke at launch, another stayed asleep")
             NSApp.terminate(nil)
         }
     }

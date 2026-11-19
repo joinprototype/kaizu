@@ -6,7 +6,7 @@ extension DebugHooks {
     static func checkPrivateBlocking(in store: BrowserStore) async throws {
         precondition(ProcessInfo.processInfo.environment["KAIZU_SUPPORT"] != nil)
         func report(_ message: String) {
-            FileHandle.standardError.write(Data((message + "\n").utf8))
+            log(message)
         }
         report("Opening private and regular test windows")
         let app = store.app
