@@ -1,4 +1,5 @@
 import Foundation
+import AVFoundation
 import Testing
 @testable import Kaizu
 
@@ -125,6 +126,28 @@ struct SoundTests {
         #expect(await real.engine.loadedCount == Sound.allCases.count)
         real.unload()
         #expect(await real.engine.loadedCount == 0)
+    }
+
+    /// Switching to another app for a few seconds stopped the idle engine, and
+    /// every sound after that was silent. Uses the real engine at zero volume;
+    /// skipped on a Mac with no audio output.
+    @Test(.enabled(if: SoundTests.hasAudioOutput))
+    func playsAgainAfterTheEngineStopsWhenIdle() async throws {
+        let engine = SoundEngine()
+        engine.play(.pin, volume: 0)
+        try await Task.sleep(for: .milliseconds(400))
+        engine.stopForIdle()
+        try await Task.sleep(for: .milliseconds(100))
+        engine.play(.pin, volume: 0)
+        try await Task.sleep(for: .milliseconds(400))
+        #expect(engine.finishedCount == 2)
+        engine.unload()
+    }
+
+    nonisolated static var hasAudioOutput: Bool {
+        // Kept alive for the call: a temporary engine is freed mid-read.
+        let engine = AVAudioEngine()
+        return withExtendedLifetime(engine) { engine.outputNode.outputFormat(forBus: 0).sampleRate > 0 }
     }
 
     /// Every sound is short, quiet and clean. Prints its levels; with

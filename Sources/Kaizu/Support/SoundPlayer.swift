@@ -99,6 +99,15 @@ final class SoundEngine: @unchecked Sendable {
     private var engine: AVAudioEngine?
     private var players: [Sound: (node: AVAudioPlayerNode, buffer: AVAudioPCMBuffer)] = [:]
     private var idleStop: DispatchWorkItem?
+    /// Counts sounds heard through to the end, for tests. Written from the
+    /// audio thread, so it's a locked box rather than state on `queue`.
+    private final class Counter: @unchecked Sendable {
+        private let lock = NSLock()
+        private var count = 0
+        func add() { lock.withLock { count += 1 } }
+        var value: Int { lock.withLock { count } }
+    }
+    private let finished = Counter()
 
     func load() {
         queue.async { Sound.allCases.forEach { _ = self.player(for: $0) } }
@@ -113,19 +122,38 @@ final class SoundEngine: @unchecked Sendable {
             }
             node.volume = volume
             // Interrupts the same sound if it's still ringing; others overlap.
-            node.scheduleBuffer(buffer, at: nil, options: .interrupts)
-            if !node.isPlaying { node.play() }
+            let finished = self.finished
+            node.scheduleBuffer(buffer, at: nil, options: .interrupts, completionCallbackType: .dataPlayedBack) { _ in
+                finished.add()
+            }
+            // Always: after the engine stops, a player still reports isPlaying,
+            // so checking it first left every sound silent from then on.
+            node.play()
             self.idleStop?.cancel()
-            let stop = DispatchWorkItem { [weak engine] in engine?.stop() }
+            let stop = DispatchWorkItem { self.stopEngine() }
             self.idleStop = stop
             self.queue.asyncAfter(deadline: .now() + Self.idleTimeout, execute: stop)
         }
     }
 
+    /// What the idle timer does, for tests: stops the players, then the engine.
+    func stopForIdle() {
+        queue.async { self.stopEngine() }
+    }
+
+    /// On `queue` only.
+    private func stopEngine() {
+        players.values.forEach { $0.node.stop() }
+        engine?.stop()
+    }
+
+    /// How many sounds have finished playing through, for tests.
+    var finishedCount: Int { finished.value }
+
     func unload() {
         queue.async {
             self.idleStop?.cancel()
-            self.engine?.stop()
+            self.stopEngine()
             self.engine = nil
             self.players = [:]
         }
