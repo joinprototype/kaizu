@@ -3,6 +3,7 @@ import WebKit
 extension BrowserTab {
     func load(_ url: URL) {
         self.url = url
+        crossedForward = []
         if let _webView {
             _webView.load(URLRequest(url: url))
         } else {
@@ -11,8 +12,23 @@ extension BrowserTab {
         }
     }
 
-    func goBack() { _webView?.goBack() }
-    func goForward() { _webView?.goForward() }
+    func goBack() {
+        guard let _webView else { return }
+        if _webView.canGoBack {
+            _webView.goBack()
+        } else {
+            step(back: true)
+        }
+    }
+
+    func goForward() {
+        guard let _webView else { return }
+        if _webView.canGoForward {
+            _webView.goForward()
+        } else {
+            step(back: false)
+        }
+    }
     func stopLoading() { _webView?.stopLoading() }
 
     func reload(fromOrigin: Bool = false) {

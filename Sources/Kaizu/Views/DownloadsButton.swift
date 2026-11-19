@@ -88,6 +88,7 @@ private struct DownloadRow: View {
                 }
                 .buttonStyle(.borderless)
                 .help("Show in Finder")
+                .accessibilityLabel("Show in Finder")
             }
         }
         .padding(.horizontal, 12)
