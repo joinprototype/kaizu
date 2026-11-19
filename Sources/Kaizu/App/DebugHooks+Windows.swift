@@ -15,17 +15,16 @@ extension DebugHooks {
         Task {
             let site = URL(string: "https://example.org/")!
             let regular = store.openTab(site)
-            await settle(3)
+            await loaded(regular)
             let hidden = app.openPrivateWindow()
-            await settle()
-            check("it's a window of its own, in front", hidden.isPrivate && app.front === hidden && app.regularFront === store)
+            check("it's a window of its own, in front", await until { hidden.isPrivate && app.front === hidden && app.regularFront === store })
             check("its space isn't shared", !app.spaces.contains { $0 === hidden.activeSpace } && hidden.spaces.count == 1)
             check("its profile is in memory", hidden.activeSpace.profile.isPrivate && !hidden.activeSpace.profile.dataStore.isPersistent)
-            check("it's dark", hidden.window?.appearance?.name == .darkAqua)
+            check("it's dark", await until { hidden.window?.appearance?.name == .darkAqua })
 
             let one = hidden.openTab(URL(string: "https://example.org/private-page"))
-            await settle(3)
-            check("a page opens in it", hidden.selectedTab === one && one.webView.window === hidden.window)
+            await loaded(one)
+            check("a page opens in it", await until { hidden.selectedTab === one && one.webView.window === hidden.window })
             let two = hidden.openTab(site, after: one, select: false)
             check("and more tabs", hidden.activeSpace.today.count == 2 && two.profile === one.profile)
 
@@ -37,8 +36,7 @@ extension DebugHooks {
 
             hidden.close(two)
             hidden.reopenClosedTab()
-            await settle()
-            check("⇧⌘T works inside it", hidden.activeSpace.today.count == 2 && app.closedTabs.isEmpty)
+            check("⇧⌘T works inside it", await until { hidden.activeSpace.today.count == 2 && app.closedTabs.isEmpty })
 
             let secret = URL(string: "https://example.org/private-page")!
             hidden.select(two)
@@ -59,10 +57,9 @@ extension DebugHooks {
             check("pausing blocking there isn't saved", store.contentBlocker.isPaused(on: secret, privateID: one.profile.privateID) && !store.contentBlocker.isPaused(on: secret, privateID: nil) && !saved.contains("example.org") && !store.contentBlocker.pausedSites.contains("example.org"))
 
             let closing = hidden.openTab(URL(string: "https://example.org/closing"))
-            await settle()
+            _ = await until { hidden.selectedTab === closing }
             hidden.close(closing)
-            await settle()
-            check("closing a tab there moves to its neighbor", hidden.selectedTab != nil)
+            check("closing a tab there moves to its neighbor", await until { hidden.selectedTab != nil })
 
             hidden.togglePin(one)
             hidden.newFolder()
@@ -75,8 +72,7 @@ extension DebugHooks {
             check("links from other apps skip it", hidden.activeSpace.today.count == count)
             let littleWindows = app.littleWindows.count
             hidden.openLittleWindow(URL(string: "https://example.org/little"))
-            await settle()
-            check("a little window from it stays inside it", app.littleWindows.count == littleWindows && hidden.activeSpace.today.count == count + 1)
+            check("a little window from it stays inside it", await until { app.littleWindows.count == littleWindows && hidden.activeSpace.today.count == count + 1 })
 
             app.save()
             let session = (try? String(contentsOf: AppPaths.support.appending(path: "session.json"), encoding: .utf8)) ?? ""
@@ -88,17 +84,15 @@ extension DebugHooks {
             check("nor Spotlight", !app.spotlightIdentifiers.contains(one.id.uuidString))
 
             let ordinary = app.openWindow()
-            await settle()
-            check("⌘N from it is an ordinary window", !ordinary.isPrivate && app.stores.contains { $0 === ordinary })
+            check("⌘N from it is an ordinary window", await until { !ordinary.isPrivate && app.stores.contains { $0 === ordinary } })
             ordinary.window?.performClose(nil)
             hidden.window?.makeKeyAndOrderFront(nil)
             app.front = hidden
             await settle()
 
             hidden.window?.performClose(nil)
-            await settle()
-            check("closing it ends it", app.privateStores.isEmpty && one.isDiscarded && hidden.window == nil)
-            check("and the ordinary window is in front again", app.front === store)
+            check("closing it ends it", await until { app.privateStores.isEmpty && one.isDiscarded && hidden.window == nil })
+            check("and the ordinary window is in front again", await until(3) { app.front === store })
             check("a site paused there is forgotten", !store.contentBlocker.isPaused(on: secret, privateID: nil))
             NSApp.terminate(nil)
         }
@@ -119,39 +113,34 @@ extension DebugHooks {
             if app.stores.count > 1 {
                 let second = app.stores[1]
                 let saved = second.savedFrame
-                await settle()
-                check("two windows came back", app.stores.count == 2)
+                check("two windows came back", await until(3) { app.stores.count == 2 })
                 check("each window kept its own tab", store.selectedTab != nil && second.selectedTab != nil && store.selectedTab !== second.selectedTab)
                 check("second window kept its place", saved != nil && second.window?.frameDescriptor == saved)
                 check("first window kept its place", store.savedFrame != nil && store.window?.frameDescriptor == store.savedFrame)
                 second.window?.performClose(nil)
-                await settle()
-                check("closing a window leaves its tabs in the sidebar", app.stores.count == 1 && store.activeSpace.today.count == 4)
+                check("closing a window leaves its tabs in the sidebar", await until(3) { app.stores.count == 1 && store.activeSpace.today.count == 4 })
                 store.window?.performClose(nil)
-                await settle()
-                check("the last window only hides", app.stores.count == 1 && store.window?.isVisible == false)
+                check("the last window only hides", await until(3) { app.stores.count == 1 && store.window?.isVisible == false })
                 check("⌘N brings it back instead of leaving it hidden", app.openWindow() === store && app.stores.count == 1)
-                await settle()
-                check("with its page", store.window?.isVisible == true && store.selectedTab != nil)
+                check("with its page", await until(3) { store.window?.isVisible == true && store.selectedTab != nil })
                 return NSApp.terminate(nil)
             }
 
             let one = store.openTab(page("one"))
             let two = store.openTab(page("two"), select: false)
-            await settle()
+            _ = await until(3) { store.selectedTab === one && one.webView.window === store.window }
             let second = app.openWindow()
-            await settle()
-            check("a new window starts on the same space, empty, in front", second.activeSpaceID == store.activeSpaceID && second.selectedTab == nil && app.front === second)
+            check("a new window starts on the same space, empty, in front", await until(3) { second.activeSpaceID == store.activeSpaceID && second.selectedTab == nil && app.front === second })
             check("and off to the side of the last", second.window?.frame != store.window?.frame)
 
             second.perform(.url(page("typed")!), mode: .newTab)
-            await settle()
+            _ = await until(3) { second.selectedTab?.url?.lastPathComponent == "typed" && second.selectedTab?.webView.window === second.window }
             let typed = second.selectedTab
             check("a page opened from the command bar opens in that window", typed?.url?.lastPathComponent == "typed" && typed?.webView.window === second.window)
             check("and the other window keeps its page", store.selectedTab === one && one.webView.window === store.window)
             store.settings.linkRoutes = [LinkRoute(pattern: "example.com", spaceID: second.activeSpaceID)]
             app.front.openExternal(page("routed")!)
-            await settle()
+            _ = await until(3) { second.selectedTab?.url?.lastPathComponent == "routed" }
             let routed = second.selectedTab
             check("a link routed to this space opens in the window in front", routed?.url?.lastPathComponent == "routed" && store.selectedTab === one)
             store.settings.linkRoutes = []
@@ -159,38 +148,33 @@ extension DebugHooks {
             routed.map(second.close)
 
             second.select(two)
-            await settle()
-            check("each window shows its own tab", second.selectedTab === two && two.webView.window === second.window && one.webView.window === store.window)
+            check("each window shows its own tab", await until(3) { second.selectedTab === two && two.webView.window === second.window && one.webView.window === store.window })
 
             second.select(one)
-            await settle()
-            check("selecting a tab shown elsewhere brings that window forward", app.front === store && second.selectedTab === two)
-            check("as the key window, when Kaizu is the active app", !NSApp.isActive || store.window?.isKeyWindow == true)
+            check("selecting a tab shown elsewhere brings that window forward", await until(3) { app.front === store && second.selectedTab === two })
+            check("as the key window, when Kaizu is the active app", await until(3) { !NSApp.isActive || store.window?.isKeyWindow == true })
 
             store.close(two)
-            await settle()
-            check("closing a tab never steals one from another window", second.selectedTab == nil && store.selectedTab === one)
+            check("closing a tab never steals one from another window", await until(3) { second.selectedTab == nil && store.selectedTab === one })
 
             let three = second.openTab(page("three"))
-            await settle()
+            _ = await until(3) { second.selectedTab === three && three.webView.window === second.window }
             store.moveToNewWindow(one)
-            await settle()
+            _ = await until(3) { app.stores.count == 3 && one.webView.window === app.stores[2].window && store.selectedTab == nil }
             let third = app.stores[2]
             check("a tab can move to a window of its own", third.selectedTab === one)
             check("its page goes with it", one.webView.window === third.window)
             check("the window it left has nothing free to show", store.selectedTab == nil)
 
             let four = store.openTab(page("four"))
-            await settle()
+            _ = await until(3) { store.selectedTab === four && four.webView.window === store.window }
             store.addToSplit(three)
-            await settle()
-            check("a split takes its pane from the window showing it", second.selectedTab == nil && three.webView.window === store.window && four.webView.window === store.window)
+            check("a split takes its pane from the window showing it", await until(3) { second.selectedTab == nil && three.webView.window === store.window && four.webView.window === store.window })
             check("and leaves no page behind", third.window?.isVisible == true && one.webView.window === third.window)
             third.select(three)
-            await settle()
-            check("a split shows in one window", third.selectedTab === one && app.front === store)
+            check("a split shows in one window", await until(3) { third.selectedTab === one && app.front === store })
             let five = third.openTab(page("five"))
-            await settle()
+            _ = await until(3) { third.selectedTab === five && five.webView.window === third.window }
             let split = store.activeSpace.split
             third.addToSplit(one)
             third.closeSplit()
@@ -206,8 +190,7 @@ extension DebugHooks {
             await settle()
             second.select(four)
             store.switchTo(home)
-            await settle()
-            check("a tab another window took isn't selected any more", store.selectedTab == nil && second.selectedTab === four)
+            check("a tab another window took isn't selected any more", await until(3) { store.selectedTab == nil && second.selectedTab === four })
 
             let empty = app.openWindow()
             await settle()
@@ -226,7 +209,7 @@ extension DebugHooks {
             await settle()
             store.switchTo(home)
             store.moveToNewWindow(favorite)
-            await settle()
+            _ = await until(3) { app.stores.last.map { $0.selectedTab === favorite && favorite.webView.window === $0.window } == true && second.selectedTab == nil }
             let fourth = app.stores[app.stores.count - 1]
             check("a favorite shown on another space moves out too", fourth.selectedTab === favorite && favorite.webView.window === fourth.window && second.selectedTab == nil)
             fourth.window?.performClose(nil)
@@ -241,8 +224,7 @@ extension DebugHooks {
             third.window?.performClose(nil)
             await settle()
             store.select(one)
-            await settle()
-            check("a closed window's tabs can show elsewhere", app.stores.count == 2 && one.webView.window === store.window)
+            check("a closed window's tabs can show elsewhere", await until(3) { app.stores.count == 2 && one.webView.window === store.window })
             check("and count as just used", five.lastActiveAt.map { -$0.timeIntervalSinceNow < 60 } == true)
 
             store.window?.setFrameOrigin(NSPoint(x: 240, y: 60))

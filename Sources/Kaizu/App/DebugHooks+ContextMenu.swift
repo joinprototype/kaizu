@@ -24,6 +24,7 @@ extension DebugHooks {
         func rightClick(_ tab: BrowserTab, _ x: Double, _ y: Double, choosing choice: String? = nil) async -> [String] {
             guard let window = tab.webView.window else { return [] }
             var titles: [String] = []
+            var dismissed = false
             PageWebView.onContextMenu = { menu in
                 titles = menu.items.filter { !$0.isHidden && !$0.isSeparatorItem }.map(\.title)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
@@ -31,6 +32,7 @@ extension DebugHooks {
                     if let choice, let index = menu.items.firstIndex(where: { $0.title == choice }) {
                         menu.performActionForItem(at: index)
                     }
+                    dismissed = true
                 }
             }
             NSApp.activate(ignoringOtherApps: true)
@@ -45,8 +47,9 @@ extension DebugHooks {
                 )!
             }
             view.rightMouseDown(with: event(.rightMouseDown))
-            await settle(1.2)
             // Only once the menu's gone: it takes the release while it's up.
+            _ = await until(3) { dismissed }
+            await settle(0.2)
             view.rightMouseUp(with: event(.rightMouseUp))
             await settle(0.3)
             return titles
@@ -77,16 +80,15 @@ extension DebugHooks {
 
             let before = store.activeSpace.today.count
             _ = await rightClick(tab, x, y, choosing: "Open Link in New Tab")
-            await settle(3)
-            check("New Tab makes one tab of the link", store.activeSpace.today.count == before + 1)
+            check("New Tab makes one tab of the link", await until { store.activeSpace.today.count == before + 1 })
             if let newTab = store.selectedTab, newTab !== tab {
-                check("and the page loads in it", await page(newTab, "document.body.innerText.length > 50") == "true")
+                check("and the page loads in it", await until { await page(newTab, "document.body.innerText.length > 50") == "true" })
                 store.close(newTab)
             } else {
                 check("and selects it", false)
             }
             store.select(tab)
-            await settle(1)
+            _ = await until(3) { store.selectedTab === tab && tab.webView.window != nil }
 
             // A middle click. Only a CGEvent can say which button: NSEvent's
             // factory can't, and with no window its location is the window's.
@@ -108,44 +110,46 @@ extension DebugHooks {
                 await settle(0.3)
                 view.otherMouseUp(with: up)
             }
-            await settle(2)
+            _ = await until(3) { store.activeSpace.today.contains { $0 !== tab } }
+            // And that the page it was on doesn't follow the link too.
+            await settle(1)
             let background = store.activeSpace.today.first { $0 !== tab }
             check("a middle click opens a background tab", background != nil && store.selectedTab === tab && tab.url?.host() == "example.com")
             if let background { store.close(background) }
             store.select(tab)
-            await settle(1)
+            _ = await until(3) { store.selectedTab === tab && tab.webView.window != nil }
 
             _ = await rightClick(tab, x, y, choosing: "Open Link in Split View")
-            await settle(2)
-            check("Split View opens it beside the page", store.activeSpace.splitTabs.count == 2 && store.activeSpace.splitTabs.contains(tab))
+            check("Split View opens it beside the page", await until { store.activeSpace.splitTabs.count == 2 && store.activeSpace.splitTabs.contains(tab) })
             check("with no stray tab", store.activeSpace.today.count == before + 1)
             let added = store.activeSpace.splitTabs.first { $0 !== tab }
             store.closeSplit()
             if let added { store.close(added) }
             store.select(tab)
-            await settle(1)
+            _ = await until(3) { store.selectedTab === tab && tab.webView.window != nil }
 
             let windows = app.stores.count
             _ = await rightClick(tab, x, y, choosing: "Open Link in New Window")
-            await settle(2)
-            check("New Window opens another window", app.stores.count == windows + 1)
+            check("New Window opens another window", await until { app.stores.count == windows + 1 })
             app.stores.last?.window?.performClose(nil)
-            await settle(1)
+            _ = await until(3) { app.stores.count == windows }
             store.window?.makeKeyAndOrderFront(nil)
             await settle()
 
             _ = await rightClick(tab, x, y, choosing: "Open Link in Private Window")
-            await settle(2)
+            _ = await until { app.privateStores.first?.selectedTab?.url != nil }
             let hidden = app.privateStores.first
             check("Private Window opens it there", hidden?.selectedTab?.url != nil && hidden?.isPrivate == true)
             if let shown = hidden?.selectedTab {
+                await loaded(shown)
+                _ = await until { await page(shown, "!!document.querySelector('a')") == "true" }
                 let inside = await center(of: "a", in: shown)
                 let there = await rightClick(shown, inside.0, inside.1)
                 say("in a private window: \(there)")
                 check("a private window offers no way out of it", !there.contains("Open Link in New Window") && !there.contains("Open Link in Private Window"))
             }
             hidden?.window?.performClose(nil)
-            await settle(1)
+            _ = await until(3) { app.privateStores.isEmpty }
             store.window?.makeKeyAndOrderFront(nil)
             await settle()
 
@@ -162,8 +166,7 @@ extension DebugHooks {
             say("on selected text: \(onText)")
             check("search uses your engine", onText.contains("Search with DuckDuckGo"))
             _ = await rightClick(tab, heading.0, heading.1, choosing: "Search with DuckDuckGo")
-            await settle(2)
-            check("and goes there with the selection", store.selectedTab?.url?.host()?.contains("duckduckgo") == true)
+            check("and goes there with the selection", await until { store.selectedTab?.url?.host()?.contains("duckduckgo") == true })
             store.settings.searchEngine = .google
             say("done")
             NSApp.terminate(nil)
