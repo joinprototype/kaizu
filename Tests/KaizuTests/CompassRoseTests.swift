@@ -1,7 +1,7 @@
 import AppKit
+import DesignSystem
 import SwiftUI
 import Testing
-@testable import Kaizu
 
 @MainActor
 struct CompassRoseTests {

@@ -1,6 +1,7 @@
 #if DEBUG
 import AppKit
 import BrowserCore
+import DesignSystem
 
 extension DebugHooks {
     static func qaShowcase(_ store: BrowserStore) {

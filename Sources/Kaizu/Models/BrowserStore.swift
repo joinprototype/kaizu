@@ -1,5 +1,6 @@
 import AppKit
 import BrowserCore
+import DesignSystem
 import SwiftUI
 
 /// One browser window: which space and tab it shows, its sidebar and

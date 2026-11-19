@@ -1,4 +1,5 @@
 import BrowserCore
+import DesignSystem
 import Foundation
 
 /// Session save/restore (`~/Library/Application Support/Kaizu/session.json`).

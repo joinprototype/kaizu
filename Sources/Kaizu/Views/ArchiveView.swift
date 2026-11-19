@@ -1,4 +1,5 @@
 import BrowserCore
+import DesignSystem
 import SwiftUI
 
 /// Opened from History or the command bar, scoped to its browser window.

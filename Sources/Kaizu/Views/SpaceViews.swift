@@ -1,3 +1,4 @@
+import DesignSystem
 import SwiftUI
 
 /// Bottom of the sidebar: one button per space, plus "new space".

@@ -1,3 +1,4 @@
+import DesignSystem
 import SwiftUI
 
 /// Over a page being captured (⇧⌘2): dims it, and the area you drag over

@@ -1,4 +1,5 @@
 import BrowserCore
+import DesignSystem
 import SwiftUI
 
 /// The selected tab's split: panes in rows and columns in any mix, the focused

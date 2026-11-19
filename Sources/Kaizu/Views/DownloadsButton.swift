@@ -1,4 +1,5 @@
 import AppKit
+import DesignSystem
 import SwiftUI
 
 /// Sidebar button (with a progress ring while downloading) that opens the downloads list.

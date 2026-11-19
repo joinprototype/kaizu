@@ -25,39 +25,6 @@ class Page(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
 
-    def check_login(self):
-        server = self.server
-        cookies = self.headers.get("Cookie", "").split("; ")
-        strict = server.cookie in cookies
-        lax = server.navigation_cookie in cookies if server.navigation_cookie else None
-        storage = self.headers.get("X-Kaizu-Storage", "unreported")
-        cookies_match = strict and lax is not False
-        storage_matches = not server.storage_token or storage == "match"
-        if cookies_match and storage_matches and not server.document_missing_lax and not server.failed_probes:
-            self.send_response(204)
-            self.end_headers()
-            server.rendered = True
-            return
-
-        observation = f"page Strict={strict}, Lax={lax}, local storage={storage}"
-        server.failed_probes.append(observation)
-        probe = len(server.failed_probes)
-        phase = "initial" if server.issue_cookie else "restored"
-        print(f"{phase} login probe {probe}: {observation}", flush=True)
-        if not server.issue_cookie and probe == 1 and getattr(server, "cookie_file", None):
-            report_cookie_checkpoint(server, server.cookie_file, "at first failed page check")
-
-        # The first failed read is final. Later requests show whether WebKit
-        # eventually supplied the cookies or the draft while the same page was open.
-        retry_cookies = not cookies_match and probe < 4
-        retry_storage = not storage_matches and probe == 1
-        if not server.issue_cookie and (retry_cookies or retry_storage):
-            self.request_recheck()
-            return
-        server.page_failure = (f"{phase} login: first document missing Lax={server.document_missing_lax}; "
-                               + " then ".join(server.failed_probes))
-        self.send_error(403)
-
     def do_GET(self):
         server = self.server
         if self.path == "/start":
@@ -122,7 +89,46 @@ class Page(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(b"window.launchControl = true;")
         elif self.path == "/" + server.challenge:
-            self.check_login()
+            cookies = self.headers.get("Cookie", "").split("; ")
+            cookie_matches = server.cookie in cookies
+            storage = self.headers.get("X-Kaizu-Storage", "unreported")
+            check_storage = bool(getattr(server, "storage_token", None))
+            if server.navigation_cookie and (server.document_missing_lax or server.navigation_cookie not in cookies):
+                phase = "restored" if not server.issue_cookie else "initial"
+                server.page_failure = (f"{phase} login: first document missing Lax={server.document_missing_lax}, "
+                                       f"page Lax={server.navigation_cookie in cookies}, page Strict={cookie_matches}, "
+                                       f"local storage {storage}")
+                self.send_error(403)
+                return
+            cookie_status = "match" if cookie_matches else "missing"
+            if server.first_storage_failure:
+                server.page_failure = (f"{server.first_storage_failure}; next probe: "
+                                       f"login cookie {cookie_status}, local storage {storage}")
+                self.send_error(403)
+                return
+            if not server.issue_cookie and check_storage and storage != "match" and not server.missing_probes:
+                server.first_storage_failure = f"restored launch: login cookie {cookie_status}, local storage {storage}"
+                print(server.first_storage_failure, flush=True)
+                self.request_recheck()
+                return
+            if not server.issue_cookie and not cookie_matches and storage == "match" and server.missing_probes < 3:
+                server.missing_probes += 1
+                print(f"Restored login cookie missing on probe {server.missing_probes}, local storage matched", flush=True)
+                self.request_recheck()
+                return
+            if server.missing_probes and cookie_matches:
+                server.page_failure = f"Restored login cookie appeared only after {server.missing_probes} failed probes"
+                self.send_error(403)
+                return
+            if not cookie_matches or (check_storage and storage != "match"):
+                phase = "initial launch" if server.issue_cookie else "restored launch"
+                server.page_failure = (f"{phase}: login cookie {'match' if cookie_matches else 'missing'}, "
+                                       f"local storage {storage if check_storage else 'not checked'}")
+                self.send_error(403)
+                return
+            self.send_response(204)
+            self.end_headers()
+            server.rendered = True
         elif self.path == "/media-call/video-source.js":
             self.send_response(200)
             self.send_header("Content-Type", "text/javascript")
@@ -168,7 +174,8 @@ def launch(server, app, *urls):
 def wait_for_page(server, process, app):
     server.rendered = False
     server.page_failure = None
-    server.failed_probes = []
+    server.missing_probes = 0
+    server.first_storage_failure = None
     server.document_missing_lax = False
     server.challenge = secrets.token_hex(12)
     deadline = time.monotonic() + 90
@@ -342,7 +349,6 @@ def seed_legacy_session(server, app, url, stores):
 def check_restored_session(server, installed, url, identity, profile_directory, reader_is_candidate):
     before_launch = storage_checkpoint(profile_directory, server.storage_token)
     cookie_file = profile_directory / "Cookies/Cookies.binarycookies"
-    server.cookie_file = cookie_file
     report_cookie_checkpoint(server, cookie_file, "before restored launch")
     print("Before restored launch:", before_launch, flush=True)
     # No URL is passed. Only the restored tab can request the new challenge.

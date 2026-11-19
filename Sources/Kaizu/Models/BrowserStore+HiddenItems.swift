@@ -1,4 +1,5 @@
 import AppKit
+import DesignSystem
 import SwiftUI
 
 /// "Hide Distracting Items" (see HiddenItems): pick parts of the page in

@@ -1,6 +1,7 @@
 import AppKit
 import BrowserCore
 import CoreSpotlight
+import DesignSystem
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let app: AppModel

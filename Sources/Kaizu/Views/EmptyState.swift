@@ -1,4 +1,5 @@
 import BrowserCore
+import DesignSystem
 import SwiftUI
 
 /// A space with no tab open: chart paper, the name, and a few keys.

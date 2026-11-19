@@ -1,6 +1,7 @@
 #if DEBUG
 import AppKit
 import BrowserCore
+import DesignSystem
 import WebKit
 
 extension DebugHooks {

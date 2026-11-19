@@ -1,5 +1,6 @@
 import AppKit
 import BrowserCore
+import DesignSystem
 import SwiftUI
 
 /// ⌘Y: the active space's profile history, grouped by day and searchable.

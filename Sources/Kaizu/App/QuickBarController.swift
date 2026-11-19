@@ -1,4 +1,5 @@
 import AppKit
+import DesignSystem
 import SwiftUI
 
 /// The command bar on its own, over whatever app you're in (Ghostty's quick

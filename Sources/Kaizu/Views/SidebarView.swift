@@ -1,4 +1,5 @@
 import BrowserCore
+import DesignSystem
 import SwiftUI
 
 struct SidebarView: View {

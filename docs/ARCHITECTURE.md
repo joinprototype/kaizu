@@ -5,7 +5,7 @@ clean as features pile up. Read this before adding a feature.
 
 ## Boundaries in the current build
 
-SwiftPM builds the `Kaizu` executable, the `BrowserCore` library and its test target. Session formats and migrations, Arc import planning, history, split layout calculations and filter conversion live in BrowserCore. They can be exercised without opening a browser window.
+SwiftPM builds the `Kaizu` executable, the `BrowserCore` and `DesignSystem` libraries and two test targets. Session formats and migrations, Arc import planning, history, split layout calculations and filter conversion live in BrowserCore. They can be exercised without opening a browser window. `DesignSystem` holds the colors, type, motion, chart art and interface sounds, and knows nothing about tabs or pages.
 
 The executable contains the UI, app and window models, and WebKit integration. Its folders organize responsibilities within one target. `AppModel` owns shared spaces and profiles. Each `BrowserStore` owns one window’s selection and overlays. `BrowserTab` currently owns page state, creates its web view, observes navigation and handles media. Several views and models import WebKit directly.
 
@@ -38,6 +38,13 @@ The executable contains the UI, app and window models, and WebKit integration. I
 SwiftPM targets give us compile-time boundaries (a view literally can't import
 WebKit), faster incremental builds, and testable cores.
 
+Today there are three: the `Kaizu` executable (`Sources/Kaizu`), `BrowserCore`
+and `DesignSystem`. `DesignSystem` imports only SwiftUI and AppKit, never the
+app or `BrowserCore`, so what the app uses from it is `public` and the rest
+stays internal. It also holds `BundledResource`, which finds bundled fonts and
+scripts (in the app bundle, or the repo's `Resources/` when run unbundled).
+The layout below is where the rest is heading.
+
 ```
 Package.swift
 Sources/
@@ -49,7 +56,8 @@ Sources/
     CommandBar/      field, ranking, suggestion rows
     Spaces/          switcher, swipe paging, space/profile editors
     Settings/  Downloads/  Find/  Peek/  LittleWindow/ ...
-  DesignSystem/    Theme, Surface, Motion, Typography, Metrics, shared components
+  DesignSystem/    Theme, Surface, Ink, Motion, Typeface, Sound, chart art,
+                   BundledResource (a real target today)
   BrowserCore/     pure Swift (no AppKit/WebKit): models, commands, session
                    schema + migrations, URL input, search engines, ranking
   WebEngine/       WebKit adapter: PageController (owns WKWebView), navigation
@@ -253,7 +261,8 @@ reinstalls, which clear a controller's scripts.
 The core library and per-window model are in place. Remaining work can be split into independently tested changes:
 
 1. ~~Add `Tests/`~~ (done: `BrowserCore` + Swift Testing); `swift format` config; tests for store ops.
-2. Extract `DesignSystem` target (no deps, easy win).
+2. ~~Extract `DesignSystem` target.~~ Done: `Sources/DesignSystem`, depends on
+   nothing of ours.
 3. Extract `WebEngine`: split `BrowserTab` into `Tab` + `PageController`.
 4. Extract `BrowserCore` models + `Storage`; add `schemaVersion`.
 5. ~~Introduce `Command`s and generate menus from them.~~ Done: see Command

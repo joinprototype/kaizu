@@ -9,7 +9,7 @@ quiet and the page stays the hero.
 
 Spaces store only a hue and `Theme.forHue` picks the nearest palette, so
 switching is a drop-in replacement of `Theme.all` in
-`Sources/Kaizu/DesignSystem/Theme.swift`; existing spaces map to the
+`Sources/DesignSystem/Theme.swift`; existing spaces map to the
 closest heritage color with no migration:
 
 | Was | Becomes |

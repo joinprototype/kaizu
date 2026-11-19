@@ -1,4 +1,5 @@
 import BrowserCore
+import DesignSystem
 import SwiftUI
 
 /// The peek card. Its scrim is separate (see ContentArea), so only the

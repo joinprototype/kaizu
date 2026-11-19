@@ -1,4 +1,5 @@
 import AppKit
+import DesignSystem
 import SwiftUI
 
 /// ⇧⌘2, Arc's Capture: the page dims, and the area you drag over is copied
