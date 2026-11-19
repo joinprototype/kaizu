@@ -74,10 +74,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if closingPages != nil { return .terminateLater }
         let tabs = Set(app.spaces.flatMap(\.allTabs) + app.stores.compactMap(\.peek) + app.littleWindows.map(\.tab))
         let views = tabs.compactMap { $0.preparePageForQuit() }
-        guard !views.isEmpty else { return .terminateNow }
+        // Only stores already in use: opening one now would start its network session.
+        let stores = app.profiles.filter { !$0.isPrivate && $0.didOpenWebsiteData }.map(\.dataStore)
+        guard !views.isEmpty || !stores.isEmpty else { return .terminateNow }
         let pages = QuitPages()
         closingPages = pages
-        pages.start(views) { sender.reply(toApplicationShouldTerminate: true) }
+        pages.start(views, cookieStores: stores) { sender.reply(toApplicationShouldTerminate: true) }
         return .terminateLater
     }
 

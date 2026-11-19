@@ -164,6 +164,28 @@ struct SelfUpdateTests {
         try await Task.sleep(for: .seconds(1))
     }
 
+    @Test func swapWaitsForWebsiteDataToBeReleased() async throws {
+        let live = root.appending(path: "live", directoryHint: .isDirectory)
+        let current = try app("old", at: live)
+        let staged = try app("new", at: root.appending(path: "cache", directoryHint: .isDirectory))
+        let data = root.appending(path: "WebsiteDataStore/profile", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: data, withIntermediateDirectories: true)
+        let cookies = data.appending(path: "Cookies.binarycookies")
+        try Data().write(to: cookies)
+        // Stands in for WebKit's network process, still writing after the app has gone.
+        let writer = Process()
+        writer.executableURL = URL(fileURLWithPath: "/bin/sh")
+        writer.arguments = ["-c", "exec 3>>\"$0\"; sleep 1.5", cookies.path]
+        try writer.run()
+        try UpdateSwap.launch(pid: 999_999, app: current, staged: staged, relaunch: false,
+                              websiteData: data.deletingLastPathComponent())
+        try await Task.sleep(for: .seconds(1))
+        #expect(marker(current) == "old", "nothing moves while WebKit still holds the website data")
+        writer.waitUntilExit()
+        try await Task.sleep(for: .seconds(1))
+        #expect(marker(current) == "new")
+    }
+
     private func neighbours(of app: URL) throws -> [String] {
         try FileManager.default.contentsOfDirectory(atPath: app.deletingLastPathComponent().path).sorted()
     }
