@@ -1,43 +1,29 @@
 # Kaizu Roadmap
 
-Arc-style browser, native WebKit, quiet craft. This is the living plan: what's
-missing versus Arc, in what order we build it, and how it should *feel*.
-Architecture rules live in [ARCHITECTURE.md](ARCHITECTURE.md); market research
-in [research/](research/).
-
-Effort: **S** = an evening, **M** = a few sessions, **L** = a project.
+Kaizu is a native WebKit browser for Mac. The [architecture guide](ARCHITECTURE.md) covers its implementation. The [changelog](../CHANGELOG.md) separates public releases from changes on the development branch.
 
 ## Where things stand
 
-| Area | Shipped | Planned work |
-| --- | --- | --- |
-| Moving to Kaizu | Arc sidebar import with a preview, bookmark and history import | Verify common password-manager extensions by hand |
-| First launch | Mac download and signed automatic updates | Developer ID signing and Apple notarization |
-| Everyday browsing | Split view, tab hibernation, daily filter updates and verified cookie rejection on two live sites | Compare content-blocking coverage and test more consent providers and regions |
-| Browser integration | Per-site permissions and notification counts in the tab and Dock | Request Apple’s browser passkey entitlement and test macOS notification banners |
-
-See the [changelog](../CHANGELOG.md) for version-by-version changes. The phases below track implementation details.
+The public Mac release is **v0.2.5**. It includes a local sidebar, separate browsing profiles, pinned folders, tab archiving, Peek, split view, and built-in ad and tracker blocking. Development builds can also import a saved Arc sidebar or Markdown export, search archived tabs by profile, and import WebKit content-blocker rules. [v0.2.5 download and notes](https://github.com/joinprototype/kaizu/releases/tag/v0.2.5) · [Unreleased changes](../CHANGELOG.md#unreleased)
 
 ## Path to 1.0 on Mac
 
-The first release should carry an Arc user from importing a sidebar through a week of browsing, a restart and an update with their tabs and logins intact. These are the checks we use to judge readiness.
+A person switching from Arc should be able to import their sidebar, browse for a week, restart and update Kaizu, and find their spaces, pages, logins and drafts where they left them. The [release checklist](https://github.com/joinprototype/kaizu/issues/48) records the candidate, macOS version and evidence for each step.
 
-| Priority | Work | Evidence to collect |
+| Workflow | Verified on development builds | Still needed for 1.0 |
 | --- | --- | --- |
-| Recover a workspace | Offer a browsable, searchable archive per profile. Exercise session recovery, import undo and upgrades with existing data. | Reopen the intended page in its original space and recover pinned folders after a restart. Check with two profiles and a private window. |
-| Trust it for daily work | Test extension installation, password filling, media calls, permissions and notifications on representative sites. | Record versions and observed outcomes for 1Password and Bitwarden, including desktop integration separately. Publish known limitations. |
-| Ship safely | Add repeatable build and test checks. Sign with Developer ID, notarize and verify a clean install and a signed upgrade. Document what the browser sends off-device. | Test the downloadable release on the minimum supported macOS and a current Mac. Apple enrollment or a Developer ID certificate is pending. |
-| Match the switching workflow | Preserve sidebar organization, Peek, little windows, routing and split layouts. Verify real Arc and Safari imports with consented or redacted samples. | Compare the preview with the resulting spaces, folders and tabs. Repeat the import and check Undo. |
+| Bring an Arc workspace | Two public Arc sidebar samples retained their tabs and spaces after restart. Repeating either import added zero tabs. Undo, split recovery and restoring an archived tab to its original profile have packaged tests. | Repeat the switching workflow on the final candidate, including equally named spaces in separate profiles and a private window. [Migration results](#migration-checks) · [Same-name import regression](https://github.com/joinprototype/kaizu/pull/59) |
+| Keep logins and drafts | On macOS 15 and 27, the restored page read its saved draft after ordinary quit, an upgrade from v0.2.5 and a signed update. The tests checked the original profile, space and tab. | Confirm the quit-time cookie flush and the update swap that waits for WebKit ([#67](https://github.com/joinprototype/kaizu/pull/67)) end the intermittent macOS 27 login loss: a daily-use trial on a real profile, then the release rehearsal. [Draft recovery](https://github.com/joinprototype/kaizu/issues/46) · [Login investigation](https://github.com/joinprototype/kaizu/issues/57) · [Quit fix](https://github.com/joinprototype/kaizu/pull/60) |
+| Browse for a week | Bitwarden for Safari filled a matching HTTPS login. KeePassXC Global Auto-Type filled a Kaizu form. Hosted direct and relayed media calls carried video, audio and data. | Record a week of ordinary use on the candidate. Include 1Password sign-in and filling, desktop unlock, a physical camera and microphone call with another participant, and notification delivery. [Bitwarden trial](https://github.com/joinprototype/kaizu/actions/runs/44291691454) · [KeePassXC trial](https://github.com/joinprototype/kaizu/actions/runs/44350921478) · [Media checks](https://github.com/joinprototype/kaizu/issues/54) |
+| Install and update | A GitHub Actions rehearsal uses the same package for upgrades on macOS 15 and 27. The updater verified and installed the public signed update. | Prototype needs a Developer ID Application certificate and notarization credentials. Check the stapled download with Gatekeeper, then install and upgrade on the exact minimum macOS 15.4 and a current Mac. [Rehearsal results](https://github.com/joinprototype/kaizu/actions/runs/44408856766) · [Packaging](../README.md#release) |
 
 **Local candidate packaging.** On macOS 27.0.1, the release build of `c27d4e2` produced an arm64 app with Hardened Runtime and an ad-hoc signature. The Mach-O and bundle both declared macOS 15.4 as the minimum. All 13 runtime resources and the signed entitlements matched the source. The read-only DMG contained the identical app and an Applications shortcut. The updater staged the ZIP and recovered the byte-identical executable. All 212 release-configuration tests passed.
 
 A separate run of `scripts/release.sh 1.0.0` in a disposable source copy used a temporary update key. Starting with v0.2.5 build 10, it produced 1.0.0 build 11, verified the ZIP signature and the disk image checksum, and generated matching download redirects, feed and website metadata. Developer ID signing, notarization, a first launch on macOS 15.4 and verification of the eventual release artifact remain open.
 
-**Drafts and upgrades from v0.2.5.** On macOS 15, v0.2.5 acknowledged a site's local-storage write and quit. The key was already absent from its database before the new browser opened. The restored page recovered its login cookie but read the key as missing twice. In twelve separate trials the value was present after quit and survived every restart or upgrade. This matters for sites that keep unfinished work on the device. [Failure with database checkpoints](https://github.com/joinprototype/kaizu/actions/runs/44391560505/job/135117070079) · [Twelve migration trials](https://github.com/joinprototype/kaizu/actions/runs/44390801472/job/135107581907)
-
 The release checks verify that the new browser reads data committed by v0.2.5 in the original profile, space and tab. They also require a new edit made by a page during candidate shutdown to survive on the first read after an ordinary quit and after installing a signed update. [Draft recovery investigation](https://github.com/joinprototype/kaizu/issues/46)
 
-Kaizu’s advantages to demonstrate are built-in tracking protection, a local sidebar with no account requirement, and mixed row-and-column splits. Performance comparisons require the same pages, hardware and measurement procedure in both browsers. Sync, Boosts, Easels and an AI panel are outside this proposed 1.0 scope. Cross-device sync remains a significant gap for people who use Arc on multiple devices.
+**Compared with Arc**, Kaizu offers an account-free local sidebar, built-in tracking protection and splits that mix rows and columns in one window. People who rely on cross-device sync, Boosts or Easels will still need those capabilities elsewhere. Those features and an AI panel are outside the Mac 1.0 scope. Browser passkeys depend on Apple granting the entitlement and a successful sign-in test. [Feature comparison](#gap-versus-arc)
 
 At commit `6b699be`, after the fix for Quit from an AppKit action, the upgrade from v0.2.5 and the signed update each recovered the login, local storage and original workspace on macOS 15.8.2 and 27.0.1. On macOS 15 the signed-update test found no cookie file before quit, found both cookies on disk after quit, and received them after installing build 10. Both ordinary-quit checks restored the final draft edit on the first read. The earlier intermittent cookie loss is still unexplained. [Four upgrade results](https://github.com/joinprototype/kaizu/actions/runs/44415780819) · [Cookie investigation](https://github.com/joinprototype/kaizu/issues/57)
 
@@ -64,6 +50,8 @@ Kaizu imported four successful destination pages and five bookmarks from Chromiu
 For a Safari ZIP containing multiple history or bookmark files, the development import preview starts with both categories skipped. Choose files by their archive paths and send them to the named Kaizu space and profile. A fixture with Work and Personal directories, each containing the same localized history filename and bookmark filename, verified that selecting Work returned only its pages and bookmarks. Selecting all files returned both sets.
 
 On a fresh macOS 27.0.1 account, Safari visited and bookmarked a local page. Its export dialog accepted Bookmarks and History as the only selected categories. After Save, macOS requested authentication and the runner produced no ZIP. A locally authenticated export of those two categories is still needed to verify the complete Safari-to-Kaizu workflow. [Fresh Safari export attempt](https://github.com/joinprototype/kaizu/actions/runs/44294859012)
+
+**Drafts and upgrades from v0.2.5.** On macOS 15, v0.2.5 acknowledged a site's local-storage write and quit. The key was already absent from its database before the new browser opened. The restored page recovered its login cookie but read the key as missing twice. In twelve separate trials the value was present after quit and survived every restart or upgrade. This matters for sites that keep unfinished work on the device. [Failure with database checkpoints](https://github.com/joinprototype/kaizu/actions/runs/44391560505/job/135117070079) · [Twelve migration trials](https://github.com/joinprototype/kaizu/actions/runs/44390801472/job/135107581907)
 
 On macOS 15.8.2, the published v0.2.5 app opened a saved tab and received a persistent login cookie from a local test site. After the app quit, the runner replaced its bundle and launched the candidate without a URL. The same tab reopened in its original space and profile, and the site received its original cookie. CI repeats this [upgrade check](https://github.com/joinprototype/kaizu/actions/runs/44264250004) alongside a clean launch. A separate [production-feed check](https://github.com/joinprototype/kaizu/actions/runs/44281594637) lowered the test bundle’s advertised build number, then let the candidate download and verify the public v0.2.5 archive. Quitting installed build 10. The original tab and test login survived. The exact minimum macOS 15.4 and Apple notarization remain open checks.
 
@@ -168,6 +156,8 @@ What that means for us:
    tail (Easels, Live Folders) before the core is solid.
 
 ### Sprint: now → Dec 22
+
+Effort estimates below use **S** for an evening, **M** for a few sessions and **L** for a project.
 
 Pulled forward from the phases below, in order:
 1. [x] Phase 0 minimum: commit, tests, session `schemaVersion` + migration, Profile/Space split **M**
