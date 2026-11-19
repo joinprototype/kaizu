@@ -48,7 +48,7 @@ extension BrowserTab: WKNavigationDelegate {
             if targetExtension != extensionBaseURL {
                 decisionHandler(.cancel)
                 if !profile.isPrivate {
-                    Task { self.reopen(at: target) }
+                    Task { self.cross(to: target) }
                 }
                 return
             }
