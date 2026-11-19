@@ -6,7 +6,7 @@ import UniformTypeIdentifiers
 /// File → Import Browsing Data…: history and bookmarks from another browser.
 /// Chromium browsers are read where they are; Safari hands over an export.
 struct BrowsingDataImportView: View {
-    enum Loaded: Sendable {
+    nonisolated enum Loaded: Sendable {
         case single(BrowsingData)
         case archive(SafariExport.Archive)
 
@@ -18,7 +18,7 @@ struct BrowsingDataImportView: View {
         }
     }
 
-    enum Source: Hashable, Sendable {
+    nonisolated enum Source: Hashable, Sendable {
         case browser(ChromiumProfile)
         case file(URL)
 
@@ -36,7 +36,9 @@ struct BrowsingDataImportView: View {
             }
         }
 
-        func read() throws -> Loaded {
+        /// Reading a big history file takes a while, so it runs off the main thread.
+        @concurrent
+        func read() async throws -> Loaded {
             switch self {
             case .browser(let profile): .single(try profile.read())
             case .file(let url) where url.pathExtension.lowercased() == "zip": .archive(try SafariExport.readArchive(url))
@@ -193,7 +195,7 @@ struct BrowsingDataImportView: View {
         problem = nil
         guard let source else { return }
         do {
-            let read = try await Task.detached { try source.read() }.value
+            let read = try await source.read()
             guard !Task.isCancelled else { return }
             loaded = (source, read)
             // Safari profiles share one bookmarks file; a lone file needs no choice.

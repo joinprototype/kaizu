@@ -125,9 +125,13 @@ struct ArcImportView: View {
         readID = UUID()
     }
 
+    @concurrent
+    private nonisolated static func read(_ source: URL) async -> Result<ArcSidebar, any Error> {
+        Result { try ArcSidebar.load(from: source) }
+    }
+
     private func load() async {
-        let source = source
-        let result = await Task.detached { Result { try ArcSidebar.load(from: source) } }.value
+        let result = await Self.read(source)
         guard !Task.isCancelled else { return }
         switch result {
         case .success(let loaded):

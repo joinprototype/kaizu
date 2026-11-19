@@ -9,7 +9,6 @@ import AppKit
 ///
 /// Nothing is made until sounds are on. The main thread only decides and
 /// hands off; `SoundEngine` renders and plays on its own queue.
-@MainActor
 final class SoundPlayer {
     /// What macOS says, read on each play so changes apply at once.
     struct System {
@@ -92,7 +91,7 @@ final class SoundPlayer {
 /// 10 to 140 ms). Scheduling a rendered buffer costs microseconds; the
 /// engine stops after a few quiet seconds so an idle Kaizu has no audio
 /// thread waking up, and starts again (about 10 ms, on this queue) when needed.
-final class SoundEngine: @unchecked Sendable {
+nonisolated final class SoundEngine: @unchecked Sendable {
     private static let idleTimeout: TimeInterval = 4
 
     private let queue = DispatchQueue(label: "com.joinprototype.kaizu.sounds", qos: .userInitiated)
@@ -101,7 +100,7 @@ final class SoundEngine: @unchecked Sendable {
     private var idleStop: DispatchWorkItem?
     /// Counts sounds heard through to the end, for tests. Written from the
     /// audio thread, so it's a locked box rather than state on `queue`.
-    private final class Counter: @unchecked Sendable {
+    private nonisolated final class Counter: @unchecked Sendable {
         private let lock = NSLock()
         private var count = 0
         func add() { lock.withLock { count += 1 } }

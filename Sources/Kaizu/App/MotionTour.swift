@@ -8,7 +8,6 @@ import QuartzCore
 /// (a frame counts as dropped when it took more than 1.5 refresh
 /// intervals). Needs the window on an awake screen; use a separate copy
 /// (KAIZU_SUPPORT and its own bundle id), since it opens tabs and spaces.
-@MainActor
 final class MotionTour: NSObject {
     private let store: BrowserStore
     private var link: CADisplayLink?

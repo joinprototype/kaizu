@@ -17,7 +17,6 @@ struct ReaderArticle: Identifiable {
 
     /// Runs Mozilla's Readability on a copy of the page, in an isolated world
     /// the page can't see. Nil when the page has no article.
-    @MainActor
     static func extract(from tab: BrowserTab) async -> ReaderArticle? {
         guard tab.isLoaded, let readability else { return nil }
         let body = readability + """

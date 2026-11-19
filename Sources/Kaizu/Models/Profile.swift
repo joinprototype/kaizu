@@ -3,7 +3,7 @@ import WebKit
 
 /// A browsing identity: its own cookies, logins and storage, plus the
 /// favorites shared by every space that uses it.
-@MainActor @Observable
+@Observable
 final class Profile: Identifiable {
     let id: UUID
     var name: String

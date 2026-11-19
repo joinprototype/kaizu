@@ -5,7 +5,7 @@ import WebKit
 
 extension DebugHooks {
     /// Exercise Undo across two regular windows, with new tabs and a saved login in an imported profile.
-    @MainActor static func checkArcImportUndo(in store: BrowserStore, file: URL) async throws {
+    static func checkArcImportUndo(in store: BrowserStore, file: URL) async throws {
         precondition(ProcessInfo.processInfo.environment["KAIZU_SUPPORT"] != nil)
         precondition(store.spaces.count == 1 && store.activeSpace.allTabs.isEmpty)
         var sidebar = try ArcSidebar.load(from: file)
@@ -64,7 +64,7 @@ extension DebugHooks {
         print("Arc import Undo preserved later edits, a favorite and a profile login, and removed the untouched space.")
     }
 
-    @MainActor private static func checkIncrementalArcImport(in store: BrowserStore, space: Space, sidebar: ArcSidebar) {
+    private static func checkIncrementalArcImport(in store: BrowserStore, space: Space, sidebar: ArcSidebar) {
         let folder = space.pinned.folders.first { $0.name == "Type" }!
         let pin = folder.children.tabs[0]
         store.rename(pin, to: "My reference")
@@ -90,7 +90,7 @@ extension DebugHooks {
         print("Repeat Arc import appended one nested pin and Undo restored the edited sidebar exactly.")
     }
 
-    @MainActor static func checkRestoredArcImportUndo(in store: BrowserStore) async {
+    static func checkRestoredArcImportUndo(in store: BrowserStore) async {
         let design = store.spaces.first { $0.name == "Design" }!
         let personal = store.spaces.first { $0.name == "Personal" }!
         let signedIn = store.spaces.first { $0.name == "Signed In" }!

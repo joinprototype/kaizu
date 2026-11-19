@@ -9,7 +9,7 @@ import WebKit
 /// `RuleListCompiler`) and cached by WebKit. Each tab gets its own user
 /// content controller so blocking can be paused per site without recompiling
 /// anything.
-@MainActor @Observable
+@Observable
 final class ContentBlocker {
     enum State: Equatable {
         case idle

@@ -2,7 +2,7 @@ import BrowserCore
 import Foundation
 
 /// A folder in a space's pinned section (Arc's tab groups). Folders nest.
-@MainActor @Observable
+@Observable
 final class Folder: Identifiable {
     let id: UUID
     var name: String
@@ -29,7 +29,6 @@ enum SidebarItem: Identifiable {
         }
     }
 
-    @MainActor
     var record: SidebarItemRecord {
         switch self {
         case .tab(let tab):
@@ -42,7 +41,6 @@ enum SidebarItem: Identifiable {
 
 // MARK: - Tree operations
 
-@MainActor
 extension [SidebarItem] {
     /// All tabs, depth-first in sidebar order.
     var tabs: [BrowserTab] {

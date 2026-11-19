@@ -136,7 +136,7 @@ struct ExtensionSettings: View {
             }
         }
         .formStyle(.grouped)
-        .task { safariApps = await Task.detached(priority: .utility) { ExtensionHost.safariExtensionApps() }.value }
+        .task { safariApps = await ExtensionHost.findSafariExtensionApps() }
     }
 
     private func chooseExtension() {

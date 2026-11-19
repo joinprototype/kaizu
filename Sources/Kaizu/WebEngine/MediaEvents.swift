@@ -6,7 +6,6 @@ import WebKit
 /// elements it muted itself are unmuted again). Runs in an isolated world,
 /// invisible to pages. The script is one of the content blocker's standard
 /// scripts; each tab adds its own message handler.
-@MainActor
 final class MediaEvents: NSObject, WKScriptMessageHandler {
     private static let name = "kaizuMedia"
     static let script = WKUserScript(

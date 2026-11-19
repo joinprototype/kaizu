@@ -1,6 +1,6 @@
 import Foundation
 
-enum BundledResource {
+nonisolated enum BundledResource {
     /// Looks in the app bundle, falling back to the repo's Resources folder
     /// when the bare executable runs from `swift run` or Xcode.
     static func url(named name: String, extension ext: String, in subdirectory: String) -> URL? {

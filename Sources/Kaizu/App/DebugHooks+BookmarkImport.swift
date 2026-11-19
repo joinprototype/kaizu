@@ -3,7 +3,7 @@ import AppKit
 import BrowserCore
 
 extension DebugHooks {
-    @MainActor static func checkBookmarkImportUndo(in store: BrowserStore) async {
+    static func checkBookmarkImportUndo(in store: BrowserStore) async {
         precondition(ProcessInfo.processInfo.environment["KAIZU_SUPPORT"] != nil)
         let space = store.activeSpace
         precondition(space.allTabs.isEmpty)

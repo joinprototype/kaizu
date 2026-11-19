@@ -24,8 +24,12 @@ The executable contains the UI, app and window models, and WebKit integration. I
 5. **Design tokens, not literals.** Colors, radii, spacing and motion come from
    `DesignSystem`. A hex literal or `withAnimation(.spring(...))` in a feature
    view is a review smell.
-6. **Strict Swift 6 concurrency.** UI + models are `@MainActor`; slow work
-   (history writes, favicon fetches, icon decoding) lives in actors.
+6. **Strict Swift 6 concurrency.** The app target defaults to the main actor
+   (`defaultIsolation(MainActor.self)`), so UI and models need no annotation.
+   Code that runs anywhere says `nonisolated`; blocking work (file reads,
+   list conversion, unzipping) is a `@concurrent` function rather than a
+   `Task.detached`; long-lived background state (history, favicons) lives in
+   actors or on its own queue.
 7. **No singletons outside the composition root.** Services are created once in
    `AppEnvironment` and injected (SwiftUI `Environment`, AppKit initializers).
 
@@ -75,7 +79,7 @@ a small protocol (`PageViewProviding`) that `KaizuApp` wires up.
 ## Target state model
 
 ```
-AppModel (one per app, @MainActor @Observable)
+AppModel (one per app, @Observable, main actor)
 ├── profiles: [Profile]          data containers → one WKWebsiteDataStore each
 ├── spaces:   [Space]            what the sidebar shows; each uses one profile
 │   ├── favorites / pinned: [SidebarItem]   tab | folder | split group

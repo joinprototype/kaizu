@@ -6,7 +6,7 @@ import Foundation
 /// and the services behind them. What differs between windows (which space
 /// and tab each shows, its sidebar, its overlays) is its `BrowserStore`.
 /// Split by concern across `AppModel+*.swift`.
-@MainActor @Observable
+@Observable
 final class AppModel {
     var profiles: [Profile] = []
     var spaces: [Space] = []

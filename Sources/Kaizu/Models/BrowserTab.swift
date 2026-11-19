@@ -4,7 +4,7 @@ import WebKit
 
 /// A tab owns its WKWebView, created lazily the first time the tab is shown
 /// so restored sessions don't load every page at launch.
-@MainActor @Observable
+@Observable
 final class BrowserTab: NSObject, Identifiable {
     let id: UUID
     let profile: Profile

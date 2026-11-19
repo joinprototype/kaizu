@@ -2,18 +2,18 @@ import AppKit
 import CoreTransferable
 import UniformTypeIdentifiers
 
-extension UTType {
+nonisolated extension UTType {
     /// A tab dragged from the sidebar. Deliberately not text: web views take
     /// text drops, and would swallow a tab dragged onto the page.
     static let kaizuTab = UTType(exportedAs: "com.joinprototype.kaizu.tab")
 }
 
-extension NSPasteboard.PasteboardType {
+nonisolated extension NSPasteboard.PasteboardType {
     static let kaizuTab = Self(UTType.kaizuTab.identifier)
 }
 
 /// What dragging a sidebar tab carries: the tab's id.
-struct TabDrag: Transferable {
+nonisolated struct TabDrag: Transferable {
     let id: UUID
 
     static var transferRepresentation: some TransferRepresentation {

@@ -80,13 +80,13 @@ struct Command: Identifiable {
 
     /// Whether it can run now. AppKit's own actions answer that through the
     /// responder chain instead, so they say yes here.
-    @MainActor func canRun(in app: AppModel) -> Bool {
+    func canRun(in app: AppModel) -> Bool {
         isEnabled?(app) ?? true
     }
 
     /// Runs our own code if it's available now; AppKit's actions go to
     /// whatever has focus.
-    @MainActor func perform(in app: AppModel) {
+    func perform(in app: AppModel) {
         switch action {
         case .run(let run):
             guard canRun(in: app) else { return }

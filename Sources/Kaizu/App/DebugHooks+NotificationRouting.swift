@@ -3,7 +3,6 @@ import AppKit
 import WebKit
 
 extension DebugHooks {
-    @MainActor
     static func qaNotificationRouting(_ store: BrowserStore) async {
         precondition(ProcessInfo.processInfo.environment["KAIZU_SUPPORT"] != nil)
         let app = store.app
@@ -82,7 +81,6 @@ extension DebugHooks {
         NSApp.terminate(nil)
     }
 
-    @MainActor
     private static func waitForPageFlag(_ flag: String, on tab: BrowserTab) async {
         for _ in 0..<100 {
             if (try? await tab.webView.evaluateJavaScript("window." + flag)) as? Bool == true { return }

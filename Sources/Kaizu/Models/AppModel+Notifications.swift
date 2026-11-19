@@ -1,7 +1,7 @@
 import AppKit
 
 /// Stored by macOS with the notification, so a click can arrive after a restart.
-struct SiteNotificationDestination: Sendable {
+nonisolated struct SiteNotificationDestination: Sendable {
     let tabID: UUID?
     let profileID: UUID?
     let spaceID: UUID?

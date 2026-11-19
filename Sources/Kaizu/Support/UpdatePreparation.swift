@@ -2,7 +2,6 @@ import BrowserCore
 import Foundation
 
 /// Manual and automatic checks share the download for each build.
-@MainActor
 final class UpdatePreparation {
     private(set) var staged: StagedUpdate?
     private var pending: [Int: Task<StagedUpdate, Error>] = [:]
@@ -43,13 +42,16 @@ final class UpdatePreparation {
                 obsolete = folder(for: previous.build)
             }
             // Only retire verified builds. Other folders may still be downloading.
-            await Task.detached(priority: .utility) {
-                try? FileManager.default.removeItem(at: obsolete)
-            }.value
+            await Self.remove(obsolete)
             // Another check may have finished during cleanup.
             return staged ?? ready
         }
         pending[build] = task
         return task
+    }
+
+    @concurrent
+    private nonisolated static func remove(_ folder: URL) async {
+        try? FileManager.default.removeItem(at: folder)
     }
 }

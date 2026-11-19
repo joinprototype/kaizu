@@ -5,7 +5,6 @@ import WebKit
 /// the active space's sidebar tabs. Windows on the same space list the same
 /// sidebar, but extensions expect a tab in one window: the one showing it,
 /// else the first on its space.
-@MainActor
 final class MainWindowAdapter: NSObject, WKWebExtensionWindow {
     weak var store: BrowserStore?
 

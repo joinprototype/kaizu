@@ -1,6 +1,6 @@
 import Foundation
 
-enum AppPaths {
+nonisolated enum AppPaths {
     /// `~/Library/Application Support/Kaizu/`, created on first use.
     static let support: URL = {
         #if DEBUG

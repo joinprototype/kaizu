@@ -3,7 +3,7 @@ import AppKit
 import WebKit
 
 extension DebugHooks {
-    @MainActor static func checkPrivateBlocking(in store: BrowserStore) async throws {
+    static func checkPrivateBlocking(in store: BrowserStore) async throws {
         precondition(ProcessInfo.processInfo.environment["KAIZU_SUPPORT"] != nil)
         func report(_ message: String) {
             FileHandle.standardError.write(Data((message + "\n").utf8))

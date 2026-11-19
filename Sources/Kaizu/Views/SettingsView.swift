@@ -235,14 +235,12 @@ private struct LinkSettings: View {
 }
 
 private enum DefaultBrowser {
-    @MainActor
     static var isCurrent: Bool {
         NSWorkspace.shared.urlForApplication(toOpen: URL(string: "https://example.com")!)?.standardizedFileURL
             == Bundle.main.bundleURL.standardizedFileURL
     }
 
     /// macOS asks the user to confirm.
-    @MainActor
     static func makeCurrent() async {
         try? await NSWorkspace.shared.setDefaultApplication(at: Bundle.main.bundleURL, toOpenURLsWithScheme: "http")
     }

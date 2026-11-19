@@ -3,7 +3,7 @@ import WebKit
 
 /// Saves every download straight to ~/Downloads (no prompt, like Safari's
 /// default) and keeps a short list for the sidebar's downloads panel.
-@MainActor @Observable
+@Observable
 final class DownloadManager: NSObject, WKDownloadDelegate {
     static let shared = DownloadManager()
     static let listLimit = 20

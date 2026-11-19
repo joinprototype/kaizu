@@ -5,7 +5,6 @@ import SwiftUI
 /// terminal, Raycast's launcher): a shortcut set in Settings → General
 /// brings it up, answers show right there, pages open in a little window.
 /// Esc, the shortcut again, or clicking elsewhere puts it away.
-@MainActor
 final class QuickBarController: NSObject, NSWindowDelegate {
     private let panel: QuickBarPanel
     private let hostingView = NSHostingView(rootView: AnyView(EmptyView()))

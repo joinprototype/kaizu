@@ -34,7 +34,6 @@ extension AppModel {
     }
 }
 
-@MainActor
 private extension Array where Element == SidebarItem {
     mutating func removeImported(_ ids: Set<UUID>) {
         removeAll { item in

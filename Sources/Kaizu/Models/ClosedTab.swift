@@ -13,7 +13,6 @@ struct ClosedTab {
 }
 
 extension Array where Element == ClosedTab {
-    @MainActor
     /// Pass `keepsHistory: false` for tabs that will fall outside the newest
     /// `historyCount` anyway, so their page state isn't serialized for nothing.
     mutating func remember(_ tab: BrowserTab, in spaceID: UUID, keepsHistory: Bool = true) {

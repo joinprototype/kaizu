@@ -3,7 +3,7 @@ import Foundation
 
 /// What the sidebar shows: a named, themed set of pinned items and today's
 /// tabs, backed by one profile (Arc's Spaces).
-@MainActor @Observable
+@Observable
 final class Space: Identifiable {
     static let symbols = [
         "person.fill", "briefcase.fill", "house.fill", "graduationcap.fill",

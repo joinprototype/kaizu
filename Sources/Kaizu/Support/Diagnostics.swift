@@ -9,7 +9,7 @@ import OSLog
 /// Two sources: MetricKit hands over crash, hang and resource diagnostics on
 /// the launch after they happen (saved to `Diagnostics/`), and macOS writes
 /// its own crash reports (.ips) for Kaizu and the WebKit processes it starts.
-final class Diagnostics: NSObject, MXMetricManagerSubscriber, Sendable {
+nonisolated final class Diagnostics: NSObject, MXMetricManagerSubscriber, Sendable {
     static let shared = Diagnostics()
     static let launchedAt = Date()
     static let directory = AppPaths.support.appending(path: "Diagnostics", directoryHint: .isDirectory)

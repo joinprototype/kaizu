@@ -3,7 +3,6 @@ import AppKit
 /// Every main-menu command, in menu order. `MainMenu` builds the menu bar
 /// from this; the command bar finds these by name and the Keyboard
 /// Shortcuts card lists their keys.
-@MainActor
 enum CommandRegistry {
     static let mainMenu: [MenuSpec] = {
         var menus = [kaizuMenu, fileMenu, editMenu, viewMenu, historyMenu, tabsMenu, spacesMenu, windowMenu]

@@ -6,7 +6,7 @@ import Foundation
 /// nothing to bundle and nothing borrowed. Each is short, quiet and soft,
 /// swelling in rather than clicking. `SoundPlayer` decides when one plays;
 /// it's off unless the user turns it on.
-enum Sound: String, CaseIterable, Sendable {
+nonisolated enum Sound: String, CaseIterable, Sendable {
     /// The command bar comes up: a small hand bell on the chart table.
     case commandBar
     /// A tab opens from the command bar, or comes back with ⇧⌘T: a card laid down.
@@ -76,7 +76,7 @@ enum Sound: String, CaseIterable, Sendable {
 }
 
 /// Where a sound is put together, one layer at a time.
-private struct Tape {
+private nonisolated struct Tape {
     let rate: Double
     var samples: [Double]
 
