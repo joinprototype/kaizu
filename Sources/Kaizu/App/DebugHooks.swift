@@ -37,7 +37,7 @@ private final class StandInDrag: NSObject, NSDraggingInfo {
 }
 
 /// Lets screenshots / manual QA jump straight into a UI state:
-///   KAIZU_DEBUG=commandbar|currency|notifications|notifywake|contextmenu|location|space|settings|history|private|peek|switcher|extension|nosidebar|reader|pin|split|splitdrop|capture|quickbar|open|swipe|spotlight|spotlightreset|commands|learn|appearance|hide|hotkeys|tour|bugreport|brokensite|windows|privatewindow|tabmoves|stress|sites|showcase|browsingdata|arcimport|arcimport-run .build/debug/Kaizu
+///   KAIZU_DEBUG=commandbar|currency|notifications|notifywake|contextmenu|location|space|settings|history|private|peek|switcher|extension|nosidebar|reader|pin|split|splitdrop|capture|quickbar|open|swipe|spotlight|spotlightreset|commands|learn|appearance|hide|hotkeys|tour|bugreport|brokensite|windows|privatewindow|tabmoves|stress|sites|consent|showcase|browsingdata|arcimport|arcimport-run .build/debug/Kaizu
 /// With `commandbar` or `quickbar`, KAIZU_TYPE="gi" types into it key by key (through
 /// the real field editor, so inline completion runs).
 /// `reader` shows Reader for the selected tab, or for KAIZU_URL.
@@ -1330,6 +1330,9 @@ enum DebugHooks {
                     }
                     FileHandle.standardError.write(Data("QA memory load: \(url.host() ?? "") \(started.duration(to: .now))\n".utf8))
                 }
+                if !AutoconsentBridge.usesPageWorld {
+                    FileHandle.standardError.write(Data("QA memory autoconsent: \(AutoconsentBridge.framesServed) frames (\(AutoconsentBridge.mainFramesServed) main), \(AutoconsentBridge.bytesServed) B of rules, \(AutoconsentBridge.evaluations) page checks so far\n".utf8))
+                }
                 await step("round \(round) loaded")
                 if environment["KAIZU_HIBERNATE"] != nil {
                     await store.app.hibernateIdleTabs(olderThan: 0)
@@ -1418,7 +1421,7 @@ enum DebugHooks {
             JSON.stringify({text: document.body ? document.body.innerText.trim().length : -1,
               nodes: document.querySelectorAll('*').length, images: document.images.length,
               height: document.documentElement.scrollHeight,
-              consent: (window.autoconsentStandalone?.messages ?? []).filter(m => m.type != 'eval').map(m => m.type + (m.cmp ? ':' + m.cmp : '') + (m.result !== undefined ? '=' + m.result : '')).slice(-6),
+              consent: ((window.kaizuAutoconsent ?? window.autoconsentStandalone)?.messages ?? []).filter(m => m.type != 'eval').map(m => m.type + (m.cmp ? ':' + m.cmp : '') + (m.result !== undefined ? '=' + m.result : '')).slice(-6),
               oneTap: !!document.querySelector('iframe[src*="accounts.google.com/gsi/iframe/select"]') && getComputedStyle(document.querySelector('iframe[src*="accounts.google.com/gsi/iframe/select"]')).display != 'none'})
             """
         let settling = environment["KAIZU_SITE_WAIT"].flatMap(Double.init) ?? 2.5
@@ -1433,7 +1436,8 @@ enum DebugHooks {
                 }
                 let loaded = (ContinuousClock.now - start).components.seconds
                 try? await Task.sleep(for: .seconds(settling))
-                let result = (try? await tab.webView.evaluateJavaScript(probe)) as? String ?? "{}"
+                // Reads the page's DOM and what autoconsent did, from its world.
+                let result = (try? await tab.webView.evaluateJavaScript(probe, contentWorld: AutoconsentBridge.world)) as? String ?? "{}"
                 let name = url.host() ?? "site"
                 FileHandle.standardError.write(Data("QA site \(name) | \(tab.url?.host() ?? "none") | \(loaded)s\(tab.isLoading ? " still loading" : "") | \(result) | \(tab.title.prefix(50))\n".utf8))
                 if let folder = environment["KAIZU_SHOTS"], let image = await tab.screenshot(of: nil), let data = image.tiffRepresentation {
@@ -1793,6 +1797,8 @@ enum DebugHooks {
             qaStress(store)
         case "memory":
             qaMemory(store)
+        case "consent":
+            qaConsent(store)
         case "rulelists":
             qaRuleLists(store)
         case "listrefresh":

@@ -52,12 +52,12 @@ extension BrowserStore {
     func showCookiePopupResult() {
         guard let tab = selectedTab, tab.isLoaded else { return }
         let script = """
-            JSON.stringify((window.autoconsentStandalone?.messages ?? [])
+            JSON.stringify(((window.kaizuAutoconsent ?? window.autoconsentStandalone)?.messages ?? [])
               .filter(m => ['cmpDetected', 'popupFound', 'optOutResult', 'autoconsentDone', 'autoconsentError'].includes(m.type))
               .map(m => m.type + (m.cmp ? ': ' + m.cmp : '') + (m.result !== undefined ? ' = ' + m.result : '')))
             """
         Task {
-            let result = (try? await tab.webView.evaluateJavaScript(script)) as? String
+            let result = (try? await tab.webView.evaluateJavaScript(script, contentWorld: AutoconsentBridge.world)) as? String
             showToast(result.map { $0 == "[]" ? "No cookie pop-up handled on this page" : $0 } ?? "autoconsent not running")
         }
     }
