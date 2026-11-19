@@ -152,9 +152,9 @@ struct SoundTests {
         #expect(samples.allSatisfy { $0.isFinite })
         #expect(duration <= Sound.longest)
         #expect(duration >= 0.1)
-        #expect(dB(peak) <= -15.9, "well clear of clipping and quieter than a system alert")
-        #expect(dB(peak) >= -22)
-        #expect((-40.0 ... -20).contains(dB(body)))
+        #expect(dB(peak) <= -23.9, "soft: far below a system alert")
+        #expect(dB(peak) >= -30)
+        #expect((-46.0 ... -26).contains(dB(body)))
         #expect(abs(samples.first ?? 1) < 0.002 && abs(samples.last ?? 1) < 0.0001, "starts and ends without a click")
         #expect(sound.render() == samples, "renders the same every time")
 

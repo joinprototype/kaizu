@@ -3,7 +3,8 @@ import Foundation
 /// Kaizu's interface sounds, made here in code from a few rung tones and a
 /// little filtered noise, so there's nothing to bundle and nothing borrowed.
 /// The chart room's materials: paper, wood, brass, a small bell. Each is
-/// short and quiet, with its main note between 200 and 800 Hz on one G
+/// short, quiet and low, swelling in over about ten milliseconds rather
+/// than clicking, with its main note between 150 and 400 Hz on one G
 /// pentatonic scale, so they sit together. `SoundPlayer` decides when
 /// one plays; it's off unless the user turns it on.
 enum Sound: String, CaseIterable, Sendable {
@@ -28,57 +29,50 @@ enum Sound: String, CaseIterable, Sendable {
 
     /// The sound as mono samples at `sampleRate`, from silence to silence.
     func render(sampleRate rate: Double = Sound.sampleRate) -> [Float] {
-        let g4 = 392.0, b4 = 493.88, d5 = 587.33, e5 = 659.26, g5 = 783.99
+        // An octave below the first set: low enough to sit under speech and
+        // music instead of cutting through them.
+        let g3 = 196.0, b3 = 246.94, d4 = 293.66, e4 = 329.63, g4 = 392.0
         switch self {
         case .commandBar:
-            var tape = Tape(duration: 0.23, rate: rate)
-            tape.rustle(from: 2_400, to: 2_400, q: 1, gain: 0.05, at: 0, length: 0.012, seed: 3)  // the felt mallet
-            tape.ring(e5 / 2, gain: 0.10, decay: 0.12)  // the hum below
-            tape.ring(e5, gain: 1, decay: 0.075, attack: 0.003)
-            tape.ring(e5 * 2, gain: 0.2, decay: 0.045, attack: 0.003)
-            tape.ring(e5 * 2.76, gain: 0.06, decay: 0.022, attack: 0.003)
-            return tape.finished(peak: -16)
+            var tape = Tape(duration: 0.24, rate: rate)
+            tape.ring(e4 / 2, gain: 0.15, decay: 0.1, attack: 0.015)  // the hum below
+            tape.ring(e4, gain: 1, decay: 0.09, attack: 0.012)
+            tape.ring(e4 * 2, gain: 0.12, decay: 0.05, attack: 0.012)
+            return tape.finished(peak: -24)
         case .openTab:
-            var tape = Tape(duration: 0.14, rate: rate)
-            tape.rustle(from: 1_200, to: 2_200, q: 0.9, gain: 0.5, at: 0, length: 0.05, seed: 7)
-            // Wood, rising into its note.
-            tape.ring(d5, gain: 1, decay: 0.032, at: 0.018, bend: 0.94)
-            tape.ring(d5 * 3.93, gain: 0.12, decay: 0.009, at: 0.018)
-            return tape.finished(peak: -19)
-        case .closeTab:
             var tape = Tape(duration: 0.15, rate: rate)
-            tape.rustle(from: 1_800, to: 900, q: 0.9, gain: 0.5, at: 0, length: 0.06, seed: 11)
+            tape.rustle(from: 600, to: 1_000, q: 0.8, gain: 0.2, at: 0, length: 0.05, seed: 7)
+            // Wood, rising into its note.
+            tape.ring(d4, gain: 1, decay: 0.04, at: 0.015, attack: 0.01, bend: 0.97)
+            return tape.finished(peak: -27)
+        case .closeTab:
+            var tape = Tape(duration: 0.16, rate: rate)
+            tape.rustle(from: 900, to: 500, q: 0.8, gain: 0.2, at: 0, length: 0.06, seed: 11)
             // Lower, and settling down into its note.
-            tape.ring(g4, gain: 1, decay: 0.035, at: 0.03, bend: 1.05)
-            tape.ring(g4 * 3.93, gain: 0.1, decay: 0.01, at: 0.03)
-            return tape.finished(peak: -20)
+            tape.ring(g3, gain: 1, decay: 0.045, at: 0.025, attack: 0.01, bend: 1.03)
+            return tape.finished(peak: -28)
         case .pin:
-            var tape = Tape(duration: 0.21, rate: rate)
-            tape.rustle(from: 420, to: 300, q: 0.7, gain: 0.25, at: 0, length: 0.02, seed: 13)
-            tape.ring(g4 / 2, gain: 0.55, decay: 0.022, attack: 0.001)  // the press
-            tape.ring(g5, gain: 0.7, decay: 0.06, at: 0.006)  // and the brass
-            tape.ring(g5 * 2.32, gain: 0.22, decay: 0.03, at: 0.006)
-            tape.ring(g5 * 4.25, gain: 0.06, decay: 0.014, at: 0.006)
-            return tape.finished(peak: -16)
+            var tape = Tape(duration: 0.22, rate: rate)
+            tape.ring(d4 / 2, gain: 0.35, decay: 0.025, attack: 0.006)  // the press
+            tape.ring(g4, gain: 0.8, decay: 0.07, at: 0.004, attack: 0.01)  // and the brass
+            tape.ring(g4 * 2, gain: 0.1, decay: 0.03, at: 0.004, attack: 0.01)
+            return tape.finished(peak: -25)
         case .unpin:
-            var tape = Tape(duration: 0.18, rate: rate)
-            tape.ring(d5, gain: 0.7, decay: 0.045)
-            tape.ring(d5 * 2.32, gain: 0.15, decay: 0.02)
-            tape.ring(g4 / 2, gain: 0.35, decay: 0.02, at: 0.03, attack: 0.001)
-            return tape.finished(peak: -19)
+            var tape = Tape(duration: 0.19, rate: rate)
+            tape.ring(d4, gain: 0.7, decay: 0.05, attack: 0.01)
+            tape.ring(g3, gain: 0.3, decay: 0.03, at: 0.03, attack: 0.008)
+            return tape.finished(peak: -27)
         case .switchSpace:
             var tape = Tape(duration: 0.22, rate: rate)
-            tape.rustle(from: 700, to: 2_600, q: 0.8, gain: 1, at: 0, length: 0.17, seed: 23)
-            tape.ring(g4 * 0.75, gain: 0.35, decay: 0.06, at: 0.1)  // the page lands
-            return tape.finished(peak: -21)
+            tape.rustle(from: 400, to: 1_400, q: 0.7, gain: 0.6, at: 0, length: 0.17, seed: 23)
+            tape.ring(g3 * 0.75, gain: 0.25, decay: 0.06, at: 0.1, attack: 0.012)  // the page lands
+            return tape.finished(peak: -29)
         case .split:
-            var tape = Tape(duration: 0.16, rate: rate)
-            for (start, note) in [(0.0, b4), (0.06, e5)] {
-                tape.rustle(from: 3_000, to: 3_000, q: 1.2, gain: 0.15, at: start, length: 0.006, seed: 31)
-                tape.ring(note, gain: 1, decay: 0.026, at: start, attack: 0.0015)
-                tape.ring(note * 3.93, gain: 0.1, decay: 0.007, at: start, attack: 0.0015)
+            var tape = Tape(duration: 0.17, rate: rate)
+            for (start, note) in [(0.0, b3), (0.07, e4)] {
+                tape.ring(note, gain: 1, decay: 0.03, at: start, attack: 0.008)
             }
-            return tape.finished(peak: -18)
+            return tape.finished(peak: -27)
         }
     }
 }
@@ -140,6 +134,14 @@ private struct Tape {
     /// Scaled so its loudest moment is `peak` dBFS, and eased out over the
     /// last 15 ms so it ends at silence.
     func finished(peak: Double) -> [Float] {
+        // A gentle low-pass takes the edge off whatever is left above 2 kHz.
+        var samples = samples
+        let smoothing = 1 - exp(-2 * .pi * 2_000 / rate)
+        var level = 0.0
+        for index in samples.indices {
+            level += smoothing * (samples[index] - level)
+            samples[index] = level
+        }
         let loudest = samples.lazy.map(abs).max() ?? 0
         guard loudest > 0 else { return samples.map(Float.init) }
         let scale = pow(10, peak / 20) / loudest
