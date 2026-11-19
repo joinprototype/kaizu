@@ -52,6 +52,7 @@ struct TabRow: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 4)
+            TabNumberHint(tab: tab)
             if tab.unreadNotifications > 0 {
                 NotificationDot()
                     .help(tab.unreadNotifications.counted("new notification"))
@@ -209,6 +210,11 @@ struct FavoriteTile: View {
                 if tab.unreadNotifications > 0 {
                     NotificationDot()
                 }
+            }
+            .overlay(alignment: .bottom) {
+                TabNumberHint(tab: tab)
+                    .background(.background, in: RoundedRectangle(cornerRadius: 4))
+                    .offset(y: 6)
             }
             .frame(maxWidth: .infinity)
             // Morphs from (and back into) the tab's row when favorited.

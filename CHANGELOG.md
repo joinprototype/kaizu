@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+Hold ⌘ for a moment and the sidebar shows which tab each of ⌘1–9 goes to: the first eight visible tabs, from Favorites down, and ⌘9 for the last. The numbers go away when you let go, press a key or click.
+
 Kaizu can play soft paper sounds: turn on **Settings → General → Play soft sounds**. They’re off by default. Opening the command bar unfolds a sheet, opening and closing tabs lays down and draws away a card, pinning presses the paper, switching spaces turns a page and splitting folds a crease. They play only for your own actions while Kaizu is in front, follow the macOS “Play user interface sound effects” setting and alert volume, and a held key or a quick run plays once.
 
 Cookie pop-up rejection now runs out of the page's reach. Kaizu loads DuckDuckGo's autoconsent library in a separate script world that pages can't see or change. Each frame receives only the rules that apply to its address, instead of the full 600 KB script and rule set. Across ten busy news and shopping sites, the pages used about 30% less CPU while loading. Memory use stayed about the same. Rejection worked as before on Cookiebot, CookieYes, Didomi, OneTrust, Sourcepoint and Usercentrics sites. The old in-page script is no longer bundled, so the app is about 600 KB smaller.
