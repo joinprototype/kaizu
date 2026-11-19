@@ -82,6 +82,11 @@ struct TabRow: View {
         .sidebarRow(depth: depth, isSelected: isSelected, isHovering: isHovering)
         .sidebarRowGeometry(tab.id, in: rowNamespace)
         .onTapGesture { store.select(tab) }
+        // Its buttons show on hover only; VoiceOver gets them as actions.
+        .accessibleRow(tab.displayTitle, isSelected: isSelected, isEditing: store.renamingTabID == tab.id) { store.select(tab) }
+        .accessibilityValue(tab.unreadNotifications > 0 ? "\(tab.unreadNotifications) unread notifications" : "")
+        .accessibilityAction(named: "Close Tab") { store.userClose(tab) }
+        .accessibilityAction(named: tab.isMuted ? "Unmute Tab" : "Mute Tab") { tab.toggleMute() }
         .onHoverFade($isHovering)
         .draggable(TabDrag(id: tab.id)) {
             Label(tab.displayTitle, systemImage: "globe")
@@ -144,6 +149,7 @@ private struct RowAction: View {
         }
         .buttonStyle(.plain)
         .help(help)
+        .accessibilityLabel(spokenName(help))
     }
 }
 
@@ -174,6 +180,8 @@ struct FolderRow: View {
         .font(.system(size: 13.5))
         .sidebarRow(depth: depth, isHovering: isHovering)
         .onTapGesture { store.toggle(folder) }
+        .accessibleRow(folder.name, isEditing: store.renamingFolderID == folder.id) { store.toggle(folder) }
+        .accessibilityValue(folder.isExpanded ? "Expanded" : "Collapsed")
         .onHoverFade($isHovering)
         .tabDropTarget(.pinned(folder: folder, before: nil))
         .contextMenu {
@@ -221,6 +229,7 @@ struct FavoriteTile: View {
             .sidebarRowGeometry(tab.id, in: rowNamespace)
             .contentShape(Rectangle())
             .onTapGesture { store.select(tab) }
+            .accessibleRow(tab.displayTitle, isSelected: isSelected) { store.select(tab) }
             .onHoverFade($isHovering)
             .help(tab.displayTitle)
             .draggable(TabDrag(id: tab.id)) {

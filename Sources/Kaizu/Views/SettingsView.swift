@@ -11,6 +11,8 @@ struct SettingsView: View {
                 .tabItem { Label("Privacy", systemImage: "hand.raised") }
             LinkSettings()
                 .tabItem { Label("Links", systemImage: "arrow.triangle.branch") }
+            WatchingSettings()
+                .tabItem { Label("Watching", systemImage: "eye") }
             ExtensionSettings()
                 .tabItem { Label("Extensions", systemImage: "puzzlepiece.extension") }
         }
@@ -110,6 +112,8 @@ private struct GeneralSettings: View {
                         } label: {
                             Image(systemName: "minus.circle.fill")
                         }
+                        .help("Remove Shortcut")
+                        .accessibilityLabel("Remove Shortcut")
                         .buttonStyle(.borderless)
                         .foregroundStyle(.secondary)
                     }
@@ -216,6 +220,8 @@ private struct LinkSettings: View {
                         } label: {
                             Image(systemName: "minus.circle.fill")
                         }
+                        .help("Remove Rule")
+                        .accessibilityLabel("Remove Rule")
                         .buttonStyle(.borderless)
                         .foregroundStyle(.secondary)
                     }
