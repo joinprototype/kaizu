@@ -2,11 +2,11 @@ import AppKit
 
 /// Menu item that runs a closure instead of dispatching a selector.
 final class ActionMenuItem: NSMenuItem {
-    private let handler: @MainActor () -> Void
+    private var handler: @MainActor () -> Void = {}
     /// For toggles: drives the checkmark each time the menu is shown.
-    private let isOn: (@MainActor () -> Bool)?
+    private var isOn: (@MainActor () -> Bool)?
 
-    private let available: @MainActor () -> Bool
+    private var available: @MainActor () -> Bool = { true }
 
     init(
         _ title: String,
@@ -29,14 +29,29 @@ final class ActionMenuItem: NSMenuItem {
         }
     }
 
-    @available(*, unavailable)
+    /// What `copy()` starts from (AppKit copies items, by this
+    /// initializer); the copy then takes the original's closures.
     nonisolated override init(title: String, action: Selector?, keyEquivalent: String) {
-        fatalError("init(title:action:keyEquivalent:) has not been implemented")
+        super.init(title: title, action: action, keyEquivalent: keyEquivalent)
     }
 
     @available(*, unavailable)
     nonisolated required init(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    /// Menus are only copied on the main thread, as AppKit uses them there.
+    nonisolated override func copy(with zone: NSZone? = nil) -> Any {
+        // Only ever on the main thread (see above), which the compiler can't see.
+        nonisolated(unsafe) let copy = super.copy(with: zone)
+        nonisolated(unsafe) let original = self
+        MainActor.assumeIsolated {
+            if let copy = copy as? ActionMenuItem {
+                (copy.handler, copy.isOn, copy.available) = (original.handler, original.isOn, original.available)
+                copy.target = copy
+            }
+        }
+        return copy
     }
 
     @objc private func fire() {
@@ -113,7 +128,8 @@ enum MainMenu {
 
 /// A main-menu item that runs a `Command`'s own code.
 final class CommandMenuItem: NSMenuItem {
-    let command: Command
+    /// Nil only between AppKit's copy and `copy(with:)` filling it in.
+    private(set) var command: Command?
     private weak var app: AppModel?
 
     init(_ command: Command, app: AppModel?) {
@@ -123,9 +139,9 @@ final class CommandMenuItem: NSMenuItem {
         target = self
     }
 
-    @available(*, unavailable)
+    /// What `copy()` starts from; see `ActionMenuItem`.
     nonisolated override init(title: String, action: Selector?, keyEquivalent: String) {
-        fatalError("init(title:action:keyEquivalent:) has not been implemented")
+        super.init(title: title, action: action, keyEquivalent: keyEquivalent)
     }
 
     @available(*, unavailable)
@@ -133,16 +149,30 @@ final class CommandMenuItem: NSMenuItem {
         fatalError("init(coder:) has not been implemented")
     }
 
+    /// Menus are only copied on the main thread, as AppKit uses them there.
+    nonisolated override func copy(with zone: NSZone? = nil) -> Any {
+        // Only ever on the main thread (see above), which the compiler can't see.
+        nonisolated(unsafe) let copy = super.copy(with: zone)
+        nonisolated(unsafe) let original = self
+        MainActor.assumeIsolated {
+            if let copy = copy as? CommandMenuItem {
+                (copy.command, copy.app) = (original.command, original.app)
+                copy.target = copy
+            }
+        }
+        return copy
+    }
+
     /// AppKit only sends this once `validateMenuItem` said yes.
     @objc private func fire() {
-        guard let app, case .run(let run) = command.action else { return }
+        guard let app, case .run(let run) = command?.action else { return }
         run(app)
     }
 }
 
 extension CommandMenuItem: NSMenuItemValidation {
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
-        guard let app else { return false }
+        guard let app, let command else { return false }
         if let isOn = command.isOn {
             state = isOn(app) ? .on : .off
         }
@@ -172,7 +202,7 @@ extension NSMenuItem {
 /// is checked), so it tracks the space list.
 final class DynamicMenu: NSMenu, NSMenuDelegate {
     private weak var app: AppModel?
-    private let entries: @MainActor (AppModel) -> [MenuEntry]
+    private var entries: @MainActor (AppModel) -> [MenuEntry] = { _ in [] }
 
     init(title: String, app: AppModel?, entries: @escaping @MainActor (AppModel) -> [MenuEntry]) {
         self.app = app
@@ -181,9 +211,23 @@ final class DynamicMenu: NSMenu, NSMenuDelegate {
         delegate = self
     }
 
-    @available(*, unavailable)
+    /// What `copy()` starts from; see `ActionMenuItem`.
     nonisolated override init(title: String) {
-        fatalError("init(title:) has not been implemented")
+        super.init(title: title)
+    }
+
+    /// Menus are only copied on the main thread, as AppKit uses them there.
+    nonisolated override func copy(with zone: NSZone? = nil) -> Any {
+        // Only ever on the main thread (see above), which the compiler can't see.
+        nonisolated(unsafe) let copy = super.copy(with: zone)
+        nonisolated(unsafe) let original = self
+        MainActor.assumeIsolated {
+            if let copy = copy as? DynamicMenu {
+                (copy.app, copy.entries) = (original.app, original.entries)
+                copy.delegate = copy
+            }
+        }
+        return copy
     }
 
     @available(*, unavailable)
