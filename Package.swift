@@ -28,7 +28,7 @@ let package = Package(
                 ]),
             ]
         ),
-        .testTarget(name: "KaizuTests", dependencies: ["Kaizu"]),
+        .testTarget(name: "KaizuTests", dependencies: ["Kaizu", "TestSupport"]),
         // Pure Swift logic with no AppKit/WebKit dependency, so it's unit-testable.
         .target(
             name: "BrowserCore",
@@ -36,9 +36,14 @@ let package = Package(
         ),
         .testTarget(
             name: "BrowserCoreTests",
-            dependencies: ["BrowserCore"],
+            dependencies: ["BrowserCore", "TestSupport"],
             path: "Tests/BrowserCoreTests",
             resources: [.copy("Fixtures")]
+        ),
+        // Helpers shared by both test targets.
+        .target(
+            name: "TestSupport",
+            path: "Tests/TestSupport"
         ),
     ]
 )
