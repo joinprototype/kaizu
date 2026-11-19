@@ -8,10 +8,11 @@
 //      the video starts without a pre-roll. When one was booked, YouTube
 //      still holds the video back for about the ad's length (a black player,
 //      5-15 s); ad blockers in Safari see the same wait (Nov 2026).
-//      Responses fetched in-page (clicking another video) are left alone:
-//      stripped, every click would stall that way, while unstripped most
-//      start at once, and an ad that does come is handled by layer 2. Once
-//      an ad has run, YouTube books fewer for a while.
+//      Clicking another video fetches its player data in-page, and that
+//      request asks YouTube for the video without an ad, so none is booked
+//      and nothing holds it back. The answer itself is left alone: stripped
+//      after booking, every click would stall the same way. Whatever does
+//      get through is handled by layer 2.
 //   2. Safety net for ads that do start, one or several in a row: hidden
 //      from the first frame (picture, badge, countdown, captions, controls),
 //      muted and run through quickly; then the user's sound, speed and
@@ -37,6 +38,83 @@
     }
     return value;
   };
+
+  // Clicking a video inside YouTube: ask for it without an ad. The player
+  // request carries `params`, a base64 protobuf; with two more fields in it
+  // (20 = 1, 100 = ".") YouTube answers without booking an ad, so there is
+  // no ad break to hold the video back for (Nov 2026). Only for YouTube's
+  // own web player, not embeds. Should YouTube ever answer such a request
+  // with an unplayable video, that video is loaded again as YouTube sent
+  // it, and after a second time Kaizu stops asking for the tab's session.
+  const NO_AD_FIELDS = [0xa0, 0x01, 0x01, 0xa2, 0x06, 0x01, 0x2e];
+  const PLAIN_KEY = 'kaizu-youtube-plain';
+  const plainList = () => {
+    try {
+      return JSON.parse(sessionStorage.getItem(PLAIN_KEY) || '[]');
+    } catch (_) {
+      return [];
+    }
+  };
+  const askPlain = (id) => {
+    const list = plainList();
+    return list.length >= 2 || list.includes(id);
+  };
+  // Videos asked for without an ad on this page, the last one first.
+  const asked = [];
+  const withoutAd = (params) => {
+    let bytes = [];
+    if (typeof params === 'string' && params) {
+      try {
+        const base64 = decodeURIComponent(params).replace(/-/g, '+').replace(/_/g, '/');
+        bytes = Array.from(atob(base64), (c) => c.charCodeAt(0));
+      } catch (_) {
+        return params;
+      }
+    }
+    if (bytes.slice(-NO_AD_FIELDS.length).join() === NO_AD_FIELDS.join()) return params;
+    return encodeURIComponent(btoa(String.fromCharCode(...bytes, ...NO_AD_FIELDS)));
+  };
+  // Requests are serialized here, before YouTube's code can lock it down.
+  const stringify = JSON.stringify;
+  JSON.stringify = function (value) {
+    if (value && typeof value === 'object' && value.context?.client?.clientName === 'WEB') {
+      // /player sends the request itself; /get_watch nests it.
+      for (const request of [value, value.playerRequest]) {
+        if (request && typeof request === 'object' && request.playbackContext
+            && typeof request.videoId === 'string' && !askPlain(request.videoId)) {
+          request.params = withoutAd(request.params);
+          asked.unshift(request.videoId);
+        }
+      }
+    }
+    return stringify.apply(this, arguments);
+  };
+  const originalFetch = window.fetch;
+  if (typeof originalFetch === 'function') {
+    window.fetch = function (input) {
+      const response = originalFetch.apply(this, arguments);
+      let path = '';
+      try {
+        path = new URL(typeof input === 'string' ? input : input?.url ?? String(input), location.href).pathname;
+      } catch (_) {}
+      if (/^\/youtubei\/v1\/(player|get_watch)$/.test(path)) {
+        response.then((reply) => reply.clone().text()).then((text) => {
+          const status = /"playabilityStatus":\{"status":"(\w+)"/.exec(text)?.[1];
+          if (status !== 'UNPLAYABLE' && status !== 'ERROR') return;
+          // An unplayable answer may come without the video's details.
+          const id = /"videoDetails":\{"videoId":"([\w-]+)"/.exec(text)?.[1] ?? asked[0];
+          if (!asked.includes(id) || askPlain(id)) return;
+          try {
+            sessionStorage.setItem(PLAIN_KEY, JSON.stringify([...plainList(), id]));
+          } catch (_) {
+            return; // without a note of it, a reload could repeat forever
+          }
+          location.reload();
+        }).catch(() => {});
+      }
+      return response;
+    };
+  }
 
   // The first player response, embedded in the page as a global.
   let initialPlayerResponse;

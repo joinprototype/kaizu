@@ -316,7 +316,7 @@ final class ContentBlocker {
         }
     }
 
-    private static let youTubeScript = pageScript(named: "youtube-ads")
+    static let youTubeScript = pageScript(named: "youtube-ads")
 
     /// A bundled script injected at document start into all frames, in the
     /// page's own JavaScript world (it needs the page's globals).
