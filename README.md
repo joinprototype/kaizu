@@ -31,7 +31,7 @@
 - **Keep your place.** Peek at a link, open it beside the page you’re reading, or arrange up to four pages in a mix of rows and columns. Idle tabs can go to sleep and wake when you return.
 - **Control what loads.** Kaizu blocks ads and trackers, rejects supported cookie prompts and strips tracking parameters. Open the site settings in the address bar to pause blocking for one site.
 
-Kaizu runs without a browser account and keeps your workspace on your Mac. If you rely on Arc Sync, Easels or Boosts, those features are outside the Mac 1.0 plan. For extensions, choose **Add to Kaizu** on a Chrome Web Store or Firefox Add-ons listing, or select a Mac app containing a Safari web extension in **Settings → Extensions**. Compatibility depends on which WebKit APIs each extension uses. [Tested extensions and password managers](docs/ROADMAP.md#extension-compatibility)
+Kaizu runs without a browser account and keeps your workspace on your Mac. [What Kaizu connects to](docs/CONNECTIONS.md) If you rely on Arc Sync, Easels or Boosts, those features are outside the Mac 1.0 plan. For extensions, choose **Add to Kaizu** on a Chrome Web Store or Firefox Add-ons listing, or select a Mac app containing a Safari web extension in **Settings → Extensions**. Compatibility depends on which WebKit APIs each extension uses. [Tested extensions and password managers](docs/ROADMAP.md#extension-compatibility)
 
 On the development branch, **Import from Arc…** also opens a saved sidebar JSON or Markdown export from another Mac. You can browse recently archived tabs in History and import a WebKit content-blocker rule list in Settings. [Unreleased changes](CHANGELOG.md#unreleased)
 
