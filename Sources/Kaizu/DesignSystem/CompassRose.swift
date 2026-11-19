@@ -76,8 +76,10 @@ private struct RoseDrawing: View {
     var body: some View {
         let inks = inks
         Canvas { context, size in
-            // Room above north for the fleur.
-            let cardinal = min(size.width, size.height) / 2 * 0.82
+            // Room above north for the fleur: it sits on the north point and is
+            // 0.34 of its length, so north plus fleur must stay inside the plate
+            // (0.72 × 1.34 ≈ 0.97 of the half-width; 0.82 cut the fleur's top off).
+            let cardinal = min(size.width, size.height) / 2 * 0.72
             let center = CGPoint(x: size.width / 2, y: size.height / 2)
             context.translateBy(x: center.x, y: center.y)
             let hairline = max(cardinal / 230, 0.4)
