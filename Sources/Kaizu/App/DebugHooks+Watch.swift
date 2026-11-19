@@ -85,6 +85,14 @@ extension DebugHooks {
                 window.orderFront(nil)
                 try await Task.sleep(for: .seconds(1))
                 saveShot(of: window, to: path)
+                // The site popover, with its Watch entry and count.
+                let site = NSHostingView(rootView: SiteSettingsView(tab: tab).environment(store).background(Color(nsColor: .windowBackgroundColor)))
+                window.appearance = store.window?.effectiveAppearance
+                window.backgroundColor = .windowBackgroundColor
+                window.contentView = site
+                window.setContentSize(site.fittingSize)
+                try await Task.sleep(for: .seconds(1))
+                saveShot(of: window, to: path.replacingOccurrences(of: ".png", with: "-site.png"))
                 window.orderOut(nil)
                 watches.remove(changed.id)
             }
