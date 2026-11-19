@@ -63,7 +63,7 @@ extension DebugHooks {
             for _ in 0..<40 where await page(tab, "!!document.querySelector('a')") != "true" {
                 await settle()
             }
-            let spelling = NSMenuItem(title: "", action: Selector(("toggleContinuousSpellChecking:")), keyEquivalent: "")
+            let spelling = NSMenuItem(title: "", action: #selector(NSTextView.toggleContinuousSpellChecking(_:)), keyEquivalent: "")
             _ = tab.webView.validateUserInterfaceItem(spelling)
             check("spelling is checked while typing", spelling.state == .on)
 

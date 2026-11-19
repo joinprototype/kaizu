@@ -16,7 +16,6 @@ import WebKit
 /// v1, the 600 KB standalone build with every rule in it, ran in the page's
 /// world of every frame. It stays as a fallback until v2 has more mileage
 /// on real consent platforms: launch with KAIZU_AUTOCONSENT=v1.
-@MainActor
 final class AutoconsentBridge: NSObject, WKScriptMessageHandlerWithReply {
     static let handlerName = "kaizuAutoconsent"
     nonisolated static let usesPageWorld = ProcessInfo.processInfo.environment["KAIZU_AUTOCONSENT"] == "v1"

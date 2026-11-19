@@ -3,7 +3,7 @@ import AppKit
 import BrowserCore
 
 extension DebugHooks {
-    @MainActor static func checkSplitCapacity(_ store: BrowserStore) {
+    static func checkSplitCapacity(_ store: BrowserStore) {
         precondition(ProcessInfo.processInfo.environment["KAIZU_SUPPORT"] != nil)
         let space = store.activeSpace
         func require(_ condition: Bool, _ message: String) {

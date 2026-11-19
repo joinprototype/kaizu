@@ -10,7 +10,7 @@ extension DebugHooks {
     /// and what the app sent to the page's frames. Waits up to
     /// KAIZU_SITE_WAIT seconds (12) per site, KAIZU_SHOTS saves a picture of
     /// each, then quits. KAIZU_AUTOCONSENT=v1 runs the old page-world script.
-    @MainActor static func qaConsent(_ store: BrowserStore) {
+    static func qaConsent(_ store: BrowserStore) {
         precondition(ProcessInfo.processInfo.environment["KAIZU_SUPPORT"] != nil)
         let environment = ProcessInfo.processInfo.environment
         let defaults = "https://www.cookiebot.com/en/help/,https://www.cookieyes.com/documentation/retrieving-consent-data-using-api-getckyconsent/,https://sandbox.didomi.io/cmp.html"

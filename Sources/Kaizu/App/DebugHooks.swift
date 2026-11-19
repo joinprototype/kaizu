@@ -42,7 +42,6 @@ import WebKit
 /// folder, an export file, or "arc", it imports that, logs the result and undoes it.
 /// `arcimport` opens Import from Arc; `arcimport-run` imports without it and logs
 /// the result. KAIZU_ARC=/path/to/StorableSidebar.json reads that instead of Arc's.
-@MainActor
 enum DebugHooks {
     private static var arcFile: URL {
         ProcessInfo.processInfo.environment["KAIZU_ARC"].map { URL(fileURLWithPath: $0) } ?? ArcSidebar.fileURL

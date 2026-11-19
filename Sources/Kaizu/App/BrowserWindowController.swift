@@ -1,7 +1,6 @@
 import AppKit
 import SwiftUI
 
-@MainActor
 final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private static let frameName = "KaizuBrowserWindow"
     private let store: BrowserStore
@@ -41,7 +40,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     @available(*, unavailable)
-    required init?(coder: NSCoder) {
+    nonisolated required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 

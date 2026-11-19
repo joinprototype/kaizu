@@ -3,7 +3,6 @@ import AppKit
 /// Help → Report a Bug: what the user wrote plus, if they agree, diagnostics,
 /// zipped in a temporary folder and attached to a Mail draft. Nothing leaves
 /// the Mac until they send that draft.
-@MainActor
 enum BugReport {
     static let recipient = "help@joinprototype.com"
 
@@ -20,19 +19,23 @@ enum BugReport {
             + details(store: store, full: includingDiagnostics) + "\n"
         try Data(text.utf8).write(to: folder.appending(path: "Report.txt"))
         if includingDiagnostics {
-            try await Task.detached {
-                let log = (try? Diagnostics.sessionLog()) ?? "Couldn't read the log."
-                try Data(log.utf8).write(to: folder.appending(path: "Kaizu.log"))
-                let reports = Diagnostics.recentReports()
-                guard !reports.isEmpty else { return }
-                let crashes = folder.appending(path: "Crash Reports", directoryHint: .isDirectory)
-                try FileManager.default.createDirectory(at: crashes, withIntermediateDirectories: true)
-                for report in reports {
-                    try? FileManager.default.copyItem(at: report, to: crashes.appending(path: report.lastPathComponent))
-                }
-            }.value
+            try await copyDiagnostics(into: folder)
         }
         return try await zip(folder)
+    }
+
+    /// The session log and recent crash reports, read and copied off the main thread.
+    @concurrent
+    private nonisolated static func copyDiagnostics(into folder: URL) async throws {
+        let log = (try? Diagnostics.sessionLog()) ?? "Couldn't read the log."
+        try Data(log.utf8).write(to: folder.appending(path: "Kaizu.log"))
+        let reports = Diagnostics.recentReports()
+        guard !reports.isEmpty else { return }
+        let crashes = folder.appending(path: "Crash Reports", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: crashes, withIntermediateDirectories: true)
+        for report in reports {
+            try? FileManager.default.copyItem(at: report, to: crashes.appending(path: report.lastPathComponent))
+        }
     }
 
     /// A Mail draft to `recipient` with the zip attached. False if this Mac

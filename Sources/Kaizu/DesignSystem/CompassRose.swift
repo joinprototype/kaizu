@@ -6,7 +6,6 @@ import SwiftUI
 /// redrawn on every frame anything in the window moves: turning a picture is
 /// nothing to the GPU, while a rose and its rhumb lines cost a space switch
 /// a third of its frames (measured with KAIZU_DEBUG=tour).
-@MainActor
 private enum Engraving {
     private static var plates: [String: Image] = [:]
 
@@ -250,7 +249,7 @@ struct ChartFrame: View {
 
 /// The ticks along a chart's edge that mark degrees and minutes: every
 /// tenth one long.
-private struct Graticule: Shape {
+private nonisolated struct Graticule: Shape {
     private let spacing: CGFloat = 12
 
     func path(in rect: CGRect) -> Path {

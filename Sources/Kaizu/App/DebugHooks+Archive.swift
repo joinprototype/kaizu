@@ -4,7 +4,7 @@ import BrowserCore
 import Darwin
 
 extension DebugHooks {
-    @MainActor static func interruptArchiveSweep(in store: BrowserStore) {
+    static func interruptArchiveSweep(in store: BrowserStore) {
         precondition(ProcessInfo.processInfo.environment["KAIZU_SUPPORT"] != nil)
         let app = store.app
         let work = store.activeSpace
@@ -23,7 +23,7 @@ extension DebugHooks {
     }
 
     /// The fixture starts with a legacy session and two archived copies of the same URL in different profiles.
-    @MainActor static func checkArchiveRecovery(in store: BrowserStore, interrupt: Bool) {
+    static func checkArchiveRecovery(in store: BrowserStore, interrupt: Bool) {
         precondition(ProcessInfo.processInfo.environment["KAIZU_SUPPORT"] != nil)
         let app = store.app
         let work = store.spaces.first { $0.name == "Work" }!

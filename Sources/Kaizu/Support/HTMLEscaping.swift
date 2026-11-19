@@ -1,6 +1,6 @@
 import Foundation
 
-extension String {
+nonisolated extension String {
     /// Safe inside HTML text or a double-quoted attribute.
     var htmlEscaped: String {
         replacingOccurrences(of: "&", with: "&amp;")

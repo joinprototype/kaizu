@@ -3,7 +3,6 @@ import WebKit
 
 /// Gives persistent pages a chance to save their final edits, then commits every
 /// profile's cookies, before the app process exits.
-@MainActor
 final class QuitPages: NSObject, WKNavigationDelegate {
     private var pending = Set<ObjectIdentifier>()
     private var deadline: Timer?

@@ -44,7 +44,6 @@ enum FilterListUpdater {
 
     /// Fetches lists if the last check was over a day ago. Returns true when
     /// at least one list changed (so rules need recompiling).
-    @MainActor
     static func updateIfDue() async -> Bool {
         let defaults = UserDefaults.standard
         guard Date().timeIntervalSince1970 - defaults.double(forKey: lastCheckKey) > interval else { return false }

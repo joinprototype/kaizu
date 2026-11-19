@@ -6,7 +6,6 @@ import WebKit
 /// scripts and their message handler live in their own content world, so
 /// pages can't call them; the style sheet itself is in the page's DOM,
 /// where a page could find it, like any page change an extension makes.
-@MainActor
 final class HiddenItems: NSObject, WKScriptMessageHandler {
     static let world = WKContentWorld.world(name: "KaizuHiddenItems")
     private static let handlerName = "kaizuHide"

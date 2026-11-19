@@ -116,7 +116,7 @@ final class WebContainerView: NSView {
     }
 
     @available(*, unavailable)
-    required init?(coder: NSCoder) {
+    nonisolated required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 
@@ -183,7 +183,7 @@ private final class TabDropCatcher: NSView {
     }
 
     @available(*, unavailable)
-    required init?(coder: NSCoder) {
+    nonisolated required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 

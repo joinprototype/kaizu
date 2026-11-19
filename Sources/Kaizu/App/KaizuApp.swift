@@ -2,7 +2,6 @@ import AppKit
 import BrowserCore
 
 @main
-@MainActor
 enum KaizuApp {
     static func main() {
         #if !DEBUG

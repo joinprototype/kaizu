@@ -4,7 +4,6 @@ import BrowserCore
 import WebKit
 
 /// What a page hears of a tab dragged over it, without the window server.
-@MainActor
 private final class StandInDrag: NSObject, NSDraggingInfo {
     let draggingLocation: NSPoint
     let draggingPasteboard = NSPasteboard.withUniqueName()

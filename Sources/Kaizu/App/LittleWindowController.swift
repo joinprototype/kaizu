@@ -3,7 +3,6 @@ import SwiftUI
 
 /// Arc's "Little Arc": a small window for a quick look at a link, with one
 /// click to promote it to a full tab.
-@MainActor
 final class LittleWindowController: NSWindowController, NSWindowDelegate {
     let tab: BrowserTab
     private unowned let app: AppModel
@@ -39,7 +38,7 @@ final class LittleWindowController: NSWindowController, NSWindowDelegate {
     }
 
     @available(*, unavailable)
-    required init?(coder: NSCoder) {
+    nonisolated required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 

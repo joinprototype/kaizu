@@ -2,7 +2,7 @@ import CryptoKit
 import WebKit
 
 /// Keeps the user's original WebKit JSON so a purged or outdated compiled cache can be rebuilt.
-@MainActor @Observable
+@Observable
 final class ImportedRuleLists {
     struct Entry: Codable, Identifiable {
         let id: String
@@ -54,11 +54,7 @@ final class ImportedRuleLists {
         guard !busy, indexError == nil else { throw ListError.unavailable }
         busy = true
         defer { busy = false }
-        let (data, id) = try await Task.detached(priority: .userInitiated) {
-            let data = try Data(contentsOf: url)
-            let id = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
-            return (data, id)
-        }.value
+        let (data, id) = try await Self.read(url)
         guard !entries.contains(where: { $0.id == id }) else { throw ListError.duplicate }
         guard let json = String(data: data, encoding: .utf8) else { throw ListError.encoding }
         let list = try await load(id, json: json)
@@ -103,6 +99,13 @@ final class ImportedRuleLists {
         // The committed index controls which lists can load, even if cleanup is interrupted.
         try? FileManager.default.removeItem(at: source(id))
         if let store = try? ruleStore() { try? await store.removeContentRuleList(forIdentifier: id) }
+    }
+
+    /// A list's bytes and their SHA-256, off the main thread.
+    @concurrent
+    private nonisolated static func read(_ url: URL) async throws -> (Data, String) {
+        let data = try Data(contentsOf: url)
+        return (data, SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined())
     }
 
     private func source(_ id: String) -> URL { directory.appendingPathComponent(id + ".json") }

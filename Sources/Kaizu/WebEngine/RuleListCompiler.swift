@@ -9,7 +9,6 @@ import WebKit
 ///
 /// The helper is this same binary, started with an argument and stopped before
 /// `NSApplication`, so it has no Dock icon and shares the app's rule list store.
-@MainActor
 enum RuleListCompiler {
     private static let argument = "--compile-rule-list"
     /// A list takes seconds. One that's stuck can't hold up the others.
@@ -57,12 +56,16 @@ enum RuleListCompiler {
         }
     }
 
+    /// Converting a big list takes a while, so it runs off the main thread.
+    @concurrent
+    private nonisolated static func convert(_ text: String) async -> (json: String?, count: Int, skipped: Int) {
+        let output = FilterListConverter.convert(text)
+        return (json: try? output.rules.encodedJSON(), count: output.rules.count, skipped: output.skipped)
+    }
+
     static func compile(_ name: String, text: String, into store: WKContentRuleListStore) async -> WKContentRuleList? {
         let started = ContinuousClock.now
-        let output = await Task.detached(priority: .utility) {
-            let output = FilterListConverter.convert(text)
-            return (json: try? output.rules.encodedJSON(), count: output.rules.count, skipped: output.skipped)
-        }.value
+        let output = await convert(text)
         guard let json = output.json else { return nil }
         do {
             let list = try await store.compileContentRuleList(forIdentifier: identifier(for: name, text: text), encodedContentRuleList: json)

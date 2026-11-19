@@ -3,7 +3,6 @@ import Carbon.HIToolbox
 
 /// A shortcut that works in every app, through Carbon's hot keys: the one
 /// API for this that needs no Accessibility permission.
-@MainActor
 final class GlobalHotKey {
     private var hotKey: EventHotKeyRef?
     private var handler: EventHandlerRef?

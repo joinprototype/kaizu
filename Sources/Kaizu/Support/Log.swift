@@ -6,7 +6,7 @@ import OSLog
 ///
 /// Addresses are logged as hashes (never in private windows), so a report can
 /// tell "the same site failed twice" without saying which site.
-enum Log {
+nonisolated enum Log {
     static let subsystem = "com.joinprototype.kaizu"
 
     static let app = Logger(subsystem: subsystem, category: "App")

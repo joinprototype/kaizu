@@ -1,7 +1,6 @@
 import AppKit
 
 /// Menu item that runs a closure instead of dispatching a selector.
-@MainActor
 final class ActionMenuItem: NSMenuItem {
     private let handler: @MainActor () -> Void
     /// For toggles: drives the checkmark each time the menu is shown.
@@ -31,7 +30,12 @@ final class ActionMenuItem: NSMenuItem {
     }
 
     @available(*, unavailable)
-    required init(coder: NSCoder) {
+    nonisolated override init(title: String, action: Selector?, keyEquivalent: String) {
+        fatalError("init(title:action:keyEquivalent:) has not been implemented")
+    }
+
+    @available(*, unavailable)
+    nonisolated required init(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 
@@ -51,7 +55,6 @@ extension ActionMenuItem: NSMenuItemValidation {
 
 
 /// Builds the menu bar from `CommandRegistry`.
-@MainActor
 enum MainMenu {
     /// `app` is nil only in tests, which look at the menu's shape: items
     /// then do nothing and are disabled.
@@ -109,7 +112,6 @@ enum MainMenu {
 }
 
 /// A main-menu item that runs a `Command`'s own code.
-@MainActor
 final class CommandMenuItem: NSMenuItem {
     let command: Command
     private weak var app: AppModel?
@@ -122,7 +124,12 @@ final class CommandMenuItem: NSMenuItem {
     }
 
     @available(*, unavailable)
-    required init(coder: NSCoder) {
+    nonisolated override init(title: String, action: Selector?, keyEquivalent: String) {
+        fatalError("init(title:action:keyEquivalent:) has not been implemented")
+    }
+
+    @available(*, unavailable)
+    nonisolated required init(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 
@@ -163,7 +170,6 @@ extension NSMenuItem {
 
 /// A menu rebuilt from its entries every time it opens (or a key equivalent
 /// is checked), so it tracks the space list.
-@MainActor
 final class DynamicMenu: NSMenu, NSMenuDelegate {
     private weak var app: AppModel?
     private let entries: @MainActor (AppModel) -> [MenuEntry]
@@ -176,7 +182,12 @@ final class DynamicMenu: NSMenu, NSMenuDelegate {
     }
 
     @available(*, unavailable)
-    required init(coder: NSCoder) {
+    nonisolated override init(title: String) {
+        fatalError("init(title:) has not been implemented")
+    }
+
+    @available(*, unavailable)
+    nonisolated required init(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 

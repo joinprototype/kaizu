@@ -95,7 +95,7 @@ private struct ChartPaper: View {
     }
 }
 
-private struct RhumbLines: Shape {
+private nonisolated struct RhumbLines: Shape {
     /// Of the 32 compass points, 0 being east, clockwise.
     let bearings: [Int]
     let reach: Double

@@ -1,4 +1,4 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.2
 import Foundation
 import PackageDescription
 
@@ -17,6 +17,8 @@ let package = Package(
             name: "Kaizu",
             dependencies: ["BrowserCore"],
             path: "Sources/Kaizu",
+            // An AppKit app: everything is main-actor unless it says otherwise.
+            swiftSettings: [.defaultIsolation(MainActor.self)],
             linkerSettings: [
                 .unsafeFlags([
                     "-Xlinker", "-sectcreate",

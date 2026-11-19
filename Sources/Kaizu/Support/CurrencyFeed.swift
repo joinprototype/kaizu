@@ -4,7 +4,7 @@ import Foundation
 /// Exchange rates for currency answers in the command bar. Fetched from
 /// Frankfurter only once someone types a conversion, then cached for half a
 /// day (central banks publish about once per working day).
-@MainActor @Observable
+@Observable
 final class CurrencyFeed {
     static let shared = CurrencyFeed()
     private static let source = URL(string: "https://api.frankfurter.dev/v2/rates?base=EUR")!

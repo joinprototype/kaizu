@@ -6,7 +6,6 @@ import OSLog
 /// the person or the Mac. A newer build downloads quietly, is checked, and goes
 /// in on restart or quit; when Kaizu can't replace itself, or anything about the
 /// download is wrong, people get the Download notice instead.
-@MainActor
 enum Updates {
     private static let feed = URL(string: "https://kaizu.joinprototype.com/version.json")!
     private static let firstCheck: Duration = .seconds(10)
@@ -103,11 +102,10 @@ enum Updates {
         let folder = preparation.folder(for: release.build)
         let stage = UpdateStage(folder: folder, bundleID: bundleID, publicKey: ReleaseUpdateKey.base64)
         let build = release.build
-        return try await Task.detached(priority: .utility) {
-            try await download(archive, into: folder, then: stage, build: build, signature: signature)
-        }.value
+        return try await download(archive, into: folder, then: stage, build: build, signature: signature)
     }
 
+    @concurrent
     private nonisolated static func download(
         _ archive: URL, into folder: URL, then stage: UpdateStage, build: Int, signature: String
     ) async throws -> StagedUpdate {

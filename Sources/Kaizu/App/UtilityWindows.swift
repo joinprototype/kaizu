@@ -4,7 +4,6 @@ import SwiftUI
 
 /// One-per-app windows (Settings, History): created on first use, then
 /// brought back to the front.
-@MainActor
 enum UtilityWindows {
     private static var windows: [String: NSWindow] = [:]
     /// Whose page the open broken-site report is about.

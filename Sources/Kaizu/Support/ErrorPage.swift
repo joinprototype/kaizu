@@ -3,7 +3,7 @@ import Foundation
 
 /// The page shown when a navigation fails (DNS, offline, TLS…): open water,
 /// on the same chart as the rest of Kaizu.
-enum ErrorPage {
+nonisolated enum ErrorPage {
     static func html(for error: NSError, url: URL?) -> String {
         let host = (url?.displayHost ?? "This page").htmlEscaped
         let message = error.localizedDescription.htmlEscaped

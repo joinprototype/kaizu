@@ -221,7 +221,6 @@ extension BrowserStore {
     ]
 }
 
-@MainActor
 private extension NSMenu {
     /// Builds the items of a menu that makes them on demand (Spaces) and
     /// validates them, so the list and isEnabled are current.

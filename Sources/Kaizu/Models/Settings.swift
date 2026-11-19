@@ -2,7 +2,7 @@ import BrowserCore
 import Foundation
 
 /// User preferences, persisted as one JSON value in UserDefaults.
-@MainActor @Observable
+@Observable
 final class Settings {
     enum ExternalLinks: String, CaseIterable, Codable {
         case littleWindow, currentSpace

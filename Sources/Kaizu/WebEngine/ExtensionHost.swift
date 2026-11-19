@@ -7,9 +7,8 @@ import WebKit
 /// `WKWebExtensionController`. Installs from an unpacked folder, a `.zip`,
 /// a Mac app that bundles a Safari web extension, or a Chrome Web Store /
 /// Firefox Add-ons page; the list persists.
-@MainActor @Observable
+@Observable
 final class ExtensionHost: NSObject {
-    @MainActor
     struct Installed: Identifiable {
         let id: UUID
         let context: WKWebExtensionContext
@@ -177,15 +176,7 @@ final class ExtensionHost: NSObject {
                 let directory = self.directory
                 let destination = directory.appending(path: id.uuidString, directoryHint: .isDirectory)
                 stagedFolder = destination
-                // Off the main thread: a big extension takes a moment to unpack.
-                try await Task.detached(priority: .userInitiated) {
-                    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-                    if url.pathExtension == "zip" {
-                        try Self.unzip(url, to: destination)
-                    } else {
-                        try FileManager.default.copyItem(at: url, to: destination)
-                    }
-                }.value
+                try await Self.stage(url, in: directory, at: destination)
                 record = Record(id: id, kind: .folder, path: destination.path, source: source)
             }
             let webExtension = try await Self.makeExtension(at: record.location(in: directory), kind: record.kind)
@@ -230,6 +221,12 @@ final class ExtensionHost: NSObject {
     func isAddingSafariApp(_ url: URL) -> Bool { pendingSafariPaths.contains(Self.safariPath(url)) }
 
     /// Safari web extensions bundled in apps under /Applications.
+    /// `safariExtensionApps()`, off the main thread: it walks the Applications folders.
+    @concurrent
+    nonisolated static func findSafariExtensionApps() async -> [URL] {
+        safariExtensionApps()
+    }
+
     nonisolated static func safariExtensionApps() -> [URL] {
         let apps = (try? FileManager.default.contentsOfDirectory(at: URL(fileURLWithPath: "/Applications"), includingPropertiesForKeys: nil)) ?? []
         return apps.filter { $0.pathExtension == "app" && safariExtensionBundle(in: $0) != nil }
@@ -412,6 +409,17 @@ final class ExtensionHost: NSObject {
         return appexes.lazy.compactMap(Bundle.init(url:)).first { bundle in
             let point = (bundle.infoDictionary?["NSExtension"] as? [String: Any])?["NSExtensionPointIdentifier"] as? String
             return point == safariExtensionPoint
+        }
+    }
+
+    /// Off the main thread: a big extension takes a moment to unpack.
+    @concurrent
+    private nonisolated static func stage(_ url: URL, in directory: URL, at destination: URL) async throws {
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        if url.pathExtension == "zip" {
+            try unzip(url, to: destination)
+        } else {
+            try FileManager.default.copyItem(at: url, to: destination)
         }
     }
 

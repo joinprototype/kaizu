@@ -2,7 +2,6 @@ import AppKit
 
 /// Favicons cached in memory and on disk, keyed by host, so pinned and restored
 /// tabs show icons without loading their pages.
-@MainActor
 final class FaviconStore {
     static let shared = FaviconStore()
 

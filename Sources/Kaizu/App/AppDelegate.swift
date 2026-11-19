@@ -2,7 +2,6 @@ import AppKit
 import BrowserCore
 import CoreSpotlight
 
-@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let app: AppModel
     private let recoveredSession: Bool

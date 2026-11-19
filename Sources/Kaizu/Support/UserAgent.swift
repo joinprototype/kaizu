@@ -1,6 +1,6 @@
 import Foundation
 
-enum UserAgent {
+nonisolated enum UserAgent {
     /// Appended to WebKit's default UA so sites treat us as the installed Safari
     /// (without it, Google and others serve degraded "unsupported browser" pages).
     static let safariSuffix: String = {

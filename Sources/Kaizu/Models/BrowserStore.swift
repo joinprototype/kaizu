@@ -55,7 +55,7 @@ struct Toast: Identifiable {
 /// overlays, and the actions views call. What windows share lives in
 /// `AppModel`. Split by concern across `BrowserStore+*.swift`: tabs, spaces,
 /// split, recents (⌃Tab, now playing), find, peek, external links, privacy.
-@MainActor @Observable
+@Observable
 final class BrowserStore {
     unowned let app: AppModel
     /// Set for a private window: the only space it sees, and nothing else sees it.

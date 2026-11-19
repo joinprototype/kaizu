@@ -18,7 +18,6 @@ import WebKit
 /// Developer ID means every build of Kaizu. So a notification also waits on
 /// its tab, a dot in the sidebar and a count on the Dock, and the Dock icon
 /// bounces when macOS wouldn't take it.
-@MainActor
 final class SiteNotifications: NSObject, WKScriptMessageHandlerWithReply {
     /// Its key in `Settings.sitePermissions`.
     static let permission = "notifications"
@@ -323,6 +322,6 @@ final class NotificationClicks: NSObject, UNUserNotificationCenterDelegate {
 
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
         let destination = SiteNotificationDestination(userInfo: response.notification.request.content.userInfo)
-        await app.openNotification(destination)
+        app.openNotification(destination)
     }
 }

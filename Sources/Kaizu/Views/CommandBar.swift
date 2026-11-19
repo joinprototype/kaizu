@@ -312,7 +312,6 @@ struct SuggestionPresentation {
 }
 
 extension Suggestion {
-    @MainActor
     func presentation(searchEngine: SearchEngine) -> SuggestionPresentation {
         switch self {
         case .answer(let answer):
