@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+Cookie pop-up rejection now runs out of the page's reach. Kaizu loads DuckDuckGo's autoconsent library in a separate script world that pages can't see or change. Each frame receives only the rules that apply to its address, instead of the full 600 KB script and rule set. Across ten busy news and shopping sites, the pages used about 30% less CPU while loading. Memory use stayed about the same. Rejection worked as before on Cookiebot, CookieYes, Didomi, OneTrust, Sourcepoint and Usercentrics sites.
+
 Quitting Kaizu now writes every profile's cookies to disk before the app exits, and an update waits for WebKit to finish saving site data before it reopens Kaizu. Previously WebKit could still be saving after Kaizu exited, so a quick relaunch after an update could lose a recent login or draft.
 
 Clear Today keeps the remaining pinned panes on screen. Undo restores the earlier split when you’ve kept its layout. Older workspaces reopen with cleared panes removed from their saved splits.
