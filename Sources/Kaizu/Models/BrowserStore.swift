@@ -59,6 +59,8 @@ final class BrowserStore {
     var isPeekExpanding = false
     /// The tab whose items are being picked to hide.
     var hidingItemsTabID: UUID?
+    /// What the picker on `hidingItemsTabID` is choosing items for.
+    var pickingPurpose = HiddenItems.Purpose.hide
     /// The color being tried in the space editor, shown on the window.
     var previewTheme: Theme?
     /// Likewise its light/dark choice.
