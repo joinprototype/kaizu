@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+Hold ⌘ for a moment and the sidebar shows which tab each of ⌘1–9 goes to: the first eight visible tabs, from Favorites down, and ⌘9 for the last. The numbers go away when you let go, press a key or click.
+
 VoiceOver can use the sidebar. Tabs, folders, favorites and New Tab read as buttons by name, say which one is selected, and open with VoiceOver's press; a tab's Close and Mute, which only show on hover, are in VoiceOver's actions (VO-⌘-Space), and folders say whether they're expanded. Icon buttons (Back, Reload, Copy Link, the shield, the space switcher, Remove in Settings, Show in Finder) are read by name instead of by icon, without their keyboard shortcut.
 
 Kaizu can watch part of a page for you, such as a price, a stock label or a score. Choose **View → Watch Part of Page…** (or "Watch" in the command bar, or from the site menu in the address bar) and click the part. About once an hour while Kaizu is running, it opens the page out of sight with that profile's sign-ins and the usual blocking, and tells you when the part's text changes: in a macOS notification where macOS allows it, otherwise with a message in the window, a bounce and a count on the Dock icon. Opening the page clears the count. **Settings → Watching** lists what's watched, what each part said before and when it changed, and parts Kaizu can no longer find. Only secure (https) pages in regular windows can be watched, up to 50 parts.

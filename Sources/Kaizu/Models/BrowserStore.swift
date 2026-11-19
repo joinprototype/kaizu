@@ -48,6 +48,9 @@ final class BrowserStore {
     var toast: Toast?
     /// Briefly true after Copy Link, so the address pill can flash "Copied".
     var didCopyLink = false
+    /// ⌘ held on its own: the sidebar shows each tab's ⌘1–9.
+    var showsTabNumbers = false
+    @ObservationIgnored var tabNumberTask: Task<Void, Never>?
 
     @ObservationIgnored weak var window: NSWindow?
     @ObservationIgnored var windowController: BrowserWindowController?
@@ -99,6 +102,7 @@ final class BrowserStore {
         installEscapeMonitor()
         installSplitFocusMonitor()
         installSpaceSwipeMonitor()
+        installTabNumberMonitor()
         installTabSwitcherMonitor()
     }
 
