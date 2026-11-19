@@ -203,6 +203,7 @@ struct CommandRegistryTests {
       Pause Blocking on This Site
       Auto-Reject Cookie Pop-ups
       Hide Distracting Items…
+      Watch Part of Page…
       ---
       Reload Page | ⌘R
       Reload Ignoring Cache | ⌥⌘R

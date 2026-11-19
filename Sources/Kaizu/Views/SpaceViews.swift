@@ -92,6 +92,8 @@ private struct SpaceButton: View {
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(space.name)
+        .accessibilityAddTraits(isActive ? .isSelected : [])
         .onHoverFade($isHovering)
     }
 }

@@ -24,6 +24,9 @@ final class AppModel {
     let tabStateFiles = TabStateFiles(directory: SessionFiles(directory: AppPaths.support).tabStates)
     let settings = Settings()
     let contentBlocker = ContentBlocker()
+    /// Parts of pages you watch for changes, and what checks them.
+    let watches = PageWatches()
+    @ObservationIgnored private(set) lazy var watcher = PageWatcher(app: self)
     let extensions = ExtensionHost()
     let history = try? HistoryStore(fileURL: AppPaths.support.appending(path: "history.sqlite"))
     @ObservationIgnored private(set) lazy var sounds = SoundPlayer(settings: settings)
@@ -60,6 +63,8 @@ final class AppModel {
         startArchiving()
         startHibernating()
         startMediaMonitoring()
+        watches.onUnseenChange = { [weak self] in self?.updateDockBadge() }
+        watcher.start()
         DownloadManager.shared.onFinish = { [weak self] item in
             guard let self, !item.isPrivate || self.front.isPrivate else { return }
             self.front.showToast("Downloaded \(item.filename)")

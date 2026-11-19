@@ -3,16 +3,16 @@
 // Injected at document start into every frame, in the page's own JavaScript
 // world, so it can intercept the player data before YouTube's code reads it.
 // Three layers:
-//   1. On a page opened directly, strip the ad payloads (adPlacements,
-//      adSlots, playerAds…) from the player data embedded in the page, so
-//      the video starts without a pre-roll. When one was booked, YouTube
-//      still holds the video back for about the ad's length (a black player,
-//      5-15 s); ad blockers in Safari see the same wait (Nov 2026).
-//      Clicking another video fetches its player data in-page, and that
-//      request asks YouTube for the video without an ad, so none is booked
-//      and nothing holds it back. The answer itself is left alone: stripped
-//      after booking, every click would stall the same way. Whatever does
-//      get through is handled by layer 2.
+//   1. Ask YouTube for each video without an ad, so none is booked and
+//      nothing holds the video back. Clicking another video fetches its
+//      player data in-page, and that request carries the ask. A page opened
+//      directly arrives with its player data, and any ad booked, already in
+//      it: the ad payloads (adPlacements, adSlots, playerAds…) are stripped,
+//      and when an ad was booked YouTube's player loads the same video again
+//      through a request that asks. Stripping alone would leave YouTube
+//      holding the video back for about the ad's length (a black player,
+//      5-15 s), as ad blockers in Safari do (Nov 2026). Whatever does get
+//      through is handled by layer 2.
 //   2. Safety net for ads that do start, one or several in a row: hidden
 //      from the first frame (picture, badge, countdown, captions, controls),
 //      muted and run through quickly; then the user's sound, speed and
@@ -116,13 +116,47 @@
     };
   }
 
+  // Where a watch link starts: t=90, t=90s, t=1m30s or start=90.
+  const startSeconds = (search) => {
+    const query = new URLSearchParams(search);
+    const value = query.get('t') ?? query.get('start');
+    if (!value) return 0;
+    if (/^\d+s?$/.test(value)) return parseInt(value, 10);
+    const parts = /^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/.exec(value);
+    return parts ? (+parts[1] || 0) * 3600 + (+parts[2] || 0) * 60 + (+parts[3] || 0) : 0;
+  };
+
+  // A watch page opened directly, with an ad booked in its player data: the
+  // player loads the same video again, asking without an ad (above). It
+  // waits for the player for up to 10 s; nothing happens on other pages,
+  // in frames, or once the tab has gone back to plain requests.
+  const reloadWithoutAd = (id) => {
+    if (window.top !== window || location.pathname !== '/watch' || askPlain(id)) return;
+    const start = startSeconds(location.search);
+    const since = Date.now();
+    const timer = setInterval(() => {
+      const player = document.getElementById('movie_player');
+      if (!player || typeof player.loadVideoById !== 'function') {
+        if (Date.now() - since > 10000) clearInterval(timer);
+        return;
+      }
+      clearInterval(timer);
+      player.loadVideoById({ videoId: id, startSeconds: start });
+    }, 50);
+  };
+
   // The first player response, embedded in the page as a global.
   let initialPlayerResponse;
   try {
     Object.defineProperty(window, 'ytInitialPlayerResponse', {
       configurable: true,
       get: () => initialPlayerResponse,
-      set: (value) => { initialPlayerResponse = strip(value); },
+      set: (value) => {
+        const booked = Array.isArray(value?.adPlacements) && value.adPlacements.length > 0;
+        initialPlayerResponse = strip(value);
+        const id = value?.videoDetails?.videoId;
+        if (booked && typeof id === 'string') reloadWithoutAd(id);
+      },
     });
   } catch (_) {}
 

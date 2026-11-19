@@ -77,6 +77,22 @@ struct SiteSettingsView: View {
                     }
                 }
                 .font(.system(size: 13))
+                if url.scheme == "https" {
+                    let watched = store.app.watches.parts.count { $0.url.host() == url.host() && $0.profileID == tab.profile.id }
+                    HStack {
+                        Button("Watch Part of Page…") {
+                            dismiss()
+                            store.beginHidingItems(on: tab, for: .watch)
+                        }
+                        .buttonStyle(.plain)
+                        Spacer()
+                        if watched > 0 {
+                            Text("\(watched) watched")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .font(.system(size: 13))
+                }
                 }
                 Button("Report a Broken Site…") {
                     dismiss()
