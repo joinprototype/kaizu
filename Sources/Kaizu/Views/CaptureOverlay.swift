@@ -91,11 +91,12 @@ struct HidingItemsHint: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Image(systemName: "eye.slash")
+            let watching = store.pickingPurpose == .watch
+            Image(systemName: watching ? "eye" : "eye.slash")
                 .foregroundStyle(.secondary)
-            Text("Click items to hide them on this site")
+            Text(watching ? "Click the part to watch, like a price" : "Click items to hide them on this site")
             Divider().frame(height: 14)
-            Button("Done") { store.endHidingItems() }
+            Button(store.pickingPurpose == .watch ? "Cancel" : "Done") { store.endHidingItems() }
                 .buttonStyle(.plain)
                 .fontWeight(.semibold)
             KeyCap(keys: "esc", size: 11)

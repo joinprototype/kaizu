@@ -90,6 +90,9 @@ extension BrowserStore {
                 PaletteCommand(id: "hide.items", title: "Hide Distracting Items", symbol: "eye.slash", keywords: ["zap", "remove", "annoying", "clutter", "banner"]) {
                     self.beginHidingItems(on: tab)
                 },
+                PaletteCommand(id: "watch.part", title: "Watch Part of Page", symbol: "eye", keywords: ["price", "drop", "restock", "monitor", "track", "change"]) {
+                    self.beginHidingItems(on: tab, for: .watch)
+                },
                 PaletteCommand(
                     id: "site.blocking",
                     title: contentBlocker.isPaused(on: tab.url, privateID: tab.profile.privateID) ? "Resume Blocking on This Site" : "Pause Blocking on This Site",

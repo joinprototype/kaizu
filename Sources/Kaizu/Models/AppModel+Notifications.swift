@@ -17,6 +17,15 @@ nonisolated struct SiteNotificationDestination: Sendable {
         self.url = url
     }
 
+    /// Not from a tab: a watched page's change.
+    init(profileID: UUID, url: URL) {
+        tabID = nil
+        self.profileID = profileID
+        spaceID = nil
+        page = ""
+        self.url = url
+    }
+
     init(userInfo: [AnyHashable: Any]) {
         tabID = (userInfo["tab"] as? String).flatMap(UUID.init(uuidString:))
         profileID = (userInfo["profile"] as? String).flatMap(UUID.init(uuidString:))
