@@ -55,7 +55,7 @@ extension DebugHooks {
             await settle()
 
             hidden.toggleBlockingOnCurrentSite(one)
-            let saved = UserDefaults.standard.stringArray(forKey: "blockingPausedSites") ?? []
+            let saved = AppDefaults.shared.stringArray(forKey: "blockingPausedSites") ?? []
             check("pausing blocking there isn't saved", store.contentBlocker.isPaused(on: secret, privateID: one.profile.privateID) && !store.contentBlocker.isPaused(on: secret, privateID: nil) && !saved.contains("example.org") && !store.contentBlocker.pausedSites.contains("example.org"))
 
             let closing = hidden.openTab(URL(string: "https://example.org/closing"))

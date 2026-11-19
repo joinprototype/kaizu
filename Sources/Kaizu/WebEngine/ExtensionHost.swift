@@ -78,7 +78,7 @@ final class ExtensionHost: NSObject {
     private static let recordsKey = "installedExtensions"
     nonisolated private static let safariExtensionPoint = "com.apple.Safari.web-extension"
 
-    init(defaults: UserDefaults = .standard,
+    init(defaults: UserDefaults = AppDefaults.shared,
          directory: URL = AppPaths.support.appending(path: "Extensions", directoryHint: .isDirectory),
          configuration: WKWebExtensionController.Configuration = .default()) {
         self.defaults = defaults
