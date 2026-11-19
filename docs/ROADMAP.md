@@ -329,7 +329,7 @@ footprint, what Activity Monitor shows; RSS counts 570 MB of shared system code)
 Plus, where Kaizu gets its personality:
 - [x] Loading delight: a compass needle in the address pill swings while a page loads and settles on north when done **S**
 - [x] A chart-paper empty state: a sea chart's rhumb-line web, drawn outward once, in the chart-maker's three inks **S**
-- [ ] Optional soft UI sounds (off by default) **S**
+- [x] Optional soft UI sounds (off by default): seven sounds of paper, wood and brass, each under 250 ms, made in code. They play only for your own actions, never for page events, at the macOS alert volume and only while macOS interface sounds are on. A held key or a run of swipes plays once. Like Herdr, which has two sounds and no volume setting, Kaizu has no volume control of its own **S**
 - [x] The chart room: IM Fell for names, New York for text, water lettered in italics; the icon's rose behind the sidebar, turning to a new bearing with each space and following the fingers in a swipe; rhumb lines, paper grain, gilt seals for favorites, paper slips, chart borders; "Where to?" **M**
 - [x] Heritage space colors (Claret, Cognac, Ochre, Vellum, Sage, Verdigris, Navy, Heather) replace the candy palette; existing spaces map to the nearest **S**
 - [x] Theme picker with live preview (the window takes the color as you pick; Cancel puts it back); per-space themes **S**

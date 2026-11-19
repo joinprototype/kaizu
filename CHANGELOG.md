@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+Kaizu can play soft interface sounds: turn on **Settings → General → Play soft sounds**. They’re off by default. Opening, closing and pinning a tab, switching spaces, making a split and bringing up the command bar each have a short sound of paper, wood or brass, made in code rather than bundled. They play at your macOS alert volume and stay silent when **Play user interface sound effects** is off in System Settings → Sound. Holding ⌘W or swiping through several spaces plays only the first sound.
+
 Quitting Kaizu now writes every profile's cookies to disk before the app exits, and an update waits for WebKit to finish saving site data before it reopens Kaizu. Previously WebKit could still be saving after Kaizu exited, so a quick relaunch after an update could lose a recent login or draft.
 
 Clear Today keeps the remaining pinned panes on screen. Undo restores the earlier split when you’ve kept its layout. Older workspaces reopen with cleared panes removed from their saved splits.
