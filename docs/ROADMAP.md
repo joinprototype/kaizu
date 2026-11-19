@@ -410,7 +410,7 @@ modes, Quick Keys, inline action parameters.)
 - [x] Every menu item findable in the command bar, read from the menus **S**
 - [x] Keyboard Shortcuts card (⌘/), read from the menus **S**
 - [x] Pinned tabs and favorites in the system Spotlight (Core Spotlight): ⌘Space → "Gmail" opens your pinned tab **S**
-- [ ] Watch page: pick part of a page, get a notification when it changes (price drop, restock) **M**
+- [x] Watch page: pick part of a page, get a notification when it changes (price drop, restock) **M**. Hourly checks in a hidden web view with the profile's cookies; Settings → Watching
 
 ## Phase 6: Ship it
 

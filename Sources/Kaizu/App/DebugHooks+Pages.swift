@@ -49,7 +49,11 @@ extension DebugHooks {
     static func qaHide(_ store: BrowserStore) {
         let tab = store.openTab(URL(string: "https://example.com/"))
         Task {
-            try? await Task.sleep(for: .seconds(4))
+            // A fresh profile can take longer than a few seconds for its first page.
+            for _ in 0..<150 where tab.isLoading || tab.title.isEmpty {
+                try? await Task.sleep(for: .milliseconds(100))
+            }
+            try? await Task.sleep(for: .seconds(1))
             store.beginHidingItems(on: tab)
             try? await Task.sleep(for: .seconds(1))
             _ = try? await tab.webView.evaluateJavaScript("""

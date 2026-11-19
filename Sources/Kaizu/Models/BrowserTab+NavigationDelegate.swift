@@ -144,6 +144,9 @@ extension BrowserTab: WKNavigationDelegate {
         lastStrippedURL = nil
         sync(with: webView)
         applyHiddenItems(in: webView)
+        if !profile.isPrivate, let watches = app?.watches, watches.unseenCount > 0 {
+            watches.markSeen(webView.url)
+        }
         if let history = app?.history, let url = webView.url, !profile.isPrivate {
             let (profileID, title) = (profile.id, webView.title ?? "")
             Task { await history.recordVisit(profile: profileID, url: url, title: title) }

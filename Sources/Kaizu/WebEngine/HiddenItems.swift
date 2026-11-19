@@ -7,6 +7,11 @@ import WebKit
 /// pages can't call them; the style sheet itself is in the page's DOM,
 /// where a page could find it, like any page change an extension makes.
 final class HiddenItems: NSObject, WKScriptMessageHandler {
+    /// The same picker also chooses a part of the page to watch.
+    enum Purpose: String {
+        case hide, watch
+    }
+
     static let world = WKContentWorld.world(name: "KaizuHiddenItems")
     private static let handlerName = "kaizuHide"
     /// Per site: enough for any real clean-up, not for a page spamming picks.
@@ -21,15 +26,19 @@ final class HiddenItems: NSObject, WKScriptMessageHandler {
     }
 
     /// A picked item's selector, from the picking script: only while the
-    /// user is picking on this tab, from its main frame, and from the page
-    /// the tab is on (not one it's just leaving).
+    /// user is picking on this tab, for what they're picking for, from its
+    /// main frame, and from the page the tab is on (not one it's just leaving).
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
         guard let tab, !tab.profile.isPrivate, let store = tab.store, store.hidingItemsTabID == tab.id,
-              message.frameInfo.isMainFrame, let selector = message.body as? String,
-              selector.count <= Self.maximumSelectorLength,
+              message.frameInfo.isMainFrame, let body = message.body as? [String: Any],
+              body["purpose"] as? String == store.pickingPurpose.rawValue,
+              let selector = body["selector"] as? String, selector.count <= Self.maximumSelectorLength,
               message.frameInfo.securityOrigin.host == tab.url?.host()
         else { return }
-        store.settings.hide(selector, on: tab.url)
+        switch store.pickingPurpose {
+        case .hide: store.settings.hide(selector, on: tab.url)
+        case .watch: store.watchPicked(selector, text: body["text"] as? String ?? "", on: tab)
+        }
     }
 
     /// Hides the site's remembered items; safe to call again (it replaces
@@ -61,8 +70,8 @@ final class HiddenItems: NSObject, WKScriptMessageHandler {
         )
     }
 
-    static func startPicking(in webView: WKWebView) {
-        webView.evaluateJavaScript(pickingScript, in: nil, in: world) { _ in }
+    static func startPicking(in webView: WKWebView, for purpose: Purpose = .hide) {
+        webView.callAsyncJavaScript(pickingScript, arguments: ["purpose": purpose.rawValue], in: nil, in: world, completionHandler: nil)
     }
 
     static func stopPicking(in webView: WKWebView) {
@@ -81,7 +90,7 @@ final class HiddenItems: NSObject, WKScriptMessageHandler {
     /// the page (frames included); what's under the pointer is found by
     /// looking through the shield. Synthetic events from the page are ignored.
     private static let pickingScript = """
-    (() => {
+    return (() => {
       if (window.__kaizuStopHiding) return 0;
       const shield = document.createElement("div");
       shield.style.cssText = "position:fixed;inset:0;z-index:2147483647;cursor:crosshair;background:transparent";
@@ -130,12 +139,19 @@ final class HiddenItems: NSObject, WKScriptMessageHandler {
         if (!\(isReal)) return;
         const element = under(event.clientX, event.clientY);
         if (!element) return;
+        if (purpose === "watch") {
+          // Kept on the page: the outline stays a moment to show what's watched.
+          outline(element);
+          const text = (element.innerText || element.textContent || "").slice(0, 2000);
+          window.webkit.messageHandlers.\(handlerName).postMessage({ purpose, selector: selectorFor(element), text });
+          return;
+        }
         box.style.display = "none";
         element.style.transition = "opacity 220ms ease-out, transform 220ms ease-out";
         element.style.opacity = "0";
         element.style.transform = "scale(0.97)";
         setTimeout(() => element.style.setProperty("display", "none", "important"), 230);
-        window.webkit.messageHandlers.\(handlerName).postMessage(selectorFor(element));
+        window.webkit.messageHandlers.\(handlerName).postMessage({ purpose, selector: selectorFor(element) });
       };
       const presses = ["mousedown", "mouseup", "pointerdown", "pointerup", "auxclick", "dblclick", "contextmenu"];
       shield.addEventListener("mousemove", move);

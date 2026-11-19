@@ -297,9 +297,10 @@ final class SiteNotifications: NSObject, WKScriptMessageHandlerWithReply {
 }
 
 extension AppModel {
-    /// The Dock's count of notifications you haven't looked at yet.
+    /// The Dock's count of notifications you haven't looked at yet, and of
+    /// watched pages that changed since you last opened them.
     func updateDockBadge() {
-        let waiting = Set(spaces.flatMap(\.allTabs)).reduce(0) { $0 + $1.unreadNotifications }
+        let waiting = Set(spaces.flatMap(\.allTabs)).reduce(0) { $0 + $1.unreadNotifications } + watches.unseenCount
         NSApp.dockTile.badgeLabel = waiting > 0 ? String(waiting) : nil
     }
 }

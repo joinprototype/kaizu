@@ -84,6 +84,7 @@ enum DebugHooks {
         case "splitdrop": qaSplitDrop(store)
         case "capture": qaCapture(store)
         case "hide": qaHide(store)
+        case "watch": qaWatch(store)
         case "brokensite": qaBrokenSite(store)
         case "bugreport": qaBugReport(store)
         case "spotlight": qaSpotlight(store)
