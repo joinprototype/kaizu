@@ -112,6 +112,8 @@ private struct GeneralSettings: View {
                         } label: {
                             Image(systemName: "minus.circle.fill")
                         }
+                        .help("Remove Shortcut")
+                        .accessibilityLabel("Remove Shortcut")
                         .buttonStyle(.borderless)
                         .foregroundStyle(.secondary)
                     }
@@ -218,6 +220,8 @@ private struct LinkSettings: View {
                         } label: {
                             Image(systemName: "minus.circle.fill")
                         }
+                        .help("Remove Rule")
+                        .accessibilityLabel("Remove Rule")
                         .buttonStyle(.borderless)
                         .foregroundStyle(.secondary)
                     }
