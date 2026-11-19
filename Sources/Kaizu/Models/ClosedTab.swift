@@ -14,8 +14,10 @@ struct ClosedTab {
 
 extension Array where Element == ClosedTab {
     @MainActor
-    mutating func remember(_ tab: BrowserTab, in spaceID: UUID) {
-        let state = tab.currentState
+    /// Pass `keepsHistory: false` for tabs that will fall outside the newest
+    /// `historyCount` anyway, so their page state isn't serialized for nothing.
+    mutating func remember(_ tab: BrowserTab, in spaceID: UUID, keepsHistory: Bool = true) {
+        let state = keepsHistory ? tab.currentState : nil
         append(ClosedTab(spaceID: spaceID, profileID: tab.profile.id, record: tab.record,
                          navigationState: state.flatMap { $0.count <= ClosedTab.maxStateBytes ? $0 : nil }))
         if count > ClosedTab.historyCount {

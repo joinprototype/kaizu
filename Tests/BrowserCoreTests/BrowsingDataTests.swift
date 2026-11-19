@@ -334,8 +334,8 @@ import Testing
             BrowsingData.Visit(url: Self.example, title: "Theirs", count: 5, lastVisit: then),
             BrowsingData.Visit(url: Self.docs, title: "Guide", count: 2, lastVisit: then),
         ]
-        #expect(await store.add(visits, profile: profile) == [Self.docs])
-        #expect(await store.add(visits, profile: profile) == [])
+        let receipt = try await store.importVisits(visits, profile: profile)
+        _ = try await store.importVisits(visits, profile: profile)
 
         let entries = await store.recent(profile: profile)
         #expect(entries.count == 2)
@@ -345,7 +345,7 @@ import Testing
         #expect(mine.lastVisit == later)
         #expect(entries.first { $0.url == Self.docs }?.visitCount == 2)
 
-        await store.remove([Self.docs], profile: profile)
+        try await store.undoImport(receipt)
         #expect(await store.recent(profile: profile).map(\.url) == [Self.example])
     }
 

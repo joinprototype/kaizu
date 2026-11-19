@@ -5,20 +5,23 @@ import SwiftUI
 /// where the command bar finds them; bookmarks become a closed pinned folder.
 extension AppModel {
     func importBrowsingData(_ visits: [BrowsingData.Visit], bookmarks: BookmarkImport?, into space: Space) async {
-        let receipt: HistoryStore.ImportUndo?
-        if visits.isEmpty {
-            receipt = nil
-        } else {
-            guard let history else {
-                regularFront.showToast("Couldn’t import pages because history is unavailable", symbol: "exclamationmark.triangle")
-                return
+        var receipt: HistoryStore.ImportUndo?
+        var historyProblem: String?
+        if !visits.isEmpty {
+            if let history {
+                do {
+                    receipt = try await history.importVisits(visits, profile: space.profile.id)
+                } catch {
+                    historyProblem = "Couldn’t save the imported history"
+                }
+            } else {
+                historyProblem = "Couldn’t import pages because history is unavailable"
             }
-            do {
-                receipt = try await history.importVisits(visits, profile: space.profile.id)
-            } catch {
-                regularFront.showToast("Couldn’t save the imported history", symbol: "exclamationmark.triangle")
-                return
-            }
+        }
+        // Bookmarks don't depend on the history database, so a failed history write still brings them.
+        if let historyProblem, bookmarks == nil {
+            regularFront.showToast(historyProblem, symbol: "exclamationmark.triangle")
+            return
         }
         let item = bookmarks.map { makeItem(.folder($0.folder), profile: space.profile) }
         let folderID = item?.id
@@ -28,9 +31,11 @@ extension AppModel {
             scheduleSave()
         }
 
-        let pages = visits.isEmpty ? nil : visits.count.counted("page")
+        let pages = receipt == nil ? nil : visits.count.counted("page")
         let summary = [pages, bookmarks?.count.counted("bookmark")].compactMap(\.self).joined(separator: " and ")
-        regularFront.showToast("Imported \(summary)", symbol: "square.and.arrow.down", undo: { [weak self] in
+        let message = historyProblem.map { "Imported \(summary). \($0)." } ?? "Imported \(summary)"
+        let symbol = historyProblem == nil ? "square.and.arrow.down" : "exclamationmark.triangle"
+        regularFront.showToast(message, symbol: symbol, undo: { [weak self] in
             guard let self else { return }
             if let receipt, let history = self.history {
                 Task {

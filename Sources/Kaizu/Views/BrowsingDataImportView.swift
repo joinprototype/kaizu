@@ -196,6 +196,11 @@ struct BrowsingDataImportView: View {
             let read = try await Task.detached { try source.read() }.value
             guard !Task.isCancelled else { return }
             loaded = (source, read)
+            // Safari profiles share one bookmarks file; a lone file needs no choice.
+            if case .archive(let archive) = read {
+                if archive.historyFiles.count == 1 { historyFile = .file(archive.historyFiles[0]) }
+                if archive.bookmarkFiles.count == 1 { bookmarkFile = .file(archive.bookmarkFiles[0]) }
+            }
         } catch {
             guard !Task.isCancelled else { return }
             problem = "Kaizu couldn't read this. If the browser is busy, quit it and try again."

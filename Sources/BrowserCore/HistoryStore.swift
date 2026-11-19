@@ -22,7 +22,6 @@ public actor HistoryStore {
     public struct ImportUndo: Sendable {
         fileprivate let batch: String
         fileprivate let profile: UUID
-        fileprivate var inserted: [URL] = []
         fileprivate var counts: [String: Int] = [:]
     }
 
@@ -120,12 +119,7 @@ public actor HistoryStore {
 
     /// Pages from another browser, all at once. A page already here keeps its
     /// title and takes the higher count and the later date, so importing
-    /// twice changes nothing. Returns the newly added pages.
-    @discardableResult
-    public func add(_ visits: [BrowsingData.Visit], profile: UUID) -> [URL] {
-        (try? importVisits(visits, profile: profile).inserted) ?? []
-    }
-
+    /// twice changes nothing. The receipt undoes only what this import added.
     public func importVisits(_ visits: [BrowsingData.Visit], profile: UUID) throws -> ImportUndo {
         var undo = ImportUndo(batch: UUID().uuidString, profile: profile)
         guard !visits.isEmpty else { return undo }
@@ -153,7 +147,6 @@ public actor HistoryStore {
                 ]
                 try runAgain(insert, values)
                 if sqlite3_changes(db) > 0 {
-                    undo.inserted.append(visit.url)
                     undo.counts[visit.url.absoluteString] = visit.count
                 } else {
                     try runAgain(update, values)
@@ -183,16 +176,6 @@ public actor HistoryStore {
                 let values: [Value] = [.text(undo.profile.uuidString), .text(url), .text(undo.batch), .integer(count)]
                 try runAgain(delete, values)
                 if sqlite3_changes(db) == 0 { try runAgain(keep, values) }
-            }
-        }
-    }
-
-    public func remove(_ urls: [URL], profile: UUID) {
-        guard let delete = prepare("DELETE FROM visits WHERE profile = ?1 AND url = ?2", []) else { return }
-        defer { sqlite3_finalize(delete) }
-        try? inTransaction {
-            for url in urls {
-                try runAgain(delete, [.text(profile.uuidString), .text(url.absoluteString)])
             }
         }
     }

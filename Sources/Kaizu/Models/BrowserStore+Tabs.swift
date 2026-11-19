@@ -220,8 +220,8 @@ extension BrowserStore {
         guard !cleared.isEmpty else { return }
         let ids = Set(cleared.map(\.id))
         let previousLayout = space.splitLayout
-        for tab in cleared {
-            closedTabs.remember(tab, in: space.id)
+        for (index, tab) in cleared.enumerated() {
+            closedTabs.remember(tab, in: space.id, keepsHistory: index >= cleared.count - ClosedTab.historyCount)
             extensions.didClose(tab)
             tab.markNotificationsRead()
         }
@@ -259,7 +259,10 @@ extension BrowserStore {
 
     func reopenClosedTab() {
         while let closed = closedTabs.popLast() {
-            guard let space = spaces.first(where: { $0.id == closed.spaceID && $0.profile.id == closed.profileID }) else { continue }
+            // If its space was deleted, another space on the same profile keeps its cookies.
+            let space = spaces.first { $0.id == closed.spaceID && $0.profile.id == closed.profileID }
+                ?? spaces.first { $0.profile.id == closed.profileID }
+            guard let space else { continue }
             reopen(closed.record, in: space, navigationState: closed.navigationState)
             return
         }
