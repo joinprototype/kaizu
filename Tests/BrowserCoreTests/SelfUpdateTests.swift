@@ -1,6 +1,7 @@
 import BrowserCore
 import CryptoKit
 import Foundation
+import TestSupport
 import Testing
 
 /// Real archives, real codesign, real helper script: only the key is made up.
