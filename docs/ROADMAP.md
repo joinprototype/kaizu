@@ -249,7 +249,7 @@ Make the codebase ready to grow (details in [ARCHITECTURE.md](ARCHITECTURE.md)).
 - [x] `Tests/` with Swift Testing: filter conversion, sessions, history, URL input, quick answers, completion (53 tests) **S**
 - [ ] Split into modules: DesignSystem → WebEngine → BrowserCore + Storage **M**
 - [x] `AppModel` (what windows share) + one `BrowserStore` per window **M**
-- [ ] `Command` registry drives menus **S**
+- [x] `Command` registry drives menus **S**
 - [x] Session `schemaVersion` + migrator; Profile/Space split (v2) **M**
 - [x] `Motion` tokens; ad-hoc animation literals removed (`Metrics` still to do) **S**
 
