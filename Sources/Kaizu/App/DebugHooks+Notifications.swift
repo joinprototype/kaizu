@@ -17,6 +17,22 @@ extension DebugHooks {
         func settle(_ seconds: Double = 0.5) async {
             try? await Task.sleep(for: .seconds(seconds))
         }
+        /// Checks `condition` every 100 ms until it holds or `timeout` runs
+        /// out; returns whether it held. For checks that something happens.
+        func until(_ timeout: Double = 10, _ condition: () async -> Bool) async -> Bool {
+            let deadline = ContinuousClock.now + .seconds(timeout)
+            while ContinuousClock.now < deadline {
+                if await condition() { return true }
+                try? await Task.sleep(for: .milliseconds(100))
+            }
+            return await condition()
+        }
+        /// Until the tab's page has finished loading.
+        func loaded(_ tab: BrowserTab) async {
+            // Let a load that was just asked for start first.
+            await settle(0.2)
+            _ = await until { !tab.webView.isLoading && tab.webView.url != nil }
+        }
         func page(_ tab: BrowserTab, _ script: String) async -> String {
             (try? await tab.webView.evaluateJavaScript("String(\(script))")) as? String ?? "failed"
         }
@@ -55,17 +71,17 @@ extension DebugHooks {
 
         Task {
             let blocked = store.openTab(URL(string: "https://example.org/"))
-            await settle(3)
+            await loaded(blocked)
             let asked = store.openTab(URL(string: "https://example.net/"))
-            await settle(3)
+            await loaded(asked)
             let allowed = store.openTab(URL(string: "https://example.com/"))
-            await settle(3)
+            await loaded(allowed)
 
             // Kaizu runs a script at the end of every load to find the icon.
             // In the page's world that counts as a click, which a page that
             // hooks the DOM could spend on asking for permission.
             let bait = store.openTab(URL(string: "https://example.edu/"))
-            await settle(2)
+            await loaded(bait)
             bait.webView.configuration.userContentController.addUserScript(WKUserScript(source: """
                 for (const name of ['querySelector', 'querySelectorAll']) {
                   const real = document[name];
@@ -73,7 +89,9 @@ extension DebugHooks {
                 }
                 """, injectionTime: .atDocumentStart, forMainFrameOnly: true))
             bait.reload()
-            await settle(4)
+            await loaded(bait)
+            // The icon script runs once the load ends; give a question time to show.
+            await settle(1)
             check("finding a page's icon can't raise the question", store.window?.attachedSheet == nil)
             if store.window?.attachedSheet != nil {
                 answerQuestion(allow: false)
@@ -82,8 +100,7 @@ extension DebugHooks {
             store.close(bait)
             await settle()
             let icon = store.openTab(URL(string: "https://github.com/"))
-            await settle(5)
-            check("and icons are still found", icon.favicon != nil)
+            check("and icons are still found", await until { icon.favicon != nil })
             store.close(icon)
             await settle()
             store.select(allowed)
@@ -95,31 +112,27 @@ extension DebugHooks {
             check("unasked site reads default", await page(asked, "Notification.permission") == "default")
             let query = "void navigator.permissions.query({ name: 'notifications' }).then(s => { window.__state = s.state })"
             _ = await page(allowed, query)
-            await settle()
-            check("permissions.query agrees", await page(allowed, "window.__state") == "granted")
+            check("permissions.query agrees", await until { await page(allowed, "window.__state") == "granted" })
             check("subframes keep WebKit's own", await page(allowed, """
                 (() => { const f = document.createElement('iframe'); document.body.append(f); return f.contentWindow.Notification.permission })()
                 """) != "granted")
 
             _ = await page(allowed, "void new Notification('Hello', { body: 'From the page', tag: 'one' })")
-            await settle()
-            check("allowed site reaches macOS", delivered == ["example.com: Hello"])
+            check("allowed site reaches macOS", await until { delivered == ["example.com: Hello"] })
             _ = await page(allowed, "void ServiceWorkerRegistration.prototype.showNotification.call({}, 'From a worker')")
-            await settle()
-            check("registration.showNotification too", delivered.contains("example.com: From a worker"))
+            check("registration.showNotification too", await until { delivered.contains("example.com: From a worker") })
             delivered = []
             _ = await page(blocked, "void Object.assign(new Notification('Nope'), { onerror() { window.__refused = true } })")
-            await settle()
-            let refused = await page(blocked, "window.__refused")
-            check("blocked site doesn't", delivered.isEmpty && refused == "true")
+            let refused = await until { await page(blocked, "window.__refused") == "true" }
+            check("blocked site doesn't", delivered.isEmpty && refused)
             let site = URL(string: "https://example.com/")!
             store.contentBlocker.togglePause(on: site, privateID: allowed.profile.privateID)
             allowed.reload()
-            await settle(3)
+            await loaded(allowed)
             check("pausing blocking keeps it", await page(allowed, "Notification.permission") == "granted")
             store.contentBlocker.togglePause(on: site, privateID: allowed.profile.privateID)
             allowed.reload()
-            await settle(3)
+            await loaded(allowed)
             _ = await page(blocked, """
                 void window.dispatchEvent(new CustomEvent('kaizu-notification-ask', { detail: JSON.stringify({ kind: 'show', id: 'x', title: 'Forged', ref: 99 }) }))
                 """)
@@ -143,40 +156,43 @@ extension DebugHooks {
             _ = await page(asked, askOnClick)
             await settle(6)
             await click(asked)
-            await settle(1)
-            check("a real click raises it", store.window?.attachedSheet != nil)
+            check("a real click raises it", await until(3) { store.window?.attachedSheet != nil })
             answerQuestion(allow: true)
-            await settle(1)
-            let told = await page(asked, "window.__asked")
-            check("and the page hears the answer", told == "granted" && settings.sitePermissions["example.net"]?[permission] == true)
+            let told = await until(3) { await page(asked, "window.__asked") == "granted" }
+            check("and the page hears the answer", told && settings.sitePermissions["example.net"]?[permission] == true)
             check("an open tab then needs a rebuild", asked.needsRebuildToNotify)
             asked.rebuildToNotify()
-            await settle(3)
-            let live = asked.webView.configuration.preferences.inactiveSchedulingPolicy == .throttle
-            check("Reload rebuilds it in place", live && !asked.needsRebuildToNotify && asked.webView.window != nil)
+            await loaded(asked)
+            let rebuilt = await until {
+                asked.webView.configuration.preferences.inactiveSchedulingPolicy == .throttle
+                    && !asked.needsRebuildToNotify && asked.webView.window != nil
+            }
+            check("Reload rebuilds it in place", rebuilt)
             check("on the same page", asked.url?.host() == "example.net")
 
             settings.sitePermissions["example.net"] = nil
             asked.reload()
-            await settle(2)
+            await loaded(asked)
             _ = await page(asked, askOnClick)
             await click(asked)
-            await settle(1)
+            _ = await until(3) { store.window?.attachedSheet != nil }
             _ = await page(asked, "void (location.href = 'https://example.edu/')")
-            await settle(3)
+            _ = await until { asked.url?.host() == "example.edu" }
+            await loaded(asked)
             answerQuestion(allow: true)
-            await settle(1)
-            check(
-                "the answer goes to the site that asked, not where it went",
+            let answered = await until(3) {
                 settings.sitePermissions["example.net"]?[permission] == true && settings.sitePermissions["example.edu"] == nil
-            )
+            }
+            check("the answer goes to the site that asked, not where it went", answered)
 
             store.select(allowed)
             await settle(1)
             _ = await page(allowed, "void document.addEventListener('click', () => { window.open('https://example.com/popup') })")
             await click(allowed)
-            await settle(3)
-            if let popup = store.activeSpace.allTabs.first(where: { $0.url?.path() == "/popup" }) {
+            let opened = { store.activeSpace.allTabs.first(where: { $0.url?.path() == "/popup" }) }
+            _ = await until { opened() != nil }
+            if let popup = opened() {
+                await loaded(popup)
                 check("a popup is never rebuilt", !popup.needsRebuildToNotify && popup.notifyingHost == nil)
                 check("so it keeps its opener", await page(popup, "window.opener !== null") == "true")
                 popup.hibernate()
@@ -191,40 +207,41 @@ extension DebugHooks {
             _ = await page(allowed, count)
             _ = await page(blocked, count)
             store.select(asked)
-            say("waiting 60 s with both in the background")
-            await settle(60)
-            let awake = Int(await page(allowed, "window.__ticks")) ?? 0
+            // A suspended page stops counting at once; a throttled one (what
+            // an allowed tab gets) keeps going at about one tick in two
+            // seconds. So: past the first stretch, is it still counting?
+            say("waiting 20 s with both in the background")
+            await settle(10)
+            let before = Int(await page(allowed, "window.__ticks")) ?? 0
+            await settle(10)
+            let awake = (Int(await page(allowed, "window.__ticks")) ?? 0) - before
             let asleep = Int(await page(blocked, "window.__ticks")) ?? 0
-            say("background ticks: allowed \(awake), other \(asleep)")
+            say("background ticks: allowed \(awake) in the last 10 s, other \(asleep) in 20 s")
             // Whether WebKit pauses the other one varies: only this is ours.
-            check("an allowed tab keeps running in the background", awake >= 25)
+            check("an allowed tab keeps running in the background", awake >= 3)
 
             let shown = app.reveal(tabWithID: allowed.id)
-            await settle()
-            check("a click brings its tab forward", shown === allowed && store.selectedTab === allowed)
+            check("a click brings its tab forward", await until(3) { shown === allowed && store.selectedTab === allowed })
             check("a closed tab is reported gone", app.reveal(tabWithID: UUID()) == nil)
 
             let twin = store.openTab(URL(string: "https://example.com/second"), select: false)
             twin.activate()
-            await settle(3)
+            await loaded(twin)
             store.select(asked)
             await settle()
             await app.hibernateIdleTabs()
             check("a tab just left is never reloaded", allowed.isLoaded && twin.isLoaded)
             await app.hibernateIdleTabs(olderThan: 0.001)
-            await settle()
-            check("one tab per site stays, not all", [allowed, twin].filter(\.isLoaded).count == 1 && !blocked.isLoaded)
+            check("one tab per site stays, not all", await until(3) { [allowed, twin].filter(\.isLoaded).count == 1 && !blocked.isLoaded })
             await app.hibernateIdleTabs(olderThan: 0)
-            await settle()
-            check("a memory warning takes it too", !allowed.isLoaded && !twin.isLoaded)
+            check("a memory warning takes it too", await until(3) { !allowed.isLoaded && !twin.isLoaded })
             app.wakeTabsThatNotify()
-            await settle(3)
-            check("the sweep wakes one again", [allowed, twin].filter(\.isLoaded).count == 1)
+            check("the sweep wakes one again", await until { [allowed, twin].filter(\.isLoaded).count == 1 })
             let awakeTab = allowed.isLoaded ? allowed : twin
             let sleepingTab = allowed.isLoaded ? twin : allowed
 
             store.select(blocked)
-            await settle(3)
+            await loaded(blocked)
             store.select(awakeTab)
             await settle()
             settings.sitePermissions["example.org"] = [permission: true]
@@ -232,9 +249,11 @@ extension DebugHooks {
             await app.hibernateIdleTabs()
             check("not while recently used", blocked.needsRebuildToNotify)
             await app.hibernateIdleTabs(olderThan: 0.001)
-            await settle(3)
-            let policy = blocked.isLoaded ? blocked.webView.configuration.preferences.inactiveSchedulingPolicy : .suspend
-            check("once idle it's rebuilt, on the same page", policy == .throttle && !blocked.needsRebuildToNotify && blocked.url?.host() == "example.org")
+            let rebuiltIdle = await until {
+                let policy = blocked.isLoaded ? blocked.webView.configuration.preferences.inactiveSchedulingPolicy : .suspend
+                return policy == .throttle && !blocked.needsRebuildToNotify && blocked.url?.host() == "example.org"
+            }
+            check("once idle it's rebuilt, on the same page", rebuiltIdle)
             settings.sitePermissions["example.org"] = [permission: false]
 
             settings.archiveAfter = .twelveHours
@@ -248,12 +267,12 @@ extension DebugHooks {
             check("archiving keeps one tab per site", today.contains(awakeTab) != today.contains(sleepingTab))
             let kept = today.contains(awakeTab) ? awakeTab : sleepingTab
             kept.activate()
-            await settle(3)
+            await loaded(kept)
 
             let hidden = app.openPrivateWindow()
             await settle()
             let inPrivate = hidden.openTab(URL(string: "https://example.com/"))
-            await settle(3)
+            await loaded(inPrivate)
             delivered = []
             check("private windows look like any other", await page(inPrivate, "Notification.toString().includes('native code')") == "false")
             check("but read no saved answers", await page(inPrivate, "Notification.permission") == "default")
@@ -265,12 +284,10 @@ extension DebugHooks {
             await settle()
 
             _ = await page(kept, "void new Notification('While away')")
-            await settle()
-            check("it waits on its tab, away from it", kept.unreadNotifications == 1 && NSApp.dockTile.badgeLabel == "1")
+            check("it waits on its tab, away from it", await until(3) { kept.unreadNotifications == 1 && NSApp.dockTile.badgeLabel == "1" })
             saveShot(of: store.window)
             store.select(kept)
-            await settle()
-            check("until you look", kept.unreadNotifications == 0 && NSApp.dockTile.badgeLabel == nil)
+            check("until you look", await until(3) { kept.unreadNotifications == 0 && NSApp.dockTile.badgeLabel == nil })
             if NSApp.isActive {
                 _ = await page(kept, "void new Notification('While looking')")
                 await settle()
@@ -288,27 +305,23 @@ extension DebugHooks {
                 check("nothing waits in a pane on screen", kept.unreadNotifications == 0)
             }
             let elsewhere = store.openTab(URL(string: "https://example.org/elsewhere"))
-            await settle(2)
+            await loaded(elsewhere)
             await app.hibernateIdleTabs(olderThan: 0)
-            await settle()
-            check("a hidden split can hibernate", !kept.isLoaded && !asked.isLoaded)
+            check("a hidden split can hibernate", await until(3) { !kept.isLoaded && !asked.isLoaded })
             store.select(kept)
-            await settle(3)
-            check("and comes back when shown", kept.isLoaded && asked.isLoaded)
+            check("and comes back when shown", await until { kept.isLoaded && asked.isLoaded })
             store.closeSplit()
             store.close(elsewhere)
             await settle()
             store.select(asked)
             await settle()
             _ = await page(kept, "void new Notification('Then closed')")
-            await settle()
-            check("another one waits", kept.unreadNotifications == 1)
+            check("another one waits", await until(3) { kept.unreadNotifications == 1 })
             let spare = store.openTab(URL(string: "https://example.com/third"), select: false)
             store.close(kept)
-            await settle()
-            check("closing the tab clears the Dock", NSApp.dockTile.badgeLabel == nil)
+            check("closing the tab clears the Dock", await until(3) { NSApp.dockTile.badgeLabel == nil })
             spare.activate()
-            await settle(3)
+            await loaded(spare)
 
             let macOS = await SiteNotifications.requestDelivery()
             say("macOS delivers: \(macOS.map(String.init(describing:)) ?? "won't for this build")")
