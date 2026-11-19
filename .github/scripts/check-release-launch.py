@@ -278,6 +278,20 @@ def wait_for_legacy_cookies(server, path):
     raise SystemExit(f"v0.2.5 never committed its login cookies after quitting: {status}")
 
 
+def wait_for_webkit_release(profile_directory):
+    # WebKit's network process keeps writing cookies and local storage after the app exits,
+    # and holds the SQLite files meanwhile. Kaizu's update swap waits for this; so must the check.
+    started = time.monotonic()
+    while time.monotonic() - started < 15:
+        holders = subprocess.run(["/usr/sbin/lsof", "-t", "+D", str(profile_directory)],
+                                 capture_output=True, text=True).stdout.split()
+        if not holders:
+            print(f"WebKit released the profile {time.monotonic() - started:.2f} s after the app exited.", flush=True)
+            return
+        time.sleep(0.1)
+    raise SystemExit(f"WebKit still held the profile 15 s after the app exited: {holders}")
+
+
 def storage_checkpoint(profile_directory, marker):
     # Query the committed row, including its WAL. Deleted rows can still leave marker bytes on disk.
     if not profile_directory.is_dir():
@@ -329,6 +343,7 @@ def seed_legacy_session(server, app, url, stores):
         if cookie_file:
             report_cookie_checkpoint(server, cookie_file, "after v0.2.5 quit")
             wait_for_legacy_cookies(server, cookie_file)
+            wait_for_webkit_release(cookie_file.parent.parent)
 
 
 def check_restored_session(server, installed, url, identity, profile_directory, reader_is_candidate):
@@ -340,6 +355,7 @@ def check_restored_session(server, installed, url, identity, profile_directory, 
     try:
         quit_app(launch(server, installed))
     finally:
+        wait_for_webkit_release(profile_directory)
         report_cookie_checkpoint(server, cookie_file, "after restore attempt")
         if server.last_edit:
             print("Shutdown edit after restore attempt:", storage_checkpoint(profile_directory, server.last_edit), flush=True)
