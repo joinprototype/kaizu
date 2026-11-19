@@ -56,6 +56,7 @@ extension DebugHooks {
         func close(_ first: CGFloat, _ second: CGFloat) -> Bool {
             abs(first - second) < 2
         }
+        let shooting = ProcessInfo.processInfo.environment["KAIZU_SHOTS"] != nil
         var shots = 0
         func shot(_ name: String) {
             guard let folder = ProcessInfo.processInfo.environment["KAIZU_SHOTS"] else { return }
@@ -78,12 +79,28 @@ extension DebugHooks {
             }
             let drag = StandInDrag(tab.id, at: point)
             _ = catcher.draggingEntered(drag)
-            try? await Task.sleep(for: .seconds(2))
+            // A picture needs the preview drawn; the drop doesn't.
+            try? await Task.sleep(for: .seconds(shooting ? 2 : 0.3))
             shot("preview-\(edge)")
             _ = catcher.performDragOperation(drag)
             catcher.draggingEnded(drag)
-            try? await Task.sleep(for: .seconds(2))
+            if shooting {
+                try? await Task.sleep(for: .seconds(2))
+            } else {
+                await panesStill()
+            }
             shot("dropped-\(edge)")
+        }
+        /// Until the panes have been where they are for a few looks in a row.
+        func panesStill() async {
+            try? await Task.sleep(for: .milliseconds(300))
+            var last: [NSRect] = [], still = 0
+            _ = await until(3) {
+                let now = space.splitTabs.map(frame(of:))
+                still = now == last ? still + 1 : 0
+                last = now
+                return still >= 3
+            }
         }
         Task {
             if space.splitTabs.count == 3, space.split.count == 3 {
@@ -106,7 +123,7 @@ extension DebugHooks {
             let fifth = store.openTab(URL(string: "https://www.iana.org/"), select: false)
             let names = [first.id: "a", second.id: "b", third.id: "c", fourth.id: "d", fifth.id: "e"]
             let layout = { describe(space.splitLayout, names) }
-            try? await Task.sleep(for: .seconds(3))
+            await loaded(second)
 
             guard let window = store.window else { return check("there's a window", false) }
             actAsFrontmost(window)
@@ -120,13 +137,11 @@ extension DebugHooks {
             let wide = frame(of: first)
             let gap = NSPoint(x: wide.maxX + 4, y: wide.midY)
             await mouse(in: window, at: gap, dragTo: NSPoint(x: gap.x + 60, y: gap.y))
-            try? await Task.sleep(for: .milliseconds(300))
+            check("a divider drags across", await until(2) { close(frame(of: first).width, wide.width + 60) })
             shot("divider-across")
-            check("a divider drags across", close(frame(of: first).width, wide.width + 60))
             await mouse(in: window, at: NSPoint(x: gap.x + 60, y: gap.y))
             await mouse(in: window, at: NSPoint(x: gap.x + 60, y: gap.y), clicks: 2)
-            try? await Task.sleep(for: .milliseconds(500))
-            check("double-clicking it evens them out", close(frame(of: first).width, frame(of: second).width))
+            check("double-clicking it evens them out", await until(2) { close(frame(of: first).width, frame(of: second).width) })
 
             await drop(third, on: second, .bottom)
             check("below a pane in a row stacks just that pane", layout() == "[a | [b / c]]")
@@ -176,26 +191,22 @@ extension DebugHooks {
 
             let rule = NSPoint(x: top.midX, y: top.minY - 4)
             await mouse(in: window, at: rule, dragTo: NSPoint(x: rule.x, y: rule.y - 60))
-            try? await Task.sleep(for: .milliseconds(300))
+            check("the rule between rows drags down", await until(2) { close(frame(of: first).height, top.height + 60) })
             shot("divider-down")
-            check("the rule between rows drags down", close(frame(of: first).height, top.height + 60))
             check("taking from both panes below", close(frame(of: second).height, left.height - 60) && close(frame(of: third).height, right.height - 60))
 
             let bar = NSPoint(x: left.maxX + 4, y: frame(of: second).midY)
             await mouse(in: window, at: bar, dragTo: NSPoint(x: bar.x + 40, y: bar.y))
-            try? await Task.sleep(for: .milliseconds(300))
-            check("the divider between them drags across", close(frame(of: second).width, left.width + 40) && close(frame(of: third).width, right.width - 40))
+            check("the divider between them drags across", await until(2) { close(frame(of: second).width, left.width + 40) && close(frame(of: third).width, right.width - 40) })
             check("leaving the top pane alone", close(frame(of: first).width, top.width) && close(frame(of: first).height, top.height + 60))
 
             await mouse(in: window, at: NSPoint(x: bar.x + 40, y: bar.y))
             await mouse(in: window, at: NSPoint(x: bar.x + 40, y: bar.y), clicks: 2)
-            try? await Task.sleep(for: .milliseconds(500))
-            check("double-clicking evens its own row", close(frame(of: second).width, frame(of: third).width) && close(frame(of: first).height, top.height + 60))
+            check("double-clicking evens its own row", await until(2) { close(frame(of: second).width, frame(of: third).width) && close(frame(of: first).height, top.height + 60) })
             let moved = NSPoint(x: rule.x, y: rule.y - 60)
             await mouse(in: window, at: moved)
             await mouse(in: window, at: moved, clicks: 2)
-            try? await Task.sleep(for: .milliseconds(500))
-            check("and the rule evens the rows", close(frame(of: first).height, frame(of: second).height))
+            check("and the rule evens the rows", await until(2) { close(frame(of: first).height, frame(of: second).height) })
 
             let tallest = frame(of: second).height
             await mouse(in: window, at: rule, dragTo: NSPoint(x: rule.x, y: rule.y - 2000))

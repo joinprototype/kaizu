@@ -437,6 +437,25 @@ enum DebugHooks {
         }
     }
 
+    /// Checks `condition` every 100 ms until it holds or `timeout` runs out;
+    /// returns whether it held. For QA checks that something happens: they
+    /// go on as soon as it has, instead of after a fixed sleep.
+    static func until(_ timeout: Double = 10, _ condition: () async -> Bool) async -> Bool {
+        let deadline = ContinuousClock.now + .seconds(timeout)
+        while ContinuousClock.now < deadline {
+            if await condition() { return true }
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+        return await condition()
+    }
+
+    /// Until the tab's page has finished loading.
+    static func loaded(_ tab: BrowserTab) async {
+        // Let a load that was just asked for start first.
+        try? await Task.sleep(for: .milliseconds(200))
+        _ = await until { !tab.webView.isLoading && tab.webView.url != nil }
+    }
+
     static func logPageCount(_ store: BrowserStore, _ label: String) {
         func count(_ view: NSView) -> Int {
             (view is WebContainerView ? 1 : 0) + view.subviews.reduce(0) { $0 + count($1) }

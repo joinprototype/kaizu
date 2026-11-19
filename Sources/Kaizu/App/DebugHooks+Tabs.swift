@@ -57,7 +57,8 @@ extension DebugHooks {
             let home = store.activeSpace
             let page = URL(string: "https://example.com/")!
             let tab = store.openTab(page)
-            try? await Task.sleep(for: .seconds(2))
+            await loaded(tab)
+            _ = await until(3) { tab.title == tab.webView.title }
             let pageTitle = tab.title
             store.rename(tab, to: "  My page ")
             check("a tab takes a name", tab.displayTitle == "My page" && tab.title == pageTitle)
@@ -76,13 +77,12 @@ extension DebugHooks {
             let stay = store.openTab(URL(string: "https://example.com/stay"))
             store.select(tab)
             store.move(tab, toSpace: same)
-            try? await Task.sleep(for: .milliseconds(500))
-            check("moved within a profile it stays live", same.today.contains(tab) && !home.today.contains(tab) && tab.webView === webView && !tab.isDiscarded)
-            check("the window moves on", store.selectedTab === stay)
+            check("moved within a profile it stays live", await until(3) { same.today.contains(tab) && !home.today.contains(tab) && tab.webView === webView && !tab.isDiscarded })
+            check("the window moves on", await until(3) { store.selectedTab === stay })
 
             store.switchTo(same)
             store.move(tab, toSpace: other)
-            try? await Task.sleep(for: .milliseconds(500))
+            _ = await until(3) { tab.isDiscarded && other.today.first != nil }
             let reopened = other.today.first
             check("across profiles it reopens there", tab.isDiscarded && same.today.isEmpty && reopened?.profile === other.profile && reopened?.url == tab.url)
             check("with its name", reopened?.displayTitle == "My page")
@@ -92,8 +92,7 @@ extension DebugHooks {
             store.rename(named, to: "Named")
             store.close(named)
             store.reopenClosedTab()
-            try? await Task.sleep(for: .milliseconds(500))
-            check("⇧⌘T keeps a tab's name", store.selectedTab?.customTitle == "Named")
+            check("⇧⌘T keeps a tab's name", await until(3) { store.selectedTab?.customTitle == "Named" })
             let beforeClear = home.today.map(\.displayTitle)
             store.clearToday(in: home)
             store.reopenClosedTab()
