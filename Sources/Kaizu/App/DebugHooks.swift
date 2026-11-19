@@ -79,6 +79,7 @@ enum DebugHooks {
         case "learn": qaLearn(store)
         case "reader": qaReader(store)
         case "pin": qaPin(store)
+        case "crossing": qaCrossing(store)
         case "split": qaSplit(store)
         case "splitdrop": qaSplitDrop(store)
         case "capture": qaCapture(store)

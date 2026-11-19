@@ -25,8 +25,8 @@ extension BrowserTab {
         }
         update(\.isLoading, webView.isLoading)
         update(\.progress, webView.estimatedProgress)
-        update(\.canGoBack, webView.canGoBack)
-        update(\.canGoForward, webView.canGoForward)
+        update(\.canGoBack, webView.canGoBack || !crossedBack.isEmpty)
+        update(\.canGoForward, webView.canGoForward || !crossedForward.isEmpty)
     }
 
     /// Avoids invalidating SwiftUI views when KVO reports an unchanged value.
