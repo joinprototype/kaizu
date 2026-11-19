@@ -67,6 +67,19 @@ jobs:
           KAIZU_DEBUG: bookmark-import-undo
           KAIZU_SUPPORT: ${{ runner.temp }}/bookmark-undo-profile
         run: build/Kaizu.app/Contents/MacOS/Kaizu
+      - name: Keep per-site blocking changes inside their private window
+        timeout-minutes: 2
+        env:
+          KAIZU_SUPPORT: ${{ runner.temp }}/private-blocking
+        run: |
+          log="$RUNNER_TEMP/private-blocking.log"
+          app="$GITHUB_WORKSPACE/build/Kaizu.app"
+          # Rendered pages in several windows need a launch through the window server.
+          open -n --env KAIZU_DEBUG=private-blocking --env "KAIZU_SUPPORT=$KAIZU_SUPPORT" --stderr "$log" -a "$app"
+          # `open -W` fails with "No such process" when the app exits before open starts waiting.
+          while pgrep -qf "$app/Contents/MacOS/Kaizu"; do sleep 0.5; done
+          cat "$log"
+          grep -Fxq 'Verified regular and two private windows with independently rendered bundled and imported rules' "$log"
       - name: Route notification clicks after closing and restoring a work tab
         timeout-minutes: 2
         env:

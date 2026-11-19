@@ -58,7 +58,7 @@ final class ContentBlocker {
 
     private let defaults: UserDefaults
 
-    init(defaults: UserDefaults = .standard) {
+    init(defaults: UserDefaults = AppDefaults.shared) {
         self.defaults = defaults
         isEnabled = defaults.object(forKey: Self.enabledKey) as? Bool ?? true
         isCookieRejectionEnabled = defaults.object(forKey: Self.cookieRejectionKey) as? Bool ?? true

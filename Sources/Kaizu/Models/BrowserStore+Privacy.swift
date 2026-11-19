@@ -52,7 +52,7 @@ extension BrowserStore {
     func showCookiePopupResult() {
         guard let tab = selectedTab, tab.isLoaded else { return }
         let script = """
-            JSON.stringify(((window.kaizuAutoconsent ?? window.autoconsentStandalone)?.messages ?? [])
+            JSON.stringify((window.kaizuAutoconsent?.messages ?? [])
               .filter(m => ['cmpDetected', 'popupFound', 'optOutResult', 'autoconsentDone', 'autoconsentError'].includes(m.type))
               .map(m => m.type + (m.cmp ? ': ' + m.cmp : '') + (m.result !== undefined ? ' = ' + m.result : '')))
             """

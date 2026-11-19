@@ -28,7 +28,7 @@ let package = Package(
                 ]),
             ]
         ),
-        .testTarget(name: "KaizuTests", dependencies: ["Kaizu", "DesignSystem"]),
+        .testTarget(name: "KaizuTests", dependencies: ["Kaizu", "DesignSystem", "TestSupport"]),
         // Colours, type, motion, the chart drawings and the paper sounds.
         // SwiftUI and AppKit only: nothing here knows about tabs or pages.
         .target(
@@ -43,9 +43,14 @@ let package = Package(
         ),
         .testTarget(
             name: "BrowserCoreTests",
-            dependencies: ["BrowserCore"],
+            dependencies: ["BrowserCore", "TestSupport"],
             path: "Tests/BrowserCoreTests",
             resources: [.copy("Fixtures")]
+        ),
+        // Helpers shared by both test targets.
+        .target(
+            name: "TestSupport",
+            path: "Tests/TestSupport"
         ),
     ]
 )

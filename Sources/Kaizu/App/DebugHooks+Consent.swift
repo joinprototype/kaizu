@@ -9,7 +9,7 @@ extension DebugHooks {
     /// logs what the site's consent platform recorded, what autoconsent did,
     /// and what the app sent to the page's frames. Waits up to
     /// KAIZU_SITE_WAIT seconds (12) per site, KAIZU_SHOTS saves a picture of
-    /// each, then quits. KAIZU_AUTOCONSENT=v1 runs the old page-world script.
+    /// each, then quits.
     static func qaConsent(_ store: BrowserStore) {
         precondition(ProcessInfo.processInfo.environment["KAIZU_SUPPORT"] != nil)
         let environment = ProcessInfo.processInfo.environment
@@ -34,19 +34,18 @@ extension DebugHooks {
               if (window.Didomi) state.didomi = safely(() => ({ noticeVisible: Didomi.notice?.isVisible?.(),
                 shouldConsentBeCollected: Didomi.shouldConsentBeCollected?.(),
                 purposes: Object.fromEntries(Object.entries(Didomi.getCurrentUserStatus?.()?.purposes ?? {}).map(([id, p]) => [id, p.enabled])) }));
-              // v2 should leave no trace in the page's world.
-              state.pageSees = [typeof window.kaizuAutoconsent, typeof window.autoconsentStandalone, typeof window.webkit].join('/');
+              // Autoconsent should leave no trace in the page's world.
+              state.pageSees = [typeof window.kaizuAutoconsent, typeof window.webkit].join('/');
               return JSON.stringify(state);
             })()
             """
         // In autoconsent's world: what it reported about this page.
         let messages = """
-            JSON.stringify(((window.kaizuAutoconsent ?? window.autoconsentStandalone)?.messages ?? [])
+            JSON.stringify((window.kaizuAutoconsent?.messages ?? [])
               .filter(m => ['cmpDetected', 'popupFound', 'optOutResult', 'autoconsentDone', 'autoconsentError'].includes(m.type))
               .map(m => m.type + (m.cmp ? ':' + m.cmp : '') + (m.result !== undefined ? '=' + m.result : '')))
             """
-        let engine = AutoconsentBridge.usesPageWorld ? "v1 page world" : "v2 isolated world"
-        log("engine \(engine), rejection \(store.contentBlocker.isCookieRejectionEnabled ? "on" : "OFF"), blocking \(store.contentBlocker.isEnabled ? "on" : "off")")
+        log("rejection \(store.contentBlocker.isCookieRejectionEnabled ? "on" : "OFF"), blocking \(store.contentBlocker.isEnabled ? "on" : "off")")
         let window = store.app.openPrivateWindow()
         Task {
             for url in sites {
@@ -70,9 +69,7 @@ extension DebugHooks {
                 try? await Task.sleep(for: .seconds(1.5))
                 state = (try? await tab.webView.evaluateJavaScript(platform)) as? String ?? "{}"
                 log("\(url.host() ?? "site") | loaded in \(loaded.components.seconds) s | platform \(state) | autoconsent \(done)")
-                if !AutoconsentBridge.usesPageWorld {
-                    log("\(url.host() ?? "site") | sent \(AutoconsentBridge.framesServed - frames) frames (\(AutoconsentBridge.mainFramesServed - main) main) \(AutoconsentBridge.bytesServed - bytes) B of rules, ran \(AutoconsentBridge.evaluations - evaluations) page checks")
-                }
+                log("\(url.host() ?? "site") | sent \(AutoconsentBridge.framesServed - frames) frames (\(AutoconsentBridge.mainFramesServed - main) main) \(AutoconsentBridge.bytesServed - bytes) B of rules, ran \(AutoconsentBridge.evaluations - evaluations) page checks")
                 if let folder = environment["KAIZU_SHOTS"], let image = await tab.screenshot(of: nil), let data = image.tiffRepresentation {
                     let png = NSBitmapImageRep(data: data)?.representation(using: .png, properties: [:])
                     try? png?.write(to: URL(fileURLWithPath: folder).appending(path: "consent-\(url.host() ?? "site").png"))

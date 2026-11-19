@@ -1,5 +1,6 @@
 import Foundation
 import SQLite3
+import TestSupport
 import Testing
 @testable import BrowserCore
 

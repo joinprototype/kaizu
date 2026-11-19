@@ -46,7 +46,7 @@ enum FilterListUpdater {
     /// Fetches lists if the last check was over a day ago. Returns true when
     /// at least one list changed (so rules need recompiling).
     static func updateIfDue() async -> Bool {
-        let defaults = UserDefaults.standard
+        let defaults = AppDefaults.shared
         guard Date().timeIntervalSince1970 - defaults.double(forKey: lastCheckKey) > interval else { return false }
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
 
