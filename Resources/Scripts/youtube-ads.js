@@ -102,9 +102,18 @@
   let emptySince = 0;
   let reloadedFor = null;
   let inAd = false;
-  // Where the video was, for putting it back after an ad break.
+  // Where the video was, for putting it back after an ad break. Only
+  // noted once the address has named the same video for a couple of
+  // seconds: right after a click the old video is still playing under the
+  // new address. Its length tells the two apart too.
   let place = null;
   let restore = null;
+  let current = { id: null, since: 0 };
+  let adEndedAt = 0;
+  const settled = (id, now) => {
+    if (current.id !== id) current = { id, since: now };
+    return now - current.since > 2000;
+  };
 
   const handleAd = () => {
     const player = playerOf();
@@ -143,7 +152,7 @@
         if (now - emptySince > 4500 && id && reloadedFor !== id && player.loadVideoById) {
           reloadedFor = id;
           emptySince = 0;
-          player.loadVideoById({ videoId: id, startSeconds: restore?.time || 0 });
+          player.loadVideoById({ videoId: id, startSeconds: restore?.id === id ? restore.time : 0 });
         }
       } else {
         emptySince = 0;
@@ -163,13 +172,18 @@
       adRate = AD_RATE;
       adClock = null;
       emptySince = 0;
+      adEndedAt = now;
     }
     if (video.seeking || !(video.duration > 0)) return;
     const id = videoIdOf();
+    // Just back from an ad break and left paused at the start: play on.
+    if (now - adEndedAt < 5000 && video.paused && video.currentTime < 1 && video.readyState >= 3) {
+      video.play().catch(() => {});
+    }
     if (restore) {
       // Back from an ad break: once the video plays again, check its place.
       if (restore.id === id && video.readyState >= 2) {
-        if (Math.abs(video.currentTime - restore.time) > 3) {
+        if (Math.abs(video.duration - restore.length) < 1 && Math.abs(video.currentTime - restore.time) > 3) {
           player.seekTo ? player.seekTo(restore.time, true) : (video.currentTime = restore.time);
         }
         restore = null;
@@ -178,7 +192,7 @@
       }
       return;
     }
-    place = { id, time: video.currentTime };
+    if (settled(id, now)) place = { id, time: video.currentTime, length: video.duration };
   };
   // A seek moves the place to come back to, even if an ad break starts
   // before the video gets there.
@@ -186,7 +200,9 @@
     const player = playerOf();
     if (!player || event.target !== player.querySelector('video')) return;
     if (player.classList.contains('ad-showing') || player.classList.contains('ad-interrupting')) return;
-    place = { id: videoIdOf(), time: event.target.currentTime };
+    const id = videoIdOf();
+    if (!settled(id, Date.now()) || !(event.target.duration > 0)) return;
+    place = { id, time: event.target.currentTime, length: event.target.duration };
   }, true);
   // Media events catch an ad as it starts (muted before it's heard);
   // the timer covers anything they miss.
