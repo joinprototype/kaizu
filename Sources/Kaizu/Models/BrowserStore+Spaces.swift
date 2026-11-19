@@ -2,6 +2,22 @@ import AppKit
 import SwiftUI
 import WebKit
 
+/// Working copy for the space editor sheet.
+struct SpaceDraft: Identifiable {
+    enum ProfileChoice: Hashable {
+        case existing(UUID)
+        case new
+    }
+
+    let id = UUID()
+    var spaceID: UUID?
+    var name: String
+    var hue: Double
+    var symbol: String
+    var profile: ProfileChoice
+    var appearance = Space.Appearance.auto
+}
+
 extension BrowserStore {
     /// The old space slides out to its side while the new one comes in
     /// (see SpacePager); `animation` is the swipe's spring when one ends it.

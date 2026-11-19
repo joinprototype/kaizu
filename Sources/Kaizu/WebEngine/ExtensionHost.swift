@@ -54,7 +54,7 @@ final class ExtensionHost: NSObject {
     /// The store listing being downloaded right now.
     private(set) var downloading: ExtensionGallery.Listing?
     /// Bumped when an extension updates its toolbar action (badge, icon), so views refresh.
-    private(set) var actionRevision = 0
+    var actionRevision = 0
 
     private var pendingSafariPaths: Set<String> = []
     private var records: [Record]
@@ -76,7 +76,6 @@ final class ExtensionHost: NSObject {
 
     @ObservationIgnored private let log = Logger(subsystem: Log.subsystem, category: "Extensions")
     private static let recordsKey = "installedExtensions"
-    nonisolated private static let safariExtensionPoint = "com.apple.Safari.web-extension"
 
     init(defaults: UserDefaults = AppDefaults.shared,
          directory: URL = AppPaths.support.appending(path: "Extensions", directoryHint: .isDirectory),
@@ -220,19 +219,6 @@ final class ExtensionHost: NSObject {
 
     func isAddingSafariApp(_ url: URL) -> Bool { pendingSafariPaths.contains(Self.safariPath(url)) }
 
-    /// Safari web extensions bundled in apps under /Applications.
-    /// `safariExtensionApps()`, off the main thread: it walks the Applications folders.
-    @concurrent
-    nonisolated static func findSafariExtensionApps() async -> [URL] {
-        safariExtensionApps()
-    }
-
-    nonisolated static func safariExtensionApps() -> [URL] {
-        let apps = (try? FileManager.default.contentsOfDirectory(at: URL(fileURLWithPath: "/Applications"), includingPropertiesForKeys: nil)) ?? []
-        return apps.filter { $0.pathExtension == "app" && safariExtensionBundle(in: $0) != nil }
-            .sorted { $0.lastPathComponent < $1.lastPathComponent }
-    }
-
     // MARK: - Actions
 
     func additionalSites(for item: Installed) -> [String] {
@@ -282,48 +268,6 @@ final class ExtensionHost: NSObject {
     func performAction(for item: Installed, on tab: BrowserTab?, anchor: CGRect) {
         popupAnchor = anchor
         item.context.performAction(for: tab)
-    }
-
-    // MARK: - Tab events
-
-    // Private tabs are never mentioned to extensions (their URLs and titles
-    // would leak through tabs.onUpdated and friends).
-
-    func didOpen(_ tab: BrowserTab) {
-        guard !tab.profile.isPrivate else { return }
-        controller.didOpenTab(tab)
-    }
-
-    func didClose(_ tab: BrowserTab) {
-        guard !tab.profile.isPrivate else { return }
-        controller.didCloseTab(tab)
-    }
-
-    func didActivate(_ tab: BrowserTab, previous: BrowserTab?) {
-        guard !tab.profile.isPrivate, tab !== previous else { return }
-        controller.didActivateTab(tab, previousActiveTab: previous)
-    }
-
-    func didChange(_ properties: WKWebExtension.TabChangedProperties, for tab: BrowserTab) {
-        guard !tab.profile.isPrivate else { return }
-        controller.didChangeTabProperties(properties, for: tab)
-    }
-
-    // MARK: - Window events
-
-    func didOpen(_ store: BrowserStore) {
-        guard !store.isPrivate else { return }
-        controller.didOpenWindow(store.extensionWindow)
-    }
-
-    func didClose(_ store: BrowserStore) {
-        guard !store.isPrivate else { return }
-        controller.didCloseWindow(store.extensionWindow)
-    }
-
-    func didFocus(_ store: BrowserStore) {
-        guard !store.isPrivate else { return }
-        controller.didFocusWindow(store.extensionWindow)
     }
 
     // MARK: - Private
@@ -401,153 +345,5 @@ final class ExtensionHost: NSObject {
                 "\(app) contains no Safari web extension. Choose a Mac app with a web extension, or add a WebExtension ZIP. For ad and tracker blocking, Kaizu also has a built-in blocker."
             }
         }
-    }
-
-    nonisolated private static func safariExtensionBundle(in app: URL) -> Bundle? {
-        let plugins = app.appending(path: "Contents/PlugIns")
-        let appexes = (try? FileManager.default.contentsOfDirectory(at: plugins, includingPropertiesForKeys: nil)) ?? []
-        return appexes.lazy.compactMap(Bundle.init(url:)).first { bundle in
-            let point = (bundle.infoDictionary?["NSExtension"] as? [String: Any])?["NSExtensionPointIdentifier"] as? String
-            return point == safariExtensionPoint
-        }
-    }
-
-    /// Off the main thread: a big extension takes a moment to unpack.
-    @concurrent
-    private nonisolated static func stage(_ url: URL, in directory: URL, at destination: URL) async throws {
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        if url.pathExtension == "zip" {
-            try unzip(url, to: destination)
-        } else {
-            try FileManager.default.copyItem(at: url, to: destination)
-        }
-    }
-
-    nonisolated private static func unzip(_ archive: URL, to destination: URL) throws {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
-        process.arguments = ["-x", "-k", archive.path, destination.path]
-        try process.run()
-        process.waitUntilExit()
-        guard process.terminationStatus == 0 else { throw CocoaError(.fileReadCorruptFile) }
-        // Zips often wrap everything in one folder; use it if the manifest is inside.
-        let contents = (try? FileManager.default.contentsOfDirectory(at: destination, includingPropertiesForKeys: nil)) ?? []
-        if !FileManager.default.fileExists(atPath: destination.appending(path: "manifest.json").path),
-           contents.count == 1, let inner = contents.first,
-           FileManager.default.fileExists(atPath: inner.appending(path: "manifest.json").path) {
-            let staging = destination.deletingLastPathComponent().appending(path: UUID().uuidString)
-            try FileManager.default.moveItem(at: inner, to: staging)
-            try FileManager.default.removeItem(at: destination)
-            try FileManager.default.moveItem(at: staging, to: destination)
-        }
-    }
-}
-
-// MARK: - WKWebExtensionControllerDelegate
-
-extension ExtensionHost: WKWebExtensionControllerDelegate {
-    func webExtensionController(_ controller: WKWebExtensionController, openWindowsFor extensionContext: WKWebExtensionContext) -> [any WKWebExtensionWindow] {
-        // Front window first, as the API asks.
-        guard let app else { return [] }
-        return ([app.regularFront] + app.stores.filter { $0 !== app.regularFront }).map(\.extensionWindow)
-    }
-
-    func webExtensionController(_ controller: WKWebExtensionController, focusedWindowFor extensionContext: WKWebExtensionContext) -> (any WKWebExtensionWindow)? {
-        app?.regularFront.extensionWindow
-    }
-
-    func webExtensionController(
-        _ controller: WKWebExtensionController,
-        openNewTabUsing configuration: WKWebExtension.TabConfiguration,
-        for extensionContext: WKWebExtensionContext,
-        completionHandler: @escaping ((any WKWebExtensionTab)?, (any Error)?) -> Void
-    ) {
-        let store = (configuration.window as? MainWindowAdapter)?.store ?? app?.regularFront
-        completionHandler(store?.openTab(configuration.url, select: configuration.shouldBeActive), nil)
-    }
-
-    func webExtensionController(
-        _ controller: WKWebExtensionController,
-        openNewWindowUsing configuration: WKWebExtension.WindowConfiguration,
-        for extensionContext: WKWebExtensionContext,
-        completionHandler: @escaping ((any WKWebExtensionWindow)?, (any Error)?) -> Void
-    ) {
-        let previous = app?.regularFront
-        let store = app?.openWindow()
-        for url in configuration.tabURLs.reversed() {
-            store?.openTab(url)
-        }
-        if !configuration.shouldBeFocused {
-            previous?.window?.makeKeyAndOrderFront(nil)
-        }
-        completionHandler(store?.extensionWindow, nil)
-    }
-
-    func webExtensionController(
-        _ controller: WKWebExtensionController,
-        openOptionsPageFor extensionContext: WKWebExtensionContext,
-        completionHandler: @escaping ((any Error)?) -> Void
-    ) {
-        if let url = extensionContext.optionsPageURL {
-            app?.regularFront.openTab(url)
-        }
-        completionHandler(nil)
-    }
-
-    func webExtensionController(
-        _ controller: WKWebExtensionController,
-        promptForPermissions permissions: Set<WKWebExtension.Permission>,
-        in tab: (any WKWebExtensionTab)?,
-        for extensionContext: WKWebExtensionContext,
-        completionHandler: @escaping (Set<WKWebExtension.Permission>, Date?) -> Void
-    ) {
-        completionHandler(confirm("wants extra permissions: " + permissions.map(\.rawValue).sorted().joined(separator: ", "), for: extensionContext) ? permissions : [], nil)
-    }
-
-    func webExtensionController(
-        _ controller: WKWebExtensionController,
-        promptForPermissionToAccess urls: Set<URL>,
-        in tab: (any WKWebExtensionTab)?,
-        for extensionContext: WKWebExtensionContext,
-        completionHandler: @escaping (Set<URL>, Date?) -> Void
-    ) {
-        let hosts = urls.compactMap { $0.host() }.sorted().joined(separator: ", ")
-        completionHandler(confirm("wants to access: \(hosts)", for: extensionContext) ? urls : [], nil)
-    }
-
-    func webExtensionController(
-        _ controller: WKWebExtensionController,
-        promptForPermissionMatchPatterns matchPatterns: Set<WKWebExtension.MatchPattern>,
-        in tab: (any WKWebExtensionTab)?,
-        for extensionContext: WKWebExtensionContext,
-        completionHandler: @escaping (Set<WKWebExtension.MatchPattern>, Date?) -> Void
-    ) {
-        let patterns = matchPatterns.map(\.string).sorted().joined(separator: ", ")
-        completionHandler(confirm("wants to access: \(patterns)", for: extensionContext) ? matchPatterns : [], nil)
-    }
-
-    func webExtensionController(_ controller: WKWebExtensionController, didUpdate action: WKWebExtension.Action, forExtensionContext context: WKWebExtensionContext) {
-        actionRevision += 1
-    }
-
-    func webExtensionController(
-        _ controller: WKWebExtensionController,
-        presentActionPopup action: WKWebExtension.Action,
-        for context: WKWebExtensionContext,
-        completionHandler: @escaping ((any Error)?) -> Void
-    ) {
-        guard let popover = action.popupPopover, let view = app?.regularFront.window?.contentView else {
-            return completionHandler(CocoaError(.featureUnsupported))
-        }
-        popover.show(relativeTo: popupAnchor, of: view, preferredEdge: .maxY)
-        completionHandler(nil)
-    }
-
-    private func confirm(_ request: String, for context: WKWebExtensionContext) -> Bool {
-        let alert = NSAlert()
-        alert.messageText = "“\(context.webExtension.displayName ?? "An extension")” \(request)"
-        alert.addButton(withTitle: "Allow")
-        alert.addButton(withTitle: "Don't Allow")
-        return alert.runModal() == .alertFirstButtonReturn
     }
 }
