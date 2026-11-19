@@ -14,6 +14,7 @@ final class BrowserTab: NSObject, Identifiable {
     var pinnedURL: URL?
     /// The name given to it, if any; the page's title otherwise.
     var customTitle: String?
+    let arcItemID: UUID?
     var favicon: NSImage?
     var isLoading = false
     var progress = 0.0
@@ -68,10 +69,12 @@ final class BrowserTab: NSObject, Identifiable {
         title: String = "",
         pinnedURL: URL? = nil,
         lastActiveAt: Date? = Date(),
+        arcItemID: UUID? = nil,
         configuration: WKWebViewConfiguration? = nil
     ) {
         self.id = id
         self.profile = profile
+        self.arcItemID = arcItemID
         self.app = app
         self.url = url
         self.title = title
@@ -80,6 +83,12 @@ final class BrowserTab: NSObject, Identifiable {
         self.pendingConfiguration = configuration
         super.init()
         favicon = url?.host().flatMap { FaviconStore.shared.cachedImage(for: $0) }
+    }
+
+    convenience init(reopening record: TabRecord, id: UUID = UUID(), profile: Profile, app: AppModel?, navigationState: Data?) {
+        self.init(id: id, profile: profile, app: app, url: record.url, title: record.title, arcItemID: record.arcItemID)
+        customTitle = record.customTitle
+        savedState = navigationState
     }
 
     /// A pinned or favorite tab that navigated off its saved page.
@@ -129,7 +138,7 @@ final class BrowserTab: NSObject, Identifiable {
             configuration = extensionConfiguration
             contentController = nil
         } else {
-            let controller = app?.contentBlocker.makeUserContentController()
+            let controller = app?.contentBlocker.makeUserContentController(privateID: profile.privateID)
             configuration = pendingConfiguration ?? Self.makeConfiguration(for: profile)
             // Like other browsers, extensions stay out of private windows.
             configuration.webExtensionController = profile.isPrivate ? nil : app?.extensions.controller
@@ -540,7 +549,7 @@ final class BrowserTab: NSObject, Identifiable {
     }
 
     var record: TabRecord {
-        TabRecord(id: id, title: title, url: url, pinnedURL: pinnedURL, lastActiveAt: lastActiveAt, customTitle: customTitle)
+        TabRecord(id: id, title: title, url: url, pinnedURL: pinnedURL, lastActiveAt: lastActiveAt, customTitle: customTitle, arcItemID: arcItemID)
     }
 
     // MARK: - State sync
@@ -696,7 +705,7 @@ extension BrowserTab: WKNavigationDelegate {
         }
 
         if navigationAction.targetFrame?.isMainFrame == true, let contentController, let blocker = app?.contentBlocker {
-            blocker.whenReady(for: target) {
+            blocker.whenReady(for: target, privateID: profile.privateID) {
                 blocker.prepare(contentController, for: target)
                 decisionHandler(.allow)
             }

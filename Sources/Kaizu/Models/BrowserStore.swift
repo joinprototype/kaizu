@@ -51,11 +51,6 @@ struct Toast: Identifiable {
     var actionTitle = "Undo"
 }
 
-struct ClosedTab {
-    let spaceID: UUID
-    let record: TabRecord
-}
-
 /// One browser window: which space and tab it shows, its sidebar and
 /// overlays, and the actions views call. What windows share lives in
 /// `AppModel`. Split by concern across `BrowserStore+*.swift`: tabs, spaces,
@@ -204,11 +199,11 @@ final class BrowserStore {
 
     var closedTabs: [ClosedTab] {
         get { isPrivate ? privateClosedTabs : app.closedTabs }
-        set {
+        _modify {
             if isPrivate {
-                privateClosedTabs = newValue
+                yield &privateClosedTabs
             } else {
-                app.closedTabs = newValue
+                yield &app.closedTabs
             }
         }
     }

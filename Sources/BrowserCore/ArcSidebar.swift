@@ -8,6 +8,7 @@ public struct ArcSidebar: Equatable, Sendable {
         public var title: String
         public var url: URL
         public var customTitle: String? = nil
+        public var itemID: UUID? = nil
     }
 
     public indirect enum Item: Equatable, Sendable {
@@ -230,7 +231,8 @@ extension ArcSidebar {
                   let host = url.host(), !host.isEmpty
             else { return nil }
             let customTitle = clean(item["title"])
-            return Tab(title: customTitle ?? clean(tab["savedTitle"]) ?? host, url: url, customTitle: customTitle)
+            return Tab(title: customTitle ?? clean(tab["savedTitle"]) ?? host, url: url, customTitle: customTitle,
+                       itemID: (item["id"] as? String).flatMap(UUID.init(uuidString:)))
         }
     }
 }

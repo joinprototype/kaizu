@@ -49,7 +49,16 @@ struct ArcImportView: View {
                 Section {
                     LabeledContent("File", value: source.lastPathComponent)
                     ForEach(Array(plan.summary.enumerated()), id: \.offset) { _, space in
-                        LabeledContent(space.name, value: detail(of: space))
+                        LabeledContent {
+                            Text(detail(of: space))
+                        } label: {
+                            VStack(alignment: .leading) {
+                                Text(space.name)
+                                Text(destination(of: space))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
                     }
                     if plan.tabCount > inSpaces {
                         LabeledContent("Favorites", value: "\(plan.tabCount - inSpaces)")
@@ -89,6 +98,12 @@ struct ArcImportView: View {
             .padding(.horizontal, 20)
             .padding(.bottom, 16)
         }
+    }
+
+    private func destination(of space: ArcImport.SpaceSummary) -> String {
+        let position = space.isNew ? "New space \(space.sidebarPosition)" : "Space \(space.sidebarPosition)"
+        guard let profile = space.profileName else { return position }
+        return "\(position) · \(profile) profile"
     }
 
     private func detail(of space: ArcImport.SpaceSummary) -> String {

@@ -369,11 +369,11 @@ enum DebugHooks {
             let refused = await page(blocked, "window.__refused")
             check("blocked site doesn't", delivered.isEmpty && refused == "true")
             let site = URL(string: "https://example.com/")!
-            store.contentBlocker.togglePause(on: site, temporarily: true)
+            store.contentBlocker.togglePause(on: site, privateID: allowed.profile.privateID)
             allowed.reload()
             await settle(3)
             check("pausing blocking keeps it", await page(allowed, "Notification.permission") == "granted")
-            store.contentBlocker.togglePause(on: site, temporarily: true)
+            store.contentBlocker.togglePause(on: site, privateID: allowed.profile.privateID)
             allowed.reload()
             await settle(3)
             _ = await page(blocked, """
@@ -627,7 +627,7 @@ enum DebugHooks {
 
             hidden.toggleBlockingOnCurrentSite(one)
             let saved = UserDefaults.standard.stringArray(forKey: "blockingPausedSites") ?? []
-            check("pausing blocking there isn't saved", store.contentBlocker.isPaused(on: secret) && !saved.contains("example.org") && !store.contentBlocker.pausedSites.contains("example.org"))
+            check("pausing blocking there isn't saved", store.contentBlocker.isPaused(on: secret, privateID: one.profile.privateID) && !store.contentBlocker.isPaused(on: secret, privateID: nil) && !saved.contains("example.org") && !store.contentBlocker.pausedSites.contains("example.org"))
 
             let closing = hidden.openTab(URL(string: "https://example.org/closing"))
             await settle()
@@ -670,7 +670,7 @@ enum DebugHooks {
             await settle()
             check("closing it ends it", app.privateStores.isEmpty && one.isDiscarded && hidden.window == nil)
             check("and the ordinary window is in front again", app.front === store)
-            check("a site paused there is forgotten", !store.contentBlocker.isPaused(on: secret))
+            check("a site paused there is forgotten", !store.contentBlocker.isPaused(on: secret, privateID: nil))
             NSApp.terminate(nil)
         }
     }
@@ -764,6 +764,11 @@ enum DebugHooks {
             store.reopenClosedTab()
             try? await Task.sleep(for: .milliseconds(500))
             check("⇧⌘T keeps a tab's name", store.selectedTab?.customTitle == "Named")
+            let beforeClear = home.today.map(\.displayTitle)
+            store.clearToday(in: home)
+            store.reopenClosedTab()
+            store.undoToast()
+            check("Clear, reopen and Undo return every tab exactly once", home.today.map(\.displayTitle) == beforeClear)
             try? await Task.sleep(for: .seconds(1))
             NSApp.terminate(nil)
         }
@@ -1212,13 +1217,13 @@ enum DebugHooks {
             let hidden = await qaAdDisplay(in: tab)
             check("a generic ad rule hides an element (\(hidden))", hidden == "none")
 
-            blocker.togglePause(on: site, temporarily: true)
+            blocker.togglePause(on: site, privateID: tab.profile.privateID)
             tab.webView.reload()
             try? await Task.sleep(for: .seconds(1))
             await qaLoaded(tab)
             let shown = await qaAdDisplay(in: tab)
             check("and doesn't with blocking paused (\(shown))", shown == "block")
-            blocker.togglePause(on: site, temporarily: true)
+            blocker.togglePause(on: site, privateID: tab.profile.privateID)
 
             FileHandle.standardError.write(Data("QA rulelists done: \(passed) ok, \(failed) failed\n".utf8))
             NSApp.terminate(nil)
@@ -1274,12 +1279,12 @@ enum DebugHooks {
             await qaLoaded(new)
             check("so does a new tab", await qaAdDisplay(in: new) == "none")
 
-            blocker.togglePause(on: site, temporarily: true)
+            blocker.togglePause(on: site, privateID: new.profile.privateID)
             new.webView.reload()
             try? await Task.sleep(for: .seconds(1))
             await qaLoaded(new)
             check("pausing still works", await qaAdDisplay(in: new) == "block")
-            blocker.togglePause(on: site, temporarily: true)
+            blocker.togglePause(on: site, privateID: new.profile.privateID)
 
             FileHandle.standardError.write(Data("QA listrefresh done: \(passed) ok, \(failed) failed\n".utf8))
             NSApp.terminate(nil)
@@ -1464,7 +1469,7 @@ enum DebugHooks {
         }
         Task {
             do {
-                let data = try await Task.detached { try source.read() }.value
+                let data = try await Task.detached { try source.read().data(history: .all, bookmarks: .all) }.value
                 let space = store.activeSpace
                 let profile = space.profile.id
                 let pinnedBefore = space.pinned.count
@@ -1639,6 +1644,16 @@ enum DebugHooks {
 
     static func apply(to store: BrowserStore) {
         switch ProcessInfo.processInfo.environment["KAIZU_DEBUG"] {
+        case "private-blocking":
+            Task {
+                do {
+                    try await checkPrivateBlocking(in: store)
+                    NSApp.terminate(nil)
+                } catch {
+                    FileHandle.standardError.write(Data("Private-window blocking check failed: \(error)\n".utf8))
+                    exit(1)
+                }
+            }
         case "notification-routing", "notification-routing-restored":
             Task { await qaNotificationRouting(store) }
         case "open":
@@ -1936,7 +1951,7 @@ enum DebugHooks {
                 store.toast?.undo?()
                 try? await Task.sleep(for: .seconds(2))
                 saveShot(ofWindow: "Report a Broken Site")
-                let details = BugReport.siteDetails(for: url, store: store).joined(separator: "; ")
+                let details = BugReport.siteDetails(for: url, tab: tab, store: store).joined(separator: "; ")
                 FileHandle.standardError.write(Data("QA broken site: \(details)\n".utf8))
             }
         case "arcimport":

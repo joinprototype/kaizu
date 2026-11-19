@@ -71,7 +71,7 @@ extension AppModel {
     func makeTab(_ record: TabRecord, profile: Profile) -> BrowserTab {
         let tab = BrowserTab(
             id: record.id, profile: profile, app: self, url: record.url, title: record.title,
-            pinnedURL: record.pinnedURL, lastActiveAt: record.lastActiveAt
+            pinnedURL: record.pinnedURL, lastActiveAt: record.lastActiveAt, arcItemID: record.arcItemID
         )
         tab.savedState = tabStateFiles.read(record.id)
         tab.customTitle = record.customTitle
@@ -101,7 +101,8 @@ extension AppModel {
             let space = Space(id: record.id, profile: profile, name: record.name, symbol: record.symbol, hue: record.hue)
             space.pinned = record.pinned.map { makeItem($0, profile: profile) }
             space.today = record.today.map { makeTab($0, profile: profile) }
-            space.splitLayout = SplitNode.restored(layout: record.splitLayout, panes: record.split ?? [], widths: record.splitWidths ?? [])
+            let layout = SplitNode.restored(layout: record.splitLayout, panes: record.split ?? [], widths: record.splitWidths ?? [])
+            space.splitLayout = space.survivingSplit(layout)
             space.appearance = record.appearance.flatMap(Space.Appearance.init) ?? .auto
             return space
         }

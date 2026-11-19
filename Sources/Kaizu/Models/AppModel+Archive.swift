@@ -31,14 +31,28 @@ extension AppModel {
                     && !tab.isCapturingMedia && !notifying.contains(tab)
             }
             guard !stale.isEmpty else { continue }
-            archived += stale.map { ArchivedTabRecord(tab: $0.record, spaceID: space.id, archivedAt: now) }
+            for tab in stale {
+                var entry = ArchivedTabRecord(tab: tab.record, spaceID: space.id, archivedAt: now)
+                if archived.count < ClosedTab.historyCount, let state = tab.currentState, state.count <= ClosedTab.maxStateBytes {
+                    do {
+                        entry.navigationStateID = try tabStateFiles.storeArchivedState(state)
+                    } catch {
+                        Log.session.error("Couldn't save archived tab history: \(error.localizedDescription, privacy: .public)")
+                    }
+                }
+                archived.append(entry)
+            }
             withAnimation(Motion.snap) {
                 space.today.removeAll { stale.contains($0) }
             }
             discard(stale)
         }
         guard !archived.isEmpty else { return }
-        archive = Array((archived + archive).prefix(Self.archiveLimit))
+        var next = Array((archived + archive).prefix(Self.archiveLimit))
+        for index in next.indices.dropFirst(ClosedTab.historyCount) {
+            next[index].navigationStateID = nil
+        }
+        archive = next
         save()
         scheduleSave()
     }
@@ -61,7 +75,14 @@ extension BrowserStore {
               let index = app.archive.firstIndex(where: { $0.id == archived.id && $0.spaceID == space.id })
         else { return }
         let entry = app.archive.remove(at: index)
-        reopen(entry.tab, in: space)
+        if let id = entry.navigationStateID, !spaces.contains(where: { $0.allTabs.contains { $0.id == id } }),
+           let state = app.tabStateFiles.read(id) {
+            // The new live tab claims this existing file before saving the session.
+            // An interrupted reopen still has its history on either side of the commit.
+            reopen(entry.tab, in: space, id: id, navigationState: state)
+        } else {
+            reopen(entry.tab, in: space)
+        }
         app.save()
     }
 }

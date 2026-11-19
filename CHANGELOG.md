@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+Clear Today keeps the remaining pinned panes on screen. Undo restores the earlier split when you’ve kept its layout. Older workspaces reopen with cleared panes removed from their saved splits.
+
+Undoing a browsing history import keeps visits you made afterward, including pages you cleared and revisited.
+
+In **File → Import Browsing Data…**, a Safari ZIP containing multiple history or bookmark files now lets you choose the files to import. The destination shows both the space and its profile, so you can bring Work and Personal across separately.
+
+Repeating an Arc sidebar import respects Today tabs you already imported and then navigated, moved within the same profile, or auto-archived. This uses the original tab ID saved by new JSON imports. Older imports still match open pages by address.
+
+Reopening a recently auto-archived tab restores its Back and Forward history, including after restarting Kaizu. The 32 newest archive entries can each keep up to 1 MiB of navigation state. Other entries reopen at their saved address.
+
+Reopen Closed Tab (⇧⌘T) restores Back and Forward history for the 32 most recently closed Today tabs when each snapshot fits in 1 MiB. Older tabs and larger pages reopen at their saved address. After Clear Today, Undo skips tabs you already reopened.
+
+The Arc import preview shows each destination’s profile and sidebar position so you can distinguish spaces with the same name before importing. When both profiles have identical pins in a space, re-import also checks the other space names in the same Arc profile.
+
 Pressing ⌘O in a little window moves the live page into its opening space, even after you switch windows. If that space was deleted, the page can move to another space in the same profile. Deleting the profile closes its little windows.
 
 In **Settings → Privacy → Import Rule List…**, add a WebKit content-blocker JSON file. You can turn individual lists off or remove them. Imported rules follow the shield’s per-site pause setting.
@@ -13,6 +27,8 @@ Opening a workspace saved by an older build repairs duplicate Today rows left by
 Undoing an Arc import preserves tabs and folders you added afterward, including changes made in another window. A newly imported profile also survives Undo once you have used its website data.
 
 **File → Import from Arc…** now accepts a saved sidebar JSON or the Markdown file from Arc’s Export Data command. Markdown links become pinned tabs inside the exported spaces and folders. The sidebar JSON also preserves profile groups, Favorites and Today tabs.
+
+Pausing or resuming blocking in a private window now affects only that window. Regular windows keep their saved site preferences.
 
 Pasting an address such as `example.com?view=weekly` or `example.com#notes` now opens the page directly. The address bar also recognizes bracketed IPv6 addresses with ports.
 

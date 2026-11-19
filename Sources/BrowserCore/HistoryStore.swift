@@ -15,6 +15,14 @@ public actor HistoryStore {
 
     public enum Failure: Error {
         case cannotOpen(String)
+        case cannotWrite(String)
+    }
+
+    /// Only rows created by this import are eligible for Undo.
+    public struct ImportUndo: Sendable {
+        fileprivate let batch: String
+        fileprivate let profile: UUID
+        fileprivate var counts: [String: Int] = [:]
     }
 
     private enum Value {
@@ -48,7 +56,8 @@ public actor HistoryStore {
             throw Failure.cannotOpen(message)
         }
         connection = Connection(handle)
-        sqlite3_exec(handle, """
+        sqlite3_busy_timeout(handle, 1_000)
+        guard sqlite3_exec(handle, """
             PRAGMA journal_mode = WAL;
             CREATE TABLE IF NOT EXISTS visits (
                 profile TEXT NOT NULL,
@@ -56,10 +65,20 @@ public actor HistoryStore {
                 title TEXT NOT NULL DEFAULT '',
                 visit_count INTEGER NOT NULL DEFAULT 1,
                 last_visit REAL NOT NULL,
+                import_batch TEXT,
                 PRIMARY KEY (profile, url)
             );
             CREATE INDEX IF NOT EXISTS visits_by_recency ON visits (profile, last_visit DESC);
-            """, nil, nil, nil)
+            """, nil, nil, nil) == SQLITE_OK else {
+            throw Failure.cannotOpen(String(cString: sqlite3_errmsg(handle)))
+        }
+        // Existing versions name the columns they write, so they can still open this database.
+        if sqlite3_table_column_metadata(handle, nil, "visits", "import_batch", nil, nil, nil, nil, nil) != SQLITE_OK {
+            let rc = sqlite3_exec(handle, "ALTER TABLE visits ADD COLUMN import_batch TEXT", nil, nil, nil)
+            guard rc == SQLITE_OK || sqlite3_table_column_metadata(handle, nil, "visits", "import_batch", nil, nil, nil, nil, nil) == SQLITE_OK else {
+                throw Failure.cannotOpen(String(cString: sqlite3_errmsg(handle)))
+            }
+        }
     }
 
     public func recordVisit(profile: UUID, url: URL, title: String, at date: Date = Date()) {
@@ -100,54 +119,80 @@ public actor HistoryStore {
 
     /// Pages from another browser, all at once. A page already here keeps its
     /// title and takes the higher count and the later date, so importing
-    /// twice changes nothing. Returns the pages that are new, for `remove`.
-    @discardableResult
-    public func add(_ visits: [BrowsingData.Visit], profile: UUID) -> [URL] {
-        guard let insert = prepare("INSERT OR IGNORE INTO visits (profile, url, title, visit_count, last_visit) VALUES (?1, ?2, ?3, ?4, ?5)", []),
-              let update = prepare("""
+    /// twice changes nothing. The receipt undoes only what this import added.
+    public func importVisits(_ visits: [BrowsingData.Visit], profile: UUID) throws -> ImportUndo {
+        var undo = ImportUndo(batch: UUID().uuidString, profile: profile)
+        guard !visits.isEmpty else { return undo }
+        guard let insert = prepare("INSERT OR IGNORE INTO visits (profile, url, title, visit_count, last_visit, import_batch) VALUES (?1, ?2, ?3, ?4, ?5, ?6)", []) else {
+            throw Failure.cannotWrite(String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(insert) }
+        // A later import that changes a row owns those edits. An identical re-import leaves Undo intact.
+        guard let update = prepare("""
                 UPDATE visits SET
+                    import_batch = CASE WHEN import_batch = ?6 THEN import_batch
+                        WHEN visit_count < ?4 OR last_visit < ?5 OR (title = '' AND ?3 != '') THEN NULL ELSE import_batch END,
                     visit_count = max(visit_count, ?4),
                     last_visit = max(last_visit, ?5),
                     title = CASE WHEN title = '' THEN ?3 ELSE title END
                 WHERE profile = ?1 AND url = ?2
                 """, [])
-        else { return [] }
-        defer {
-            sqlite3_finalize(insert)
-            sqlite3_finalize(update)
-        }
-        var added: [URL] = []
-        inTransaction {
+        else { throw Failure.cannotWrite(String(cString: sqlite3_errmsg(db))) }
+        defer { sqlite3_finalize(update) }
+        try inTransaction {
             for visit in visits {
                 let values: [Value] = [
                     .text(profile.uuidString), .text(visit.url.absoluteString), .text(visit.title),
-                    .integer(visit.count), .real(visit.lastVisit.timeIntervalSince1970),
+                    .integer(visit.count), .real(visit.lastVisit.timeIntervalSince1970), .text(undo.batch),
                 ]
-                runAgain(insert, values)
+                try runAgain(insert, values)
                 if sqlite3_changes(db) > 0 {
-                    added.append(visit.url)
+                    undo.counts[visit.url.absoluteString] = visit.count
                 } else {
-                    runAgain(update, values)
+                    try runAgain(update, values)
+                    if let count = undo.counts[visit.url.absoluteString] {
+                        undo.counts[visit.url.absoluteString] = max(count, visit.count)
+                    }
                 }
             }
         }
-        return added
+        return undo
     }
 
-    public func remove(_ urls: [URL], profile: UUID) {
-        guard let delete = prepare("DELETE FROM visits WHERE profile = ?1 AND url = ?2", []) else { return }
+    /// Retain genuine later visits. Deleting and revisiting the same URL creates an unmarked row.
+    public func undoImport(_ undo: ImportUndo) throws {
+        guard !undo.counts.isEmpty else { return }
+        let match = "WHERE profile = ?1 AND url = ?2 AND import_batch = ?3"
+        guard let delete = prepare("DELETE FROM visits \(match) AND visit_count = ?4", []) else {
+            throw Failure.cannotWrite(String(cString: sqlite3_errmsg(db)))
+        }
         defer { sqlite3_finalize(delete) }
-        inTransaction {
-            for url in urls {
-                runAgain(delete, [.text(profile.uuidString), .text(url.absoluteString)])
+        guard let keep = prepare("UPDATE visits SET visit_count = visit_count - ?4, import_batch = NULL \(match) AND visit_count > ?4", []) else {
+            throw Failure.cannotWrite(String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(keep) }
+        try inTransaction {
+            for (url, count) in undo.counts {
+                let values: [Value] = [.text(undo.profile.uuidString), .text(url), .text(undo.batch), .integer(count)]
+                try runAgain(delete, values)
+                if sqlite3_changes(db) == 0 { try runAgain(keep, values) }
             }
         }
     }
 
-    private func inTransaction(_ body: () -> Void) {
-        sqlite3_exec(db, "BEGIN", nil, nil, nil)
-        body()
-        sqlite3_exec(db, "COMMIT", nil, nil, nil)
+    private func inTransaction(_ body: () throws -> Void) throws {
+        guard sqlite3_exec(db, "BEGIN IMMEDIATE", nil, nil, nil) == SQLITE_OK else {
+            throw Failure.cannotWrite(String(cString: sqlite3_errmsg(db)))
+        }
+        do {
+            try body()
+            guard sqlite3_exec(db, "COMMIT", nil, nil, nil) == SQLITE_OK else {
+                throw Failure.cannotWrite(String(cString: sqlite3_errmsg(db)))
+            }
+        } catch {
+            sqlite3_exec(db, "ROLLBACK", nil, nil, nil)
+            throw error
+        }
     }
 
     /// Forgets everything, or only one profile's history.
@@ -168,10 +213,10 @@ public actor HistoryStore {
     }
 
     /// For a statement prepared once and used for many rows.
-    private func runAgain(_ statement: OpaquePointer, _ values: [Value]) {
+    private func runAgain(_ statement: OpaquePointer, _ values: [Value]) throws {
         bind(values, to: statement)
-        sqlite3_step(statement)
-        sqlite3_reset(statement)
+        defer { sqlite3_reset(statement) }
+        guard sqlite3_step(statement) == SQLITE_DONE else { throw Failure.cannotWrite(String(cString: sqlite3_errmsg(db))) }
     }
 
     private func entries(_ sql: String, _ values: [Value]) -> [Entry] {

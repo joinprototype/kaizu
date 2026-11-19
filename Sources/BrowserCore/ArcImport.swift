@@ -9,6 +9,9 @@ public struct ArcImport: Equatable, Sendable {
     public struct SpaceSummary: Equatable, Sendable {
         public var name: String
         public var isNew: Bool
+        /// One-based position in the sidebar after applying this plan.
+        public var sidebarPosition: Int
+        public var profileName: String?
         public var pinned: Int
         public var today: Int
     }
@@ -44,64 +47,39 @@ public struct ArcImport: Equatable, Sendable {
     /// when made by hand; a space keeps Arc's color when it has one.
     public init(
         _ sidebar: ArcSidebar, profiles: [ProfileRecord], spaces: [SpaceRecord],
-        includesToday: Bool, hues: [Double], symbols: [String], now: Date = Date()
+        archivedTabs: [ArchivedTabRecord] = [], includesToday: Bool, hues: [Double], symbols: [String], now: Date = Date()
     ) {
-        // Two profiles can each have an "Inbox". Compare saved addresses only when the
-        // name is ambiguous, keeping sidebar order for otherwise indistinguishable matches.
-        func matchingSpace(for arc: ArcSidebar.Space, among candidates: [SpaceRecord]) -> SpaceRecord? {
-            let named = candidates.filter { $0.name.caseInsensitiveCompare(arc.name) == .orderedSame }
-            guard named.count > 1 else { return named.first }
-            let sourceTabs = Set((arc.pinned.tabs + arc.today).map(\.url))
-            let sourceFavorites = Set((sidebar.favorites[arc.profile] ?? []).map(\.url))
-            var best: SpaceRecord?
-            var bestScore = -1
-            for space in named {
-                let tabs = (space.pinned.tabs + space.today).compactMap { $0.pinnedURL ?? $0.url }
-                let favorites = profiles.first { $0.id == space.profileID }?.favorites ?? []
-                let score = sourceTabs.intersection(tabs).count
-                    + sourceFavorites.intersection(favorites.compactMap { $0.pinnedURL ?? $0.url }).count
-                if score > bestScore {
-                    best = space
-                    bestScore = score
-                }
-            }
-            return best
-        }
-
-        var kaizuProfile: [String: UUID] = [:]
-        // Match the default profile first, even if a custom Arc space appears
-        // first in the file. Custom profiles must never claim its destination.
-        let defaultSpaces = sidebar.spaces.filter { $0.profile == ArcSidebar.defaultProfile }
-        if !defaultSpaces.isEmpty {
-            let existing = defaultSpaces.lazy.compactMap { arc in
-                matchingSpace(for: arc, among: spaces)
-            }.first
-            kaizuProfile[ArcSidebar.defaultProfile] = (existing ?? spaces.first)?.profileID
-        }
-        var matches: [Int: SpaceRecord] = [:]
-        var taken: Set<UUID> = []
-        for (index, arc) in sidebar.spaces.enumerated() {
-            let eligible = spaces.filter { space in
-                guard !taken.contains(space.id) else { return false }
-                if let destination = kaizuProfile[arc.profile] { return destination == space.profileID }
-                return !kaizuProfile.values.contains(space.profileID)
-            }
-            guard let match = matchingSpace(for: arc, among: eligible) else { continue }
-            matches[index] = match
-            taken.insert(match.id)
-            kaizuProfile[arc.profile] = match.profileID
-        }
+        let archivedBySpace = Dictionary(grouping: archivedTabs, by: \.spaceID)
+        var (matches, kaizuProfile) = Self.matchDestinations(sidebar, profiles: profiles, spaces: spaces,
+                                                            archivedBySpace: archivedBySpace)
         if matches.isEmpty, spaces.count == 1, let only = spaces.first, only.pinned.isEmpty, only.today.isEmpty,
            let index = sidebar.spaces.firstIndex(where: { $0.profile == ArcSidebar.defaultProfile }) {
             let arc = sidebar.spaces[index]
             matches[index] = only
             takeover = Takeover(spaceID: only.id, name: arc.name, hue: arc.hue)
         }
+        // A Today tab may have navigated, moved within its profile, or gone to the archive.
+        // Its Arc item ID still identifies it without conflating the same URL in another account.
+        var importedByProfile: [UUID: Set<UUID>] = [:]
+        for profile in profiles {
+            importedByProfile[profile.id] = Set(profile.favorites.compactMap(\.arcItemID))
+        }
+        for space in spaces {
+            let archived = archivedBySpace[space.id]?.map(\.tab) ?? []
+            let items = space.today + space.pinned.tabs + archived
+            importedByProfile[space.profileID, default: []].formUnion(items.compactMap(\.arcItemID))
+        }
         var spaceCount = spaces.count
         for (index, arc) in sidebar.spaces.enumerated() {
-            let today = includesToday ? arc.today : []
-            if let match = matches[index] {
-                let favorites = profiles.first { $0.id == match.profileID }?.favorites ?? []
+            let owner = matches[index]?.profileID ?? kaizuProfile[arc.profile]
+            let imported = owner.flatMap { importedByProfile[$0] } ?? []
+            let today = includesToday ? arc.today.filter { tab in
+                guard let id = tab.itemID else { return true }
+                return !imported.contains(id)
+            } : []
+            if let match = matches[index], let position = spaces.firstIndex(where: { $0.id == match.id }) {
+                let profile = profiles.first { $0.id == match.profileID }
+                let favorites = profile?.favorites ?? []
                 let known = Self.addresses(of: match.pinned.tabs + match.today + favorites)
                 var folders: [UUID: [SidebarItemRecord]] = [:]
                 let pinned = Self.additions(arc.pinned, alongside: match.pinned, skipping: known, folders: &folders)
@@ -110,7 +88,10 @@ public struct ArcImport: Equatable, Sendable {
                 let fresh = today.filter { !known.contains($0.url) }.map { Self.record($0, now: now) }
                 if !pinned.isEmpty { self.pinned[match.id] = pinned }
                 if !fresh.isEmpty { self.today[match.id] = fresh }
-                summary.append(SpaceSummary(name: arc.name, isNew: false, pinned: pinnedCount, today: fresh.count))
+                summary.append(SpaceSummary(
+                    name: arc.name, isNew: false, sidebarPosition: position + 1, profileName: profile?.name,
+                    pinned: pinnedCount, today: fresh.count
+                ))
                 continue
             }
             let profileID = kaizuProfile[arc.profile] ?? UUID()
@@ -125,7 +106,11 @@ public struct ArcImport: Equatable, Sendable {
                 pinned: pinned, today: today.map { Self.record($0, now: now) }
             ))
             spaceCount += 1
-            summary.append(SpaceSummary(name: arc.name, isNew: true, pinned: pinned.tabCount, today: today.count))
+            let profile = profiles.first { $0.id == profileID } ?? newProfiles.first { $0.id == profileID }
+            summary.append(SpaceSummary(
+                name: arc.name, isNew: true, sidebarPosition: spaceCount, profileName: profile?.name,
+                pinned: pinned.tabCount, today: today.count
+            ))
         }
 
         // Favorites of an Arc profile with no space here have nowhere to go.
@@ -186,7 +171,7 @@ public struct ArcImport: Equatable, Sendable {
 
     /// Stamped now, so the clock on archiving starts from the import.
     private static func record(_ tab: ArcSidebar.Tab, now: Date) -> TabRecord {
-        TabRecord(id: UUID(), title: tab.title, url: tab.url, lastActiveAt: now, customTitle: tab.customTitle)
+        TabRecord(id: UUID(), title: tab.title, url: tab.url, lastActiveAt: now, customTitle: tab.customTitle, arcItemID: tab.itemID)
     }
 }
 

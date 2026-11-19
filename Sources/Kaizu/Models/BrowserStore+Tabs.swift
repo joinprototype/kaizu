@@ -19,6 +19,11 @@ extension BrowserStore {
         // goes to one on the opener's profile, so it keeps its cookies.
         let space = space ?? opener.flatMap { self.space(containing: $0) ?? self.space(on: $0.profile) } ?? activeSpace
         let tab = BrowserTab(profile: space.profile, app: app, url: url, configuration: configuration)
+        insertToday(tab, in: space, after: opener, select: select)
+        return tab
+    }
+
+    private func insertToday(_ tab: BrowserTab, in space: Space, after opener: BrowserTab? = nil, select: Bool = true) {
         withAnimation(Motion.pop) {
             if let opener, let index = space.today.firstIndex(of: opener) {
                 space.today.insert(tab, at: index + 1)
@@ -31,7 +36,6 @@ extension BrowserStore {
             self.select(tab, in: space)
         }
         scheduleSave()
-        return tab
     }
 
     /// A page can only be in one window: selecting a tab that's showing in
@@ -135,7 +139,7 @@ extension BrowserStore {
         var neighborIndex = 0
         space.removeFromSplit(tab.id)
         if let index = space.today.firstIndex(of: tab) {
-            closedTabs.append(ClosedTab(spaceID: space.id, record: tab.record))
+            closedTabs.remember(tab, in: space.id)
             withAnimation(Motion.snap) {
                 _ = space.today.remove(at: index)
             }
@@ -215,13 +219,15 @@ extension BrowserStore {
         let cleared = space.today
         guard !cleared.isEmpty else { return }
         let ids = Set(cleared.map(\.id))
-        for tab in cleared {
-            closedTabs.append(ClosedTab(spaceID: space.id, record: tab.record))
+        let previousLayout = space.splitLayout
+        for (index, tab) in cleared.enumerated() {
+            closedTabs.remember(tab, in: space.id, keepsHistory: index >= cleared.count - ClosedTab.historyCount)
             extensions.didClose(tab)
             tab.markNotificationsRead()
         }
         withAnimation(Motion.snap, completionCriteria: .removed) {
             space.today = []
+            space.splitLayout = space.survivingSplit(previousLayout)
         } completion: {
             // After the rows have gone, so tearing pages down can't drop
             // frames; hibernating keeps their state in case of Undo.
@@ -229,31 +235,42 @@ extension BrowserStore {
                 tab.hibernate()
             }
         }
+        let remainingLayout = space.splitLayout
         for store in app.allStores where store.selectedTabIDs[space.id].map(ids.contains) == true {
-            store.setSelected(nil, in: space)
+            store.selectNeighbor(of: 0, in: space, previousSplit: previousLayout?.panes ?? [])
         }
         scheduleSave()
         showToast("Closed \(cleared.count.counted("tab"))", symbol: "xmark.circle") { [weak self] in
+            guard let self, spaces.contains(where: { $0 === space }) else { return }
+            // A tab reopened with ⇧⌘T is already back, possibly in another space.
+            let stillClosed = Set(closedTabs.lazy.map(\.record.id).filter(ids.contains))
+            let restoring = cleared.filter { stillClosed.contains($0.id) }
             withAnimation(Motion.pop) {
-                space.today = cleared + space.today
+                space.today = restoring + space.today
+                if remainingLayout != previousLayout, space.splitLayout == remainingLayout {
+                    space.splitLayout = space.survivingSplit(previousLayout)
+                }
             }
-            cleared.forEach { self?.extensions.didOpen($0) }
-            self?.closedTabs.removeAll { ids.contains($0.record.id) }
-            self?.scheduleSave()
+            restoring.forEach { extensions.didOpen($0) }
+            closedTabs.removeAll { ids.contains($0.record.id) }
+            scheduleSave()
         }
     }
 
     func reopenClosedTab() {
-        guard let closed = closedTabs.popLast() else { return }
-        let space = spaces.first { $0.id == closed.spaceID } ?? activeSpace
-        reopen(closed.record, in: space)
+        while let closed = closedTabs.popLast() {
+            // If its space was deleted, another space on the same profile keeps its cookies.
+            let space = spaces.first { $0.id == closed.spaceID && $0.profile.id == closed.profileID }
+                ?? spaces.first { $0.profile.id == closed.profileID }
+            guard let space else { continue }
+            reopen(closed.record, in: space, navigationState: closed.navigationState)
+            return
+        }
     }
 
-    /// Opens a closed or archived tab again, under the name it had.
-    func reopen(_ record: TabRecord, in space: Space) {
-        let tab = openTab(record.url, in: space)
-        tab.title = record.title
-        tab.customTitle = record.customTitle
+    func reopen(_ record: TabRecord, in space: Space, id: UUID = UUID(), navigationState: Data? = nil) {
+        let tab = BrowserTab(reopening: record, id: id, profile: space.profile, app: app, navigationState: navigationState)
+        insertToday(tab, in: space)
     }
 
     // MARK: - Moving

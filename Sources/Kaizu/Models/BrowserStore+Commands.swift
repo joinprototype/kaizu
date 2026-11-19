@@ -92,7 +92,7 @@ extension BrowserStore {
                 },
                 PaletteCommand(
                     id: "site.blocking",
-                    title: contentBlocker.isPaused(on: tab.url) ? "Resume Blocking on This Site" : "Pause Blocking on This Site",
+                    title: contentBlocker.isPaused(on: tab.url, privateID: tab.profile.privateID) ? "Resume Blocking on This Site" : "Pause Blocking on This Site",
                     symbol: "shield.slash", keywords: ["adblock", "broken"]
                 ) {
                     self.toggleBlockingOnCurrentSite()

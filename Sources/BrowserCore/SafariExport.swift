@@ -13,20 +13,54 @@ public enum SafariExport {
         var data: BrowsingData
         switch file.pathExtension.lowercased() {
         case "zip":
-            data = try readArchive(file)
+            return try readArchive(file).combined
         case "json":
             guard let visits = history(fromJSON: try Data(contentsOf: file)) else { throw BrowsingData.Failure.unreadable }
             data = BrowsingData(visits: visits)
         default:
             data = BrowsingData(bookmarks: bookmarks(fromHTML: try String(contentsOf: file, encoding: .utf8)))
         }
-        data.visits = Array(data.visits.sorted { $0.lastVisit > $1.lastVisit }.prefix(BrowsingData.visitLimit))
+        data.visits = newest(data.visits)
         return data
     }
 
-    private static func readArchive(_ file: URL) throws -> BrowsingData {
+    private static func newest(_ visits: [BrowsingData.Visit]) -> [BrowsingData.Visit] {
+        Array(visits.sorted { $0.lastVisit > $1.lastVisit }.prefix(BrowsingData.visitLimit))
+    }
+
+    public enum Selection: Hashable, Sendable {
+        case skip, all, file(String)
+    }
+
+    public struct Archive: Sendable {
+        public let combined: BrowsingData
+        fileprivate let histories: [String: [BrowsingData.Visit]]
+        fileprivate let bookmarks: [String: [BrowsingData.Bookmark]]
+
+        public var historyFiles: [String] { histories.keys.sorted() }
+        public var bookmarkFiles: [String] { bookmarks.keys.sorted() }
+        public var needsSelection: Bool { histories.count > 1 || bookmarks.count > 1 }
+
+        public func selected(history: Selection, bookmarks selection: Selection) -> BrowsingData {
+            let visits: [BrowsingData.Visit] = switch history {
+            case .skip: []
+            case .all: combined.visits
+            case .file(let name): histories[name] ?? []
+            }
+            let items: [BrowsingData.Bookmark] = switch selection {
+            case .skip: []
+            case .all: combined.bookmarks
+            case .file(let name): bookmarks[name] ?? []
+            }
+            return BrowsingData(visits: visits, bookmarks: items)
+        }
+    }
+
+    public static func readArchive(_ file: URL) throws -> Archive {
         guard let listing = unzip(["-Z1", file.path]) else { throw BrowsingData.Failure.unreadable }
-        var data = BrowsingData()
+        var histories: [String: [BrowsingData.Visit]] = [:]
+        var bookmarkFiles: [String: [BrowsingData.Bookmark]] = [:]
+        var combined = BrowsingData()
         for name in String(decoding: listing, as: UTF8.self).split(separator: "\n").map(String.init) {
             let kind = (name as NSString).pathExtension.lowercased()
             guard kind == "json" || kind == "html" else { continue }
@@ -34,12 +68,19 @@ public enum SafariExport {
             let pattern = name.replacingOccurrences(of: #"([\\*?\[\]])"#, with: #"\\$1"#, options: .regularExpression)
             guard let entry = unzip(["-p", file.path, pattern]) else { continue }
             if kind == "html" {
-                data.bookmarks += bookmarks(fromHTML: String(decoding: entry, as: UTF8.self))
-            } else if let visits = history(fromJSON: entry) {
-                data.visits += visits
+                let items = bookmarks(fromHTML: String(decoding: entry, as: UTF8.self))
+                if !items.isEmpty {
+                    bookmarkFiles[name] = items
+                    combined.bookmarks += items
+                }
+            } else if let visits = history(fromJSON: entry), !visits.isEmpty {
+                let sorted = newest(visits)
+                histories[name] = sorted
+                combined.visits += sorted
             }
         }
-        return data
+        if histories.count > 1 { combined.visits = newest(combined.visits) }
+        return Archive(combined: combined, histories: histories, bookmarks: bookmarkFiles)
     }
 
     private static func unzip(_ arguments: [String]) -> Data? {

@@ -16,7 +16,17 @@ public final class TabStateFiles: Sendable {
         }
     }
 
-    public func save(_ states: [UUID: Data], inBackground: Bool = false) {
+    /// Commit a new archive snapshot after any queued sweep, without pruning live tabs.
+    public func storeArchivedState(_ state: Data) throws -> UUID {
+        try queue.sync {
+            let id = UUID()
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            try state.write(to: directory.appending(path: "\(id).state"), options: .atomic)
+            return id
+        }
+    }
+
+    public func save(_ states: [UUID: Data], retaining archived: Set<UUID> = [], inBackground: Bool = false) {
         let write: @Sendable () -> Void = { [directory] in
             let files = FileManager.default
             try? files.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -25,7 +35,7 @@ public final class TabStateFiles: Sendable {
             }
             let existing = (try? files.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
             for file in existing where file.pathExtension == "state" {
-                if let id = UUID(uuidString: file.deletingPathExtension().lastPathComponent), states[id] == nil {
+                if let id = UUID(uuidString: file.deletingPathExtension().lastPathComponent), states[id] == nil, !archived.contains(id) {
                     try? files.removeItem(at: file)
                 }
             }

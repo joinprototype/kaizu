@@ -56,9 +56,9 @@ enum BugReport {
     }
 
     /// The setup that most often explains a broken site.
-    static func siteDetails(for url: URL, store: BrowserStore) -> [String] {
+    static func siteDetails(for url: URL, tab: BrowserTab, store: BrowserStore) -> [String] {
         let blocker = store.contentBlocker
-        let paused = blocker.isPaused(on: url) ? ", paused on this site" : ""
+        let paused = blocker.isPaused(on: url, privateID: tab.profile.privateID) ? ", paused on this site" : ""
         let extensions = store.extensions.installed.map(\.name)
         var lines = [
             "Kaizu \(Diagnostics.appVersion)",

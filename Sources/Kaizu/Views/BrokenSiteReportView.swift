@@ -22,7 +22,7 @@ struct BrokenSiteReportView: View {
             note: note,
             blockingTest: blockingTest,
             includesAddress: includesAddress,
-            details: BugReport.siteDetails(for: url, store: store)
+            details: BugReport.siteDetails(for: url, tab: tab, store: store)
         )
     }
 
@@ -44,13 +44,13 @@ struct BrokenSiteReportView: View {
                 if store.contentBlocker.isEnabled {
                     Section {
                         Toggle("Block ads and trackers here", isOn: Binding(
-                            get: { !store.contentBlocker.isPaused(on: url) },
+                            get: { !store.contentBlocker.isPaused(on: url, privateID: tab.profile.privateID) },
                             set: { _ in
-                                store.contentBlocker.togglePause(on: url, temporarily: tab.profile.isPrivate)
+                                store.contentBlocker.togglePause(on: url, privateID: tab.profile.privateID)
                                 tab.reload()
                             }
                         ))
-                        if store.contentBlocker.isPaused(on: url) {
+                        if store.contentBlocker.isPaused(on: url, privateID: tab.profile.privateID) {
                             Picker("Did that fix it?", selection: $blockingTest) {
                                 ForEach(BrokenSiteReport.BlockingTest.allCases, id: \.self) { test in
                                     Text(test.rawValue).tag(test)

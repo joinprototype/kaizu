@@ -208,6 +208,42 @@ import Testing
         #expect(try FileManager.default.contentsOfDirectory(atPath: output.path) == ["Export.zip"])
     }
 
+    @Test func selectsSafariFilesByArchivePathBeforeCombiningProfiles() throws {
+        let root = try folder()
+        let archive = root.appending(path: "Export.zip")
+        for profile in ["Work", "Personal"] {
+            let directory = root.appending(path: profile, directoryHint: .isDirectory)
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
+            let site = "https://" + profile.lowercased() + ".example.test/"
+            let json = #"{"metadata":{"data_type":"history"},"history":[{"url":"\#(site)","time_usec":2}]}"#
+            try Data(json.utf8).write(to: directory.appending(path: "Historique [1].json"))
+            let html = #"<DL><DT><A HREF="\#(site)">\#(profile)</A></DL>"#
+            try Data(html.utf8).write(to: directory.appending(path: "Bookmarks.html"))
+        }
+        let zip = Process()
+        zip.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
+        zip.currentDirectoryURL = root
+        zip.arguments = ["-q", "-r", archive.path, "Personal", "Work"]
+        try zip.run()
+        zip.waitUntilExit()
+        try #require(zip.terminationStatus == 0)
+
+        let files = try SafariExport.readArchive(archive)
+        #expect(files.needsSelection)
+        #expect(files.historyFiles == ["Personal/Historique [1].json", "Work/Historique [1].json"])
+        #expect(files.bookmarkFiles == ["Personal/Bookmarks.html", "Work/Bookmarks.html"])
+        #expect(files.selected(history: .skip, bookmarks: .skip).isEmpty)
+        for profile in ["Work", "Personal"] {
+            let selected = files.selected(history: .file(profile + "/Historique [1].json"), bookmarks: .file(profile + "/Bookmarks.html"))
+            let page = try #require(URL(string: "https://" + profile.lowercased() + ".example.test/"))
+            #expect(selected.visits.map(\.url) == [page])
+            #expect(selected.bookmarks == [.page(title: profile, url: page)])
+        }
+        #expect(files.selected(history: .all, bookmarks: .skip).bookmarks.isEmpty)
+        #expect(files.selected(history: .all, bookmarks: .all) == files.combined)
+        #expect(files.combined.visits.count == 2 && files.combined.bookmarks.count == 2)
+    }
+
     @Test func aLoneHistoryFileComesNewestFirst() throws {
         let file = try folder().appending(path: "History.json")
         try Data(Self.historyJSON.utf8).write(to: file)
@@ -298,8 +334,8 @@ import Testing
             BrowsingData.Visit(url: Self.example, title: "Theirs", count: 5, lastVisit: then),
             BrowsingData.Visit(url: Self.docs, title: "Guide", count: 2, lastVisit: then),
         ]
-        #expect(await store.add(visits, profile: profile) == [Self.docs])
-        #expect(await store.add(visits, profile: profile) == [])
+        let receipt = try await store.importVisits(visits, profile: profile)
+        _ = try await store.importVisits(visits, profile: profile)
 
         let entries = await store.recent(profile: profile)
         #expect(entries.count == 2)
@@ -309,7 +345,82 @@ import Testing
         #expect(mine.lastVisit == later)
         #expect(entries.first { $0.url == Self.docs }?.visitCount == 2)
 
-        await store.remove([Self.docs], profile: profile)
+        try await store.undoImport(receipt)
         #expect(await store.recent(profile: profile).map(\.url) == [Self.example])
+    }
+
+    @Test func undoImportKeepsSubsequentVisitsAndIsRepeatable() async throws {
+        let file = try folder().appending(path: "history.sqlite")
+        let importer = try HistoryStore(fileURL: file)
+        let browser = try HistoryStore(fileURL: file)
+        let profile = UUID()
+        let other = UUID()
+        let then = Date(timeIntervalSince1970: 100)
+        let later = Date(timeIntervalSince1970: 200)
+        let visits = [
+            BrowsingData.Visit(url: Self.example, title: "Imported", count: 3, lastVisit: then),
+            BrowsingData.Visit(url: Self.example, title: "Imported", count: 7, lastVisit: then),
+            BrowsingData.Visit(url: Self.docs, title: "Guide", count: 1, lastVisit: then),
+        ]
+        let receipt = try await importer.importVisits(visits, profile: profile)
+        _ = try await importer.importVisits(visits, profile: profile)
+        await browser.recordVisit(profile: other, url: Self.docs, title: "Work", at: later)
+        await browser.recordVisit(profile: profile, url: Self.example, title: "Homepage", at: later)
+        await browser.recordVisit(profile: profile, url: Self.example, title: "Homepage", at: later)
+        try await importer.undoImport(receipt)
+        try await importer.undoImport(receipt)
+
+        #expect(await browser.recent(profile: profile) == [
+            .init(url: Self.example, title: "Homepage", visitCount: 2, lastVisit: later)
+        ])
+        #expect(await browser.recent(profile: other) == [
+            .init(url: Self.docs, title: "Work", visitCount: 1, lastVisit: later)
+        ])
+    }
+
+    @Test func earlierUndoKeepsRecreatedPagesAndLaterImports() async throws {
+        let store = try HistoryStore(fileURL: folder().appending(path: "history.sqlite"))
+        let profile = UUID()
+        let date = Date(timeIntervalSince1970: 100)
+        let receipt = try await store.importVisits([
+            .init(url: Self.example, title: "Example", count: 1, lastVisit: date),
+            .init(url: Self.docs, title: "Guide", count: 2, lastVisit: date),
+        ], profile: profile)
+        await store.remove(Self.example, profile: profile)
+        await store.recordVisit(profile: profile, url: Self.example, title: "Example", at: date)
+        _ = try await store.importVisits([.init(url: Self.docs, title: "Guide", count: 6, lastVisit: date)], profile: profile)
+        try await store.undoImport(receipt)
+
+        let entries = await store.recent(profile: profile)
+        #expect(entries.first { $0.url == Self.example }?.visitCount == 1)
+        #expect(entries.first { $0.url == Self.docs }?.visitCount == 6)
+    }
+
+    @Test func migratingHistoryPreservesExistingRowsAndFailedImportsRollBack() async throws {
+        let file = try folder().appending(path: "history.sqlite")
+        let profile = UUID()
+        var db: OpaquePointer?
+        try #require(sqlite3_open(file.path, &db) == SQLITE_OK)
+        defer { sqlite3_close(db) }
+        try #require(sqlite3_exec(db, """
+            CREATE TABLE visits (profile TEXT NOT NULL, url TEXT NOT NULL, title TEXT NOT NULL DEFAULT '',
+                visit_count INTEGER NOT NULL DEFAULT 1, last_visit REAL NOT NULL, PRIMARY KEY (profile, url));
+            INSERT INTO visits VALUES ('\(profile.uuidString)', 'https://existing.example/', 'Existing', 9, 100);
+            CREATE TRIGGER fail_write BEFORE INSERT ON visits WHEN NEW.url = '\(Self.docs.absoluteString)'
+                BEGIN SELECT RAISE(ABORT, 'simulated write failure'); END;
+            """, nil, nil, nil) == SQLITE_OK)
+        let store = try HistoryStore(fileURL: file)
+        let visits = [Self.example, Self.docs].map {
+            BrowsingData.Visit(url: $0, title: "", count: 3, lastVisit: Date(timeIntervalSince1970: 200))
+        }
+        await #expect(throws: HistoryStore.Failure.self) {
+            try await store.importVisits(visits, profile: profile)
+        }
+        let existing = HistoryStore.Entry(url: URL(string: "https://existing.example/")!, title: "Existing",
+                                          visitCount: 9, lastVisit: Date(timeIntervalSince1970: 100))
+        #expect(await store.recent(profile: profile) == [existing])
+        let receipt = try await store.importVisits([visits[0]], profile: profile)
+        try await store.undoImport(receipt)
+        #expect(await store.recent(profile: profile) == [existing])
     }
 }

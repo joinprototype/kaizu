@@ -202,14 +202,17 @@ public struct TabRecord: Codable, Hashable, Sendable {
     public var lastActiveAt: Date?
     /// The name given to it, shown instead of the page's title.
     public var customTitle: String?
+    /// The original Arc sidebar item, if this Today tab was imported from JSON.
+    public var arcItemID: UUID?
 
-    public init(id: UUID, title: String, url: URL?, pinnedURL: URL? = nil, lastActiveAt: Date? = nil, customTitle: String? = nil) {
+    public init(id: UUID, title: String, url: URL?, pinnedURL: URL? = nil, lastActiveAt: Date? = nil, customTitle: String? = nil, arcItemID: UUID? = nil) {
         self.id = id
         self.title = title
         self.url = url
         self.pinnedURL = pinnedURL
         self.lastActiveAt = lastActiveAt
         self.customTitle = customTitle
+        self.arcItemID = arcItemID
     }
 }
 
@@ -218,6 +221,8 @@ public struct ArchivedTabRecord: Codable, Equatable, Sendable, Identifiable {
     public var tab: TabRecord
     public var spaceID: UUID
     public var archivedAt: Date
+    /// The snapshot becomes the reopened tab’s state file when the workspace commits.
+    public var navigationStateID: UUID?
 
     public var id: UUID { tab.id }
 

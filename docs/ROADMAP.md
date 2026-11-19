@@ -29,17 +29,27 @@ The first release should carry an Arc user from importing a sidebar through a we
 | Ship safely | Add repeatable build and test checks. Sign with Developer ID, notarize and verify a clean install and a signed upgrade. Document what the browser sends off-device. | Test the downloadable release on the minimum supported macOS and a current Mac. Apple enrollment or a Developer ID certificate is pending. |
 | Match the switching workflow | Preserve sidebar organization, Peek, little windows, routing and split layouts. Verify real Arc and Safari imports with consented or redacted samples. | Compare the preview with the resulting spaces, folders and tabs. Repeat the import and check Undo. |
 
+**Local candidate packaging.** On macOS 27.0.1, the release build of `c27d4e2` produced an arm64 app with Hardened Runtime and an ad-hoc signature. The Mach-O and bundle both declared macOS 15.4 as the minimum. All 13 runtime resources and the signed entitlements matched the source. The read-only DMG contained the identical app and an Applications shortcut. The updater staged the ZIP and recovered the byte-identical executable. All 212 release-configuration tests passed.
+
+A separate run of `scripts/release.sh 1.0.0` in a disposable source copy used a temporary update key. Starting with v0.2.5 build 10, it produced 1.0.0 build 11, verified the ZIP signature and the disk image checksum, and generated matching download redirects, feed and website metadata. Developer ID signing, notarization, a first launch on macOS 15.4 and verification of the eventual release artifact remain open.
+
 **Drafts and upgrades from v0.2.5.** On macOS 15, v0.2.5 acknowledged a site's local-storage write and quit. The key was already absent from its database before the new browser opened. The restored page recovered its login cookie but read the key as missing twice. In twelve separate trials the value was present after quit and survived every restart or upgrade. This matters for sites that keep unfinished work on the device. [Failure with database checkpoints](https://github.com/joinprototype/kaizu/actions/runs/44391560505/job/135117070079) · [Twelve migration trials](https://github.com/joinprototype/kaizu/actions/runs/44390801472/job/135107581907)
 
 The release checks verify that the new browser reads data committed by v0.2.5 in the original profile, space and tab. They also require a new edit made by a page during candidate shutdown to survive on the first read after an ordinary quit and after installing a signed update. [Draft recovery investigation](https://github.com/joinprototype/kaizu/issues/46)
 
 Kaizu’s advantages to demonstrate are built-in tracking protection, a local sidebar with no account requirement, and mixed row-and-column splits. Performance comparisons require the same pages, hardware and measurement procedure in both browsers. Sync, Boosts, Easels and an AI panel are outside this proposed 1.0 scope. Cross-device sync remains a significant gap for people who use Arc on multiple devices.
 
+At commit `6b699be`, after the fix for Quit from an AppKit action, the upgrade from v0.2.5 and the signed update each recovered the login, local storage and original workspace on macOS 15.8.2 and 27.0.1. On macOS 15 the signed-update test found no cookie file before quit, found both cookies on disk after quit, and received them after installing build 10. Both ordinary-quit checks restored the final draft edit on the first read. The earlier intermittent cookie loss is still unexplained. [Four upgrade results](https://github.com/joinprototype/kaizu/actions/runs/44415780819) · [Cookie investigation](https://github.com/joinprototype/kaizu/issues/57)
+
 ### Archive recovery
+
+In a local three-process WebKit rehearsal, a tab with three visited pages was auto-archived on the middle page. A fresh Kaizu model reopened it in its saved space from disk. A third process read the committed workspace before any quit-time history save, restored the middle page and navigated forward to the third. Archive navigation snapshots are limited to the newest 32 entries at up to 1 MiB each. Older archives remain searchable and reopen at their saved address.
 
 On macOS 27.0.1, an interrupted reopen used to remove a tab from the archive before saving it in its space. The workspace and archive now commit together. With two profiles containing the same URL, the command bar found the renamed tab by its custom title or space. After an abrupt exit it reopened in its original space with the custom title intact, and the other profile kept its archived copy. A separate interrupted auto-archive sweep preserved the stale tab in the archive and excluded a private-window tab. The session reader from v0.2.5 decoded the saved workspace and separate archive. After that reader rewrote the session in its older format, the development build restored it again.
 
 ### Migration checks
+
+A local switching rehearsal found that navigating an imported Today tab, then auto-archiving it, made the repeat preview offer the original tab again. With its Arc item ID preserved, the preview showed zero additions before and after archiving. On restart, the two-pane split recovered and the archived tab reopened in its original profile with its custom title and Back history. Another profile and a private store could not reopen the entry. The rehearsal compares the preview data with the applied sidebar and exercises incremental import and Undo using the redacted JSON fixture. Run it with `scripts/test-arc-switching.sh`. The native chooser and window rendering are covered separately.
 
 Two publicly available Arc sidebar samples were imported into separate, empty Kaizu sessions. The [linkcache fixture](https://github.com/adlio/linkcache/blob/95d64d3739b3d9afd4b4e3be58f8cd42e33c6062/test_data/StorableSidebar.json) produced 9 tabs in 2 spaces on 1 profile. The [A New Arc Begins fixture](https://github.com/Zarrar09/A-New-Arc-Begins/blob/41f0df8520c4ff13b7f25d387a9046547b927f31/tests/fixtures/sampleStorableSidebar.json) produced 78 tabs in 4 spaces on 2 profiles. After a restart, importing each sidebar again added zero tabs and preserved the saved session. Undo in a fresh run returned each session to one empty space. The source files retained their original hashes.
 
@@ -50,6 +60,8 @@ An updated Arc export added one link inside an existing nested folder on macOS 2
 Chrome 157 wrote a fresh test profile with a loopback visit and a bookmark. Kaizu imported both, kept the bookmarks folder collapsed, recognized the bookmark on a repeat preview, and removed the imported visit and folder on Undo. A tab added to the folder after import survived Undo. Both source files retained their original hashes.
 
 Kaizu imported four successful destination pages and five bookmarks from Chromium’s two Safari 18.4 history fixtures and bookmark file. It skipped redirect and failed-load entries. The bookmarks landed in a collapsed folder, a second preview found zero new bookmarks, and Undo preserved a tab moved into the folder after import. [Chromium fixtures](https://chromium.googlesource.com/chromium/src/+/f82317413d635d3dfc1abf79597fce56eb9eceff/components/test/data/user_data_importer/valid/)
+
+For a Safari ZIP containing multiple history or bookmark files, the development import preview starts with both categories skipped. Choose files by their archive paths and send them to the named Kaizu space and profile. A fixture with Work and Personal directories, each containing the same localized history filename and bookmark filename, verified that selecting Work returned only its pages and bookmarks. Selecting all files returned both sets.
 
 On a fresh macOS 27.0.1 account, Safari visited and bookmarked a local page. Its export dialog accepted Bookmarks and History as the only selected categories. After Save, macOS requested authentication and the runner produced no ZIP. A locally authenticated export of those two categories is still needed to verify the complete Safari-to-Kaizu workflow. [Fresh Safari export attempt](https://github.com/joinprototype/kaizu/actions/runs/44294859012)
 
@@ -72,6 +84,8 @@ A separate macOS 15 upgrade restored the login cookie, but the page could not re
 ### Blocking on the first page
 
 On macOS 27.0.1, a fresh Kaizu profile fetched and executed a script matching a bundled EasyList rule when the previous three-second startup wait expired. With the navigation fix and an empty rule cache, the first page executed the control script and the local server received no request for the matching script. With blocking disabled in a separate fresh profile, both scripts reached the server and ran. Opening an external link on this Mac took 6.83 seconds with an empty rule cache and 0.57 seconds after relaunch. Both pages ran the control script and kept the matching request off the network. This check covers Kaizu’s built-in blocker. Extension filtering has its own startup behavior.
+
+The development build also keeps per-site blocker changes inside their private window. On macOS 27.0.1, a rendered page in a regular window lost its protection when a second window privately paused the parent domain. With the fix, only that private window showed the fixture’s ad. A separate private window and the regular window kept hiding it. Resuming a subdomain privately also preserved a saved regular pause, and a fresh private window inherited the regular setting after the original one closed.
 
 ### Cookie consent on live sites
 
@@ -206,13 +220,13 @@ default-browser capable · curated themes · app icon.
 | Multiple / private windows | ✓ | ✓ | — | M | `WKWebsiteDataStore.nonPersistent()` |
 | Back/forward kept across restarts | ✓ | ✓ | — | S | `interactionState` ✓ |
 | Ad + tracker blocking | via extensions | ✓ built in | — | M | `WKContentRuleList` ✓ (same engine as Safari content blockers) |
-| Split view | ✓ | ✓ | — | L | several page views per window |
+| Split view | ✓ | Up to four panes in a mix of rows and columns | — | L | Each pane keeps its live page |
 | Peek (link preview overlay) | ✓ | ✓ | — | M | promote preview to tab without reload |
 | Little Arc (mini window) | ✓ | ✓ | — | M | On macOS 27.0.1, the File menu moved a live page and its unsaved draft back to its opening space across two windows. |
 | ⌃Tab recent-tab switcher | ✓ | ✓ | — | M | `takeSnapshot` ✓ for thumbnails |
 | Media: now playing, mute, auto-PiP | ✓ | ✓ | — | M | event-driven via isolated-world script; auto-PiP ✓ |
 | Capture / screenshots | ✓ | ✓ | — | S | `takeSnapshot`, `createPDF` ✓ |
-| Extensions | Chrome Web Store | ✓ Chrome Web Store, Firefox Add-ons, Safari | — | L | `WKWebExtension` ✓ (macOS 15.4+) |
+| Extensions | Chrome Web Store | Install from Chrome Web Store and Firefox Add-ons listings or a Mac app containing a Safari web extension | partial | L | WebKit API coverage varies by extension. [Tested packages and workflows](#extension-compatibility) |
 | Password managers | extensions | Bitwarden for Safari filled a self-hosted login | partial | L | Verify 1Password autofill and desktop unlock separately |
 | Site notifications | ✓ | on the tab and Dock; macOS banners need Developer ID | P6 | M | no public `Notification` delivery: a page script plus `UserNotifications`; macOS refuses ad-hoc signed apps |
 | Passkeys | ✓ | blocked | P6 | — | needs Apple's browser passkey entitlement |

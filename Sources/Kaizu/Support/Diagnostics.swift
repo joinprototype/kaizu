@@ -19,7 +19,9 @@ final class Diagnostics: NSObject, MXMetricManagerSubscriber, Sendable {
         let info = Bundle.main.infoDictionary
         let version = info?["CFBundleShortVersionString"] as? String ?? "?"
         let build = info?["CFBundleVersion"] as? String ?? "?"
-        return "\(version) (\(build))"
+        let label = "\(version) (\(build))"
+        guard let revision = info?["KaizuSourceRevision"] as? String, !revision.isEmpty else { return label }
+        return "\(label) · \(revision.prefix(7))"
     }
 
     /// "macOS 27.0 (Build 27A123)".

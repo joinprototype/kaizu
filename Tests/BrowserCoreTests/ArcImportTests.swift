@@ -163,7 +163,7 @@ import Testing
         #expect(plan.today.values.first?.count == 1)
         #expect(plan.favorites[Self.profileID]?.count == 1)
         #expect(plan.tabCount == 4)
-        #expect(plan.summary == [.init(name: "personal", isNew: false, pinned: 2, today: 1)])
+        #expect(plan.summary == [.init(name: "personal", isNew: false, sidebarPosition: 1, profileName: "Personal", pinned: 2, today: 1)])
     }
 
     @Test func aLoneEmptySpaceBecomesTheFirstArcSpace() throws {
@@ -259,6 +259,8 @@ import Testing
         let workSpace = try #require(spaces.first { $0.profileID == workProfile.id })
         #expect(updated.tabCount == 1)
         #expect(updated.pinned[workSpace.id]?.tabs.map(\.pinnedURL) == [added.url])
+        #expect(updated.summary.map(\.profileName) == [workProfile.name, "Personal"])
+        #expect(updated.summary.first?.sidebarPosition == 2)
     }
 
     @Test func repeatImportUsesProfileFavoritesWhenSameNamedSpacesShareTheirTabs() throws {
@@ -268,13 +270,70 @@ import Testing
         let original = Self.emptySpace()
         let first = Self.plan(source, spaces: [original])
         let profiles = [ProfileRecord(id: Self.profileID, name: "Existing", favorites: [])] + first.newProfiles
+        #expect(first.summary.map(\.sidebarPosition) == [2, 3])
         let spaces = [original] + first.newSpaces.reversed()
-        #expect(Self.plan(source, profiles: profiles, spaces: spaces).tabCount == 0)
+        let repeatPlan = Self.plan(source, profiles: profiles, spaces: spaces)
+        #expect(repeatPlan.tabCount == 0)
+        #expect(repeatPlan.summary.map(\.sidebarPosition) == [3, 2])
+        #expect(repeatPlan.summary.allSatisfy { !$0.isNew })
         source.spaces[0].today.append(Self.tab("https://work-update.test/"))
         let updated = Self.plan(source, profiles: profiles, spaces: spaces)
         let work = try #require(first.newSpaces.first)
         #expect(updated.tabCount == 1)
         #expect(updated.today[work.id]?.map(\.url) == [URL(string: "https://work-update.test/")])
+    }
+
+    @Test(arguments: [ArcSidebar.defaultProfile, "Personal"])
+    func siblingSpaceIdentifiesTheProfileOfAnOtherwiseIdenticalInbox(personalProfile: String) throws {
+        var source = Self.sidebar(name: "Inbox", profile: "Work")
+        source.favorites = [:]
+        let personal = Self.sidebar(name: "Inbox", profile: personalProfile).spaces[0]
+        let projects = Self.sidebar(name: "Projects", profile: "Work").spaces[0]
+        source.spaces += [personal, projects]
+
+        var home = Self.emptySpace()
+        home.today = [TabRecord(id: UUID(), title: "Existing", url: URL(string: "https://existing.test/"))]
+        let first = Self.plan(source, spaces: [home])
+        let workInbox = try #require(first.newSpaces.first)
+        let spaces = [home] + first.newSpaces
+        let profiles = [ProfileRecord(id: Self.profileID, name: "Main", favorites: [])] + first.newProfiles
+
+        source.spaces.swapAt(0, 1)
+        let repeated = Self.plan(source, profiles: profiles, spaces: spaces)
+        #expect(repeated.tabCount == 0)
+        #expect(repeated.newSpaces.isEmpty)
+        #expect(repeated.summary.map(\.sidebarPosition) == [3, 2, 4])
+
+        let added = Self.tab("https://work.test/new-project")
+        source.spaces[1].pinned.append(.tab(added))
+        let updated = Self.plan(source, profiles: profiles, spaces: spaces)
+        #expect(updated.tabCount == 1)
+        #expect(updated.pinned[workInbox.id]?.tabs.map(\.pinnedURL) == [added.url])
+    }
+
+    @Test(arguments: [false, true])
+    func unrelatedSpaceNameCannotOverrideAnExistingInboxPin(reverse: Bool) {
+        let marker = Self.tab("https://personal.test/known-pin")
+        let added = Self.tab("https://personal.test/new-pin")
+        var source = Self.sidebar(name: "Inbox")
+        source.spaces[0].pinned = [.tab(marker), .tab(added)]
+        source.spaces.append(Self.sidebar(name: "Projects").spaces[0])
+
+        if reverse { source.spaces.reverse() }
+
+        let workID = UUID()
+        var workInbox = Self.emptySpace(name: "Inbox")
+        workInbox.profileID = workID
+        var workProjects = Self.emptySpace(name: "Projects")
+        workProjects.profileID = workID
+        var personalInbox = Self.emptySpace(name: "Inbox")
+        personalInbox.pinned = [.tab(TabRecord(id: UUID(), title: "Existing", url: marker.url, pinnedURL: marker.url))]
+        let profiles = [ProfileRecord(id: workID, name: "Work", favorites: []),
+                        ProfileRecord(id: Self.profileID, name: "Personal", favorites: [])]
+        let plan = Self.plan(source, profiles: profiles, spaces: [workInbox, workProjects, personalInbox])
+        #expect(plan.pinned[personalInbox.id]?.tabs.map(\.pinnedURL) == [added.url])
+        #expect(plan.pinned[workInbox.id] == nil)
+        #expect(plan.newSpaces.map(\.profileID) == [Self.profileID])
     }
 
     @Test func keepsArcsColorWhenThereIsOne() {
@@ -315,6 +374,51 @@ import Testing
         #expect(second.tabCount == 0)
         #expect(second.pinned.isEmpty)
         #expect(second.today.isEmpty)
+    }
+
+    @Test func archivedTodayItemsIdentifyTheirOriginalAccountsAfterTheExportIsReordered() throws {
+        var source = try ArcSidebarTests.fixture()
+        let first = try #require(source.spaces[0].today.first)
+        let second = try #require(source.spaces[1].today.first)
+        _ = try #require(first.itemID)
+        _ = try #require(second.itemID)
+        source.favorites = [:]
+        for index in source.spaces.indices {
+            source.spaces[index].name = "Inbox"
+            source.spaces[index].pinned = []
+        }
+        source.spaces[0].today = [first]
+        source.spaces[1].today = [second]
+        let work = Self.emptySpace(name: "Inbox")
+        var home = Self.emptySpace(name: "Inbox")
+        home.profileID = UUID()
+        let profiles = [ProfileRecord(id: work.profileID, name: "Work", favorites: []),
+                        ProfileRecord(id: home.profileID, name: "Home", favorites: [])]
+        let elsewhere = URL(string: "https://later.example.test/")!
+        let archive = [(work, first), (home, second)].map { space, item in
+            ArchivedTabRecord(tab: TabRecord(id: UUID(), title: "Later", url: elsewhere, arcItemID: item.itemID),
+                              spaceID: space.id, archivedAt: Self.now)
+        }
+        source.spaces.reverse()
+        // Arc exported a new Today item at the same URL as the archived one.
+        var newItem = second
+        newItem.itemID = UUID()
+        source.spaces[0].today.append(newItem)
+        func plan(_ archive: [ArchivedTabRecord]) -> ArcImport {
+            ArcImport(source, profiles: profiles, spaces: [work, home], archivedTabs: archive,
+                      includesToday: true, hues: Self.hues, symbols: Self.symbols)
+        }
+        let result = plan(archive)
+        #expect(result.summary.map(\.profileName) == ["Home", "Work"])
+        #expect(result.summary.map(\.sidebarPosition) == [2, 1])
+        #expect(result.tabCount == 1)
+        #expect(result.today[home.id]?.map(\.arcItemID) == [newItem.itemID])
+        #expect(result.today[work.id] == nil)
+        // An unrelated local archive entry has no import identity.
+        var local = archive
+        local[1].tab.arcItemID = nil
+        let fallback = plan(local)
+        #expect(fallback.today[home.id]?.count == 2)
     }
 
     @Test func repeatImportKeepsEditedFoldersAndNavigatedPins() throws {
