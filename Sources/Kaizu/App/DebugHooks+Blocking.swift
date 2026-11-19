@@ -9,7 +9,7 @@ extension DebugHooks {
         var passed = 0, failed = 0
         func check(_ label: String, _ condition: Bool) {
             if condition { passed += 1 } else { failed += 1 }
-            FileHandle.standardError.write(Data("QA rulelists \(condition ? "ok" : "FAILED"): \(label)\n".utf8))
+            log("QA rulelists \(condition ? "ok" : "FAILED"): \(label)")
         }
         Task {
             let started = ContinuousClock.now
@@ -17,7 +17,7 @@ extension DebugHooks {
             while blocker.state != .ready, started.duration(to: .now) < .seconds(120) {
                 try? await Task.sleep(for: .milliseconds(200))
             }
-            FileHandle.standardError.write(Data("QA rulelists ready after \(started.duration(to: .now))\n".utf8))
+            log("QA rulelists ready after \(started.duration(to: .now))")
             check("blocking is ready", blocker.state == .ready)
             let stored = await WKContentRuleListStore.default()?.availableIdentifiers() ?? []
             for name in ContentBlocker.listNames {
@@ -39,7 +39,7 @@ extension DebugHooks {
             check("and doesn't with blocking paused (\(shown))", shown == "block")
             blocker.togglePause(on: site, privateID: tab.profile.privateID)
 
-            FileHandle.standardError.write(Data("QA rulelists done: \(passed) ok, \(failed) failed\n".utf8))
+            log("QA rulelists done: \(passed) ok, \(failed) failed")
             NSApp.terminate(nil)
         }
     }
@@ -50,7 +50,7 @@ extension DebugHooks {
         var passed = 0, failed = 0
         func check(_ label: String, _ condition: Bool) {
             if condition { passed += 1 } else { failed += 1 }
-            FileHandle.standardError.write(Data("QA listrefresh \(condition ? "ok" : "FAILED"): \(label)\n".utf8))
+            log("QA listrefresh \(condition ? "ok" : "FAILED"): \(label)")
         }
         func stored() async -> Set<String> {
             Set(await WKContentRuleListStore.default()?.availableIdentifiers() ?? [])
@@ -75,7 +75,7 @@ extension DebugHooks {
             let started = ContinuousClock.now
             await blocker.refreshLists()
             let after = await stored()
-            FileHandle.standardError.write(Data("QA listrefresh refreshed in \(started.duration(to: .now))\n".utf8))
+            log("QA listrefresh refreshed in \(started.duration(to: .now))")
             check("the check is recorded", AppDefaults.shared.double(forKey: lastCheckKey) > 0)
             check("lists changed", after != before)
             check("a list that didn't change kept its copy", after.contains { $0.hasPrefix("kaizu-") && before.contains($0) })
@@ -100,7 +100,7 @@ extension DebugHooks {
             check("pausing still works", await qaAdDisplay(in: new) == "block")
             blocker.togglePause(on: site, privateID: new.profile.privateID)
 
-            FileHandle.standardError.write(Data("QA listrefresh done: \(passed) ok, \(failed) failed\n".utf8))
+            log("QA listrefresh done: \(passed) ok, \(failed) failed")
             NSApp.terminate(nil)
         }
     }

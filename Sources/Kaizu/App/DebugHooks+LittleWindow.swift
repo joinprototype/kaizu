@@ -19,7 +19,7 @@ extension DebugHooks {
         }
         func check(_ condition: Bool, _ message: String) {
             guard condition else {
-                FileHandle.standardError.write(Data("FAILED: \(message)\n".utf8))
+                log("FAILED: \(message)")
                 exit(1)
             }
         }
@@ -82,7 +82,7 @@ extension DebugHooks {
         removedWindow.promote()
         check(!home.today.contains(removed) && !removed.isLoaded, "removed profile stayed out of the workspace")
         check(app.littleWindows.contains { $0.tab === kept }, "deleting another profile preserved this little window")
-        FileHandle.standardError.write(Data("Little-window promotion preserved the live page and its profile.\n".utf8))
+        log("Little-window promotion preserved the live page and its profile.")
         NSApp.terminate(nil)
     }
 }

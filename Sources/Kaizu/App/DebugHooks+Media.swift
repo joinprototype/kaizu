@@ -11,7 +11,7 @@ extension DebugHooks {
         var passed = 0, failed = 0
         func check(_ label: String, _ condition: Bool) {
             if condition { passed += 1 } else { failed += 1 }
-            FileHandle.standardError.write(Data("QA audible \(condition ? "ok" : "FAILED"): \(label)\n".utf8))
+            log("QA audible \(condition ? "ok" : "FAILED"): \(label)")
         }
         let silence = """
         window.qaSilence = () => {
@@ -90,7 +90,7 @@ extension DebugHooks {
             try? await Task.sleep(for: .seconds(1))
             check("Web Audio is busy", await synth.isBusy)
 
-            FileHandle.standardError.write(Data("QA audible done: \(passed) ok, \(failed) failed\n".utf8))
+            log("QA audible done: \(passed) ok, \(failed) failed")
             NSApp.terminate(nil)
         }
     }

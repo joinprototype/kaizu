@@ -17,7 +17,7 @@ extension DebugHooks {
         let sites = (environment["KAIZU_SITES"] ?? defaults).split(separator: ",").compactMap { URL(string: String($0)) }
         let wait = environment["KAIZU_SITE_WAIT"].flatMap(Double.init) ?? 12
         func log(_ text: String) {
-            FileHandle.standardError.write(Data("QA consent \(text)\n".utf8))
+            DebugHooks.log("QA consent \(text)")
         }
         // In the page's world: what each platform's own API says.
         let platform = """

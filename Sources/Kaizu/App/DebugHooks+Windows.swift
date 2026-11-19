@@ -8,7 +8,7 @@ extension DebugHooks {
     static func qaPrivateWindow(_ store: BrowserStore) {
         let app = store.app
         func check(_ name: String, _ passed: Bool) {
-            FileHandle.standardError.write(Data("QA private \(passed ? "ok" : "FAILED"): \(name)\n".utf8))
+            log("QA private \(passed ? "ok" : "FAILED"): \(name)")
         }
         func settle(_ seconds: Double = 0.5) async {
             try? await Task.sleep(for: .seconds(seconds))
@@ -102,7 +102,7 @@ extension DebugHooks {
     static func qaWindows(_ store: BrowserStore) {
         let app = store.app
         func check(_ name: String, _ passed: Bool) {
-            FileHandle.standardError.write(Data("QA windows \(passed ? "ok" : "FAILED"): \(name)\n".utf8))
+            log("QA windows \(passed ? "ok" : "FAILED"): \(name)")
         }
         func settle() async {
             try? await Task.sleep(for: .milliseconds(500))
