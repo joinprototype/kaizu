@@ -135,13 +135,21 @@ struct SoundTests {
     @Test(.enabled(if: SoundTests.hasAudioOutput))
     func playsAgainAfterTheEngineStopsWhenIdle() async throws {
         let engine = SoundEngine()
+        // Waits for each sound to be heard through rather than a fixed time:
+        // a busy audio device (a video playing) can start the engine late.
+        func played(_ count: Int) async throws -> Bool {
+            let deadline = ContinuousClock.now + .seconds(3)
+            while engine.finishedCount < count, ContinuousClock.now < deadline {
+                try await Task.sleep(for: .milliseconds(20))
+            }
+            return engine.finishedCount >= count
+        }
         engine.play(.pin, volume: 0)
-        try await Task.sleep(for: .milliseconds(400))
+        #expect(try await played(1))
         engine.stopForIdle()
         try await Task.sleep(for: .milliseconds(100))
         engine.play(.pin, volume: 0)
-        try await Task.sleep(for: .milliseconds(400))
-        #expect(engine.finishedCount == 2)
+        #expect(try await played(2), "a sound after the engine idled out is heard")
         engine.unload()
     }
 
