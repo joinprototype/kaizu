@@ -63,6 +63,7 @@ final class AppModel {
         startArchiving()
         startHibernating()
         startMediaMonitoring()
+        watches.onUnseenChange = { [weak self] in self?.updateDockBadge() }
         watcher.start()
         DownloadManager.shared.onFinish = { [weak self] item in
             guard let self, !item.isPrivate || self.front.isPrivate else { return }

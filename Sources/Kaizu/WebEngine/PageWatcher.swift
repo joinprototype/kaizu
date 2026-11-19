@@ -16,10 +16,23 @@ final class PageWatcher: NSObject, WKNavigationDelegate, WKUIDelegate {
     private weak var app: AppModel?
     private var timer: Task<Void, Never>?
     private var isChecking = false
-    private var loaded: CheckedContinuation<Bool, Never>?
+    /// Parts waiting for the check that's running ("Check Now" during a timed round).
+    private var queue: [UUID] = []
+    private var current: UUID?
+    /// The profile whose page is loading now, and whether it was deleted meanwhile.
+    private var reading: UUID?
+    private var isForgotten = false
+    private var loaded: CheckedContinuation<Load, Never>?
 
-    init(app: AppModel?) {
+    private enum Load {
+        case finished, timedOut, failed
+    }
+
+    private let loadTimeout: Duration
+
+    init(app: AppModel?, loadTimeout: Duration = PageWatcher.loadTimeout) {
         self.app = app
+        self.loadTimeout = loadTimeout
     }
 
     /// The first round waits a little, so launching stays quick.
@@ -39,23 +52,51 @@ final class PageWatcher: NSObject, WKNavigationDelegate, WKUIDelegate {
         await check(watches.due(every: Self.interval))
     }
 
-    /// Checks these now, one after another.
+    /// Checks these, one after another; returns once they're done. A check
+    /// already running takes them on after its own.
     func check(_ parts: [WatchedPart]) async {
-        guard !isChecking else { return }
+        queue += parts.map(\.id).filter { !queue.contains($0) }
+        if isChecking {
+            let mine = Set(parts.map(\.id))
+            while isChecking, queue.contains(where: mine.contains) || current.map(mine.contains) == true {
+                try? await Task.sleep(for: .milliseconds(200))
+            }
+            return
+        }
         isChecking = true
-        defer { isChecking = false }
-        for part in parts {
-            guard let app, let profile = app.profiles.first(where: { $0.id == part.profileID }), !profile.isPrivate else { continue }
+        defer {
+            isChecking = false
+            current = nil
+        }
+        while !queue.isEmpty {
+            let id = queue.removeFirst()
+            current = id
+            // As it is now: it may have been stopped since it was queued.
+            guard let app, let part = app.watches.parts.first(where: { $0.id == id }),
+                  let profile = app.profiles.first(where: { $0.id == part.profileID }), !profile.isPrivate
+            else { continue }
             let text = await read(part, profile: profile)
             if let changed = app.watches.record(part.id, found: text) {
                 await announce(changed)
             }
         }
-        app?.updateDockBadge()
+    }
+
+    /// A deleted profile: its parts go, and a page of it loading now stops,
+    /// so its website data can be removed.
+    func forget(profile id: UUID) {
+        app?.watches.removeAll(profile: id)
+        if reading == id {
+            isForgotten = true
+            finish(.failed)
+        }
     }
 
     /// The part's text, or nil when the page didn't load or doesn't have it.
     func read(_ part: WatchedPart, profile: Profile) async -> String? {
+        reading = profile.id
+        isForgotten = false
+        defer { reading = nil }
         let configuration = BrowserTab.makeConfiguration(for: profile)
         configuration.mediaTypesRequiringUserActionForPlayback = .all
         // Out of a window it would be paused before its scripts draw anything.
@@ -80,22 +121,31 @@ final class PageWatcher: NSObject, WKNavigationDelegate, WKUIDelegate {
         }
         // A page that never finishes (a stalled request) mustn't hold up the rest.
         let timeout = Task { [weak self] in
-            try? await Task.sleep(for: Self.loadTimeout)
-            if !Task.isCancelled { self?.finish(false) }
+            try? await Task.sleep(for: self?.loadTimeout ?? Self.loadTimeout)
+            if !Task.isCancelled { self?.finish(.timedOut) }
         }
-        let finished = await withCheckedContinuation { done in
+        let load = isForgotten ? .failed : await withCheckedContinuation { done in
             loaded = done
             webView.load(URLRequest(url: part.url))
         }
         timeout.cancel()
-        guard finished else { return nil }
-        return await Self.text(of: part.selector, in: webView)
+        switch load {
+        case .failed:
+            return nil
+        case .finished:
+            return await Self.text(of: part.selector, in: webView) { [weak self] in self?.isForgotten == true }
+        case .timedOut:
+            // Still loading something (an ad, a stalled frame): the part may well be there.
+            return await Self.text(of: part.selector, in: webView, patience: .seconds(3)) { [weak self] in self?.isForgotten == true }
+        }
     }
 
     /// Looks for the part until it shows up with some text, or patience runs out.
-    static func text(of selector: String, in webView: WKWebView, patience: Duration = patience) async -> String? {
+    static func text(of selector: String, in webView: WKWebView, patience: Duration = patience,
+                     until stopped: () -> Bool = { false }) async -> String? {
         let deadline = ContinuousClock.now + patience
         repeat {
+            if stopped() { return nil }
             let found = try? await webView.callAsyncJavaScript(
                 """
                 let element = null;
@@ -111,17 +161,17 @@ final class PageWatcher: NSObject, WKNavigationDelegate, WKUIDelegate {
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        finish(true)
+        finish(.finished)
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: any Error) {
-        finish(false)
+        finish(.failed)
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: any Error) {
         // A redirect cancels the first load and goes on with the next.
         if (error as NSError).code == NSURLErrorCancelled { return }
-        finish(false)
+        finish(.failed)
     }
 
     func webView(
@@ -134,7 +184,7 @@ final class PageWatcher: NSObject, WKNavigationDelegate, WKUIDelegate {
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
-        finish(false)
+        finish(.failed)
     }
 
     // Nobody's looking at this page: it gets no windows, dialogs, devices
@@ -180,8 +230,8 @@ final class PageWatcher: NSObject, WKNavigationDelegate, WKUIDelegate {
         decisionHandler(.deny)
     }
 
-    private func finish(_ ok: Bool) {
-        loaded?.resume(returning: ok)
+    private func finish(_ load: Load) {
+        loaded?.resume(returning: load)
         loaded = nil
     }
 
@@ -228,6 +278,7 @@ extension AppModel {
     /// Opens a watched page in a new tab of its profile's window.
     func openWatched(_ part: WatchedPart) {
         guard let profile = profiles.first(where: { $0.id == part.profileID }) else { return }
+        watches.markSeen(part.id)
         let window = store(for: profile)
         window.openTab(part.url)
         front = window

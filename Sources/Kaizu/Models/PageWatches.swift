@@ -38,8 +38,13 @@ final class PageWatches {
     private static let key = "watchedParts"
 
     private(set) var parts: [WatchedPart] {
-        didSet { save() }
+        didSet {
+            save()
+            if unseenCount != oldValue.count(where: \.isUnseen) { onUnseenChange?() }
+        }
     }
+    /// The Dock's count follows the changes you haven't seen.
+    @ObservationIgnored var onUnseenChange: (() -> Void)?
 
     @ObservationIgnored private let defaults: UserDefaults
 
@@ -77,6 +82,11 @@ final class PageWatches {
         parts.removeAll { $0.id == id }
     }
 
+    /// A deleted profile's parts go with it.
+    func removeAll(profile id: UUID) {
+        parts.removeAll { $0.profileID == id }
+    }
+
     /// The result of a check: the part's text, or nil when it wasn't on the
     /// page. Returns the part when its text changed.
     @discardableResult
@@ -102,12 +112,26 @@ final class PageWatches {
         return changed ? part : nil
     }
 
-    /// You've opened the page: its changes are seen.
+    /// You've opened the page: its changes are seen. Goes by host and path,
+    /// as a page often adds or changes its query (locale, session) as it loads.
     func markSeen(_ url: URL?) {
-        guard let url, parts.contains(where: { $0.isUnseen && $0.url == url }) else { return }
-        for index in parts.indices where parts[index].url == url {
+        guard let url else { return }
+        let page = Self.page(url)
+        guard parts.contains(where: { $0.isUnseen && Self.page($0.url) == page }) else { return }
+        for index in parts.indices where Self.page(parts[index].url) == page {
             parts[index].isUnseen = false
         }
+    }
+
+    func markSeen(_ id: UUID) {
+        guard let index = parts.firstIndex(where: { $0.id == id }), parts[index].isUnseen else { return }
+        parts[index].isUnseen = false
+    }
+
+    nonisolated static func page(_ url: URL) -> String {
+        let host = (url.host() ?? "").lowercased()
+        let path = url.path(percentEncoded: true)
+        return (host.hasPrefix("www.") ? String(host.dropFirst(4)) : host) + (path.hasSuffix("/") ? String(path.dropLast()) : path)
     }
 
     /// The ones to check now, oldest check first.

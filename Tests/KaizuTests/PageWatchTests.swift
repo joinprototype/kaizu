@@ -104,4 +104,44 @@ final class PageWatchTests {
         #expect(text == "$12")
         #expect(ContinuousClock.now - started < .seconds(10))
     }
+
+    /// Pages often change their query as they load (locale, session):
+    /// opening one still counts as seeing its change.
+    @Test func seenGoesByPageNotQuery() throws {
+        let (watches, _) = watches()
+        var told = 0
+        watches.onUnseenChange = { told += 1 }
+        let part = try #require(watches.add(url: URL(string: "https://www.shop.example.com/kettle?ref=home")!, selector: "#p", text: "1", title: "", profileID: profile))
+        watches.record(part.id, found: "2")
+        #expect(told == 1)
+        watches.markSeen(URL(string: "https://shop.example.com/kettle/?lang=fr#top"))
+        #expect(watches.unseenCount == 0 && told == 2)
+        watches.record(part.id, found: "3")
+        watches.markSeen(URL(string: "https://shop.example.com/teapot"))
+        #expect(watches.unseenCount == 1)
+        // Stopping a changed part takes it off the Dock's count too.
+        watches.remove(part.id)
+        #expect(watches.unseenCount == 0 && told == 4)
+    }
+
+    @Test func deletedProfilesTakeTheirParts() {
+        let (watches, _) = watches()
+        let other = UUID()
+        watches.add(url: page, selector: "#a", text: "a", title: "", profileID: profile)
+        watches.add(url: page, selector: "#a", text: "a", title: "", profileID: other)
+        watches.removeAll(profile: profile)
+        #expect(watches.parts.map(\.profileID) == [other])
+    }
+
+    /// A page still loading something when time's up is read anyway.
+    @Test func aPageThatNeverFinishesIsStillRead() async throws {
+        _ = NSApplication.shared
+        // The image never answers, so the page's load never finishes.
+        let html = "<body><b id=price>$12</b><img src='https://10.255.255.1/never.png'>"
+        let url = try #require(URL(string: "data:text/html," + html.addingPercentEncoding(withAllowedCharacters: .alphanumerics)!))
+        let part = WatchedPart(id: UUID(), url: url, selector: "#price", title: "", profileID: UUID(), text: "$10")
+        let watcher = PageWatcher(app: nil, loadTimeout: .seconds(2))
+        let text = await watcher.read(part, profile: Profile(name: "Temporary", isPrivate: true))
+        #expect(text == "$12")
+    }
 }

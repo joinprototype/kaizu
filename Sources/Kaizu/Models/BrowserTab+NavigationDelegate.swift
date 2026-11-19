@@ -146,7 +146,6 @@ extension BrowserTab: WKNavigationDelegate {
         applyHiddenItems(in: webView)
         if !profile.isPrivate, let watches = app?.watches, watches.unseenCount > 0 {
             watches.markSeen(webView.url)
-            app?.updateDockBadge()
         }
         if let history = app?.history, let url = webView.url, !profile.isPrivate {
             let (profileID, title) = (profile.id, webView.title ?? "")

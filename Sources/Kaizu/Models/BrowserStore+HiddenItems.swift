@@ -12,6 +12,7 @@ extension BrowserStore {
             return showToast("Only secure (https) pages can be watched", symbol: "eye.slash")
         }
         endHidingItems()
+        pickingSession += 1
         withAnimation(Motion.snap) {
             pickingPurpose = purpose
             hidingItemsTabID = tab.id
@@ -22,15 +23,17 @@ extension BrowserStore {
 
     /// One part per pick: watching starts and the picker goes away.
     func watchPicked(_ selector: String, text: String, on tab: BrowserTab) {
-        guard let url = tab.url else { return }
+        guard let url = tab.url, watchPickedSession != pickingSession else { return }
         let watches = app.watches
         guard let part = watches.add(url: url, selector: selector, text: text, title: tab.displayTitle, profileID: tab.profile.id) else {
             let full = watches.parts.count >= PageWatches.maximum
             return showToast(full ? "Kaizu watches up to \(PageWatches.maximum) parts of pages" : "That part has no text to watch", symbol: "eye.slash")
         }
+        let session = pickingSession
+        watchPickedSession = session
         Task {
             try? await Task.sleep(for: .milliseconds(600))
-            endHidingItems()
+            if pickingSession == session { endHidingItems() }
         }
         showToast("Watching “\(part.text)”. Kaizu checks every hour.", symbol: "eye", undo: { watches.remove(part.id) }, lasts: .seconds(6))
     }
