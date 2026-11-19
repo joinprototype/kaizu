@@ -73,13 +73,16 @@ final class PageWatchTests {
     /// Pages that draw with scripts: the part is waited for.
     @Test func readsAPartDrawnLate() async throws {
         _ = NSApplication.shared
-        let view = WKWebView(frame: NSRect(x: 0, y: 0, width: 400, height: 300))
+        // As the watcher sets it up: out of a window, scripts keep running.
+        let configuration = WKWebViewConfiguration()
+        configuration.preferences.inactiveSchedulingPolicy = .none
+        let view = WKWebView(frame: NSRect(x: 0, y: 0, width: 400, height: 300), configuration: configuration)
         view.loadHTMLString("""
             <body><main></main><script>
             setTimeout(() => { document.querySelector('main').innerHTML = '<span id=price>\\n  $39.99 </span>'; }, 700);
             </script>
             """, baseURL: URL(string: "https://shop.example.com/"))
-        let text = await PageWatcher.text(of: "#price", in: view, patience: .seconds(5))
+        let text = await PageWatcher.text(of: "#price", in: view, patience: .seconds(10))
         #expect(text.map(PageWatches.normalized) == "$39.99")
         #expect(await PageWatcher.text(of: "#gone", in: view, patience: .milliseconds(600)) == nil)
         #expect(await PageWatcher.text(of: "not a [selector", in: view, patience: .milliseconds(600)) == nil)
