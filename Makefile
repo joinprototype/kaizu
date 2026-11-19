@@ -25,7 +25,7 @@ app: build
 	cp Resources/AppIcon.icns $(APP)/Contents/Resources/AppIcon.icns
 	mkdir -p $(APP)/Contents/Resources/Filters $(APP)/Contents/Resources/Scripts $(APP)/Contents/Resources/Fonts
 	cp Resources/Filters/*.txt $(APP)/Contents/Resources/Filters/
-	cp Resources/Scripts/*.js Resources/Scripts/*.txt $(APP)/Contents/Resources/Scripts/
+	cp Resources/Scripts/*.js Resources/Scripts/*.json Resources/Scripts/*.txt $(APP)/Contents/Resources/Scripts/
 	cp Resources/Fonts/* $(APP)/Contents/Resources/Fonts/
 	codesign --force $(SIGN_FLAGS) --sign - $(APP)
 

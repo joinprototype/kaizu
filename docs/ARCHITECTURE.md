@@ -206,7 +206,7 @@ struct Command: Identifiable {
 | A window's state and actions | `Models/BrowserStore.swift` + `BrowserStore+Tabs/Spaces/Split/Recents/Find/Peek/Reader/External/Privacy/Commands.swift`, `App/BrowserWindowController.swift` |
 | A tab and its web view | `Models/BrowserTab.swift` (navigation delegate, mute, picture in picture), `BrowserTab+UIDelegate.swift` (dialogs, popups, permissions), `WebEngine/MediaEvents.swift` |
 | Command bar | `Views/CommandBar.swift`, `Views/KeyTextField.swift` (inline completion); answers in `BrowserCore/QuickAnswer.swift`, `CurrencyConversion.swift`, `TimeZoneAnswer.swift`, `SearchShortcut.swift`, `InlineCompletion.swift`; command registry in `BrowserStore+Commands.swift` |
-| Privacy | `WebEngine/ContentBlocker.swift` (rule lists, page scripts, per-site pause), `RuleListCompiler.swift` (compiles in a short-lived copy of the app, started with `--compile-rule-list`), `FilterListUpdater.swift`, `BrowserCore/ContentBlocking/`, `TrackingParameters.swift` |
+| Privacy | `WebEngine/ContentBlocker.swift` (rule lists, page scripts, per-site pause), `AutoconsentBridge.swift` with `BrowserCore/ContentBlocking/Autoconsent.swift` (cookie pop-ups: per-frame rules, page-state checks by snippet id), `RuleListCompiler.swift` (compiles in a short-lived copy of the app, started with `--compile-rule-list`), `FilterListUpdater.swift`, `BrowserCore/ContentBlocking/`, `TrackingParameters.swift` |
 | Extensions | `WebEngine/ExtensionHost.swift`, `ExtensionAdapters.swift`, `Views/ExtensionViews.swift` |
 | Page right-click menu | `WebEngine/PageContextMenu.swift`: `PageWebView` edits WebKit's menu as it opens. Its item identifiers aren't public, so an item WebKit renames just stays as it was. Link destinations fire WebKit's own item, which knows the link, and `createWebViewWith` routes it. |
 | Sound in a page | `BrowserTab.isPlayingSound`: WebKit's public playback state calls a silent autoplaying video playing, so it's checked against `_isPlayingAudio`, the one private name Kaizu reads. Without it a tab goes by the public state. The speaker, mini player, auto picture in picture, archiving and hibernation all go by this |
@@ -218,8 +218,11 @@ struct Command: Identifiable {
 | Bundled page scripts | `Resources/Scripts/` (see its README for sources and licenses) |
 
 Page scripts we write run in WebKit's isolated `.defaultClient` world where
-possible (media events, mute, picture in picture, Reader), so pages can't see
-or tamper with them. `ContentBlocker.standardScripts` survive the blocker's
+possible (media events, mute, picture in picture, Reader, autoconsent), so
+pages can't see or tamper with them. Autoconsent shares that world with the
+media script, which already runs in every frame, so it adds no world of its
+own; the few checks that need the page's globals are run by the app in the
+page's world, chosen by id from the snippets that ship with its rules. `ContentBlocker.standardScripts` survive the blocker's
 reinstalls, which clear a controller's scripts.
 
 ## Migration from today's layout

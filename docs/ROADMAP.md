@@ -96,7 +96,9 @@ On macOS 27.0.1, fresh profiles with content blocking and automatic rejection tu
 | [Cookiebot help](https://www.cookiebot.com/en/help/) | `Cookiebot.hasResponse` became true. Necessary cookies were allowed. Preferences, statistics and marketing were declined. A separate profile with only automatic rejection enabled produced the same result. |
 | [CookieYes documentation](https://www.cookieyes.com/documentation/retrieving-consent-data-using-api-getckyconsent/) | `getCkyConsent().isUserActionCompleted` became true. Necessary cookies were allowed. Functional, analytics, performance and advertisement cookies were declined. |
 
-On Didomi's public demo, the SDK loaded but showed no notice in the control profile, including with the vendor's country-preview option. Rejection on that provider remains unverified. [Didomi sandbox](https://sandbox.didomi.io/cmp.html) · [Preview option](https://developers.didomi.io/cmp/web-sdk/getting-started)
+On Didomi's public demo, the SDK loaded but showed no notice in the control profile, including with the vendor's country-preview option. [Didomi sandbox](https://sandbox.didomi.io/cmp.html) · [Preview option](https://developers.didomi.io/cmp/web-sdk/getting-started)
+
+On Nov 18, `KAIZU_DEBUG=consent` opened French sites that run Didomi in a fresh private window. On L'Équipe, Marmiton, Ouest-France, AlloCiné, Boursorama and Doctissimo, autoconsent found the notice and rejected it. Afterwards `Didomi.shouldConsentBeCollected()` was false, and every purpose was disabled except the site's essential one. Both autoconsent v1 and v2 did this. On Leboncoin, neither version found the notice, the page stayed dimmed, and Didomi still reported that consent was needed. On 20 Minutes, every purpose ended up disabled, and the site then showed its pay-or-accept page.
 
 ### Notification clicks across profiles
 
@@ -178,12 +180,12 @@ Pulled forward from the phases below, in order:
    - [x] cookie-banner hiding (EasyList Cookie List)
    - [x] Global Privacy Control (macOS 27+), HTTPS-first navigation
    - [x] cookie pop-ups auto-rejected v1 (DuckDuckGo's autoconsent standalone, MPL-2.0; page world, all frames)
-   - [ ] autoconsent v2: isolated content world + native rule filtering (DDG-style), smaller per-frame cost. Measured Nov 2: on ten heavy sites the 600 KB script costs about 100 MB of 2.4 GB, inside the noise between runs, so memory is no reason to do this. Moving to an isolated world needs a native bridge for the rules that `eval` page state (DDG evaluates those in the page world), and must be checked on real CMPs before it replaces v1
+   - [x] autoconsent v2: the 110 KB library in the isolated client world (shared with the media script, so no extra world per frame); the app filters rules per frame (a port of autoconsent's `filterCompactRules`, checked against it on its test suite's sites) and runs page-state checks in the page's world by snippet id only, never code. v1 stays behind `KAIZU_AUTOCONSENT=v1` for one release. Measured Nov 18 (`KAIZU_DEBUG=memory`, ten heavy sites, three alternating runs each): per frame, 597 KB of script became 111 KB plus 160 KB of rules for a main frame or 6 KB for a subframe; the 26 frames that ran it got 5.4 MB instead of 15.5 MB. Page-process CPU while loading went from 42 to 53 s (v1) to 34 s (v2) in every run; memory stayed within noise (1.5 to 2.0 GB of page processes either way). `KAIZU_DEBUG=consent`, fresh private window: Cookiebot and CookieYes record the rejection as with v1; Didomi now verified on six French sites (L'Équipe, Marmiton, Ouest-France, AlloCiné, Boursorama, Doctissimo); OneTrust (onetrust.com, IKEA), Sourcepoint (Spiegel, Guardian, Zeit, heise, BBC) and Usercentrics also handled, same result as v1 on all of them. Leboncoin's Didomi notice is missed by both v1 and v2
    - [x] filter list auto-updates (daily, also in a Kaizu left open for days, and retried hourly while offline; newer of downloaded vs bundled wins)
    - [x] per-site "pause blocking" (shield in address pill, per-tab controllers, no recompiles)
    - [x] broken-site reporting (site popover, Help menu, the toast after pausing): a Mail draft with the site's name, never the page unless asked; records whether turning blocking off fixed it
    - [x] strip tracking parameters (utm_*, fbclid, gclid…) on navigation and Copy Link
-   - [ ] evaluate Brave's adblock-rust converter vs ours (coverage, scriptlets)
+   - [x] evaluate Brave's adblock-rust converter vs ours (coverage, scriptlets): keep ours, adopt escaped selectors and `$object` handling; see research/adblock-converter-comparison.md
 7. [x] Find in page, history, Peek, split view **L** total
 8. [x] Phase 1 motion pass on the core interactions **M**
 9. [x] Arc importer from `StorableSidebar.json` with a preview + one-click import (format documented in research/arc-sidebar-format.md; fixture in Tests) **M**

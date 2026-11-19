@@ -81,7 +81,7 @@ struct ExtensionRecoveryTests {
         try PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0)
             .write(to: plugin.appending(path: "Contents/Info.plist"))
         let signer = try Process.run(URL(fileURLWithPath: "/usr/bin/codesign"), arguments: ["--force", "--sign", "-", plugin.path])
-        signer.waitUntilExit()
+        signer.waitForExit()
         try #require(signer.terminationStatus == 0)
         let bundle = try #require(Bundle(url: plugin))
         _ = try await WKWebExtension(appExtensionBundle: bundle)

@@ -120,6 +120,61 @@ import Testing
         #expect(convert(line).count == 1)
     }
 
+    @Test(arguments: [
+        #"##.h-\[90px\]"#,
+        #"##.lg\:min-h-\[290px\]"#,
+        #"###\30 _pweumum7"#,
+        #"##.group\/ads"#,
+        ##"##.bg-\[\#f8f8f8\]"##,
+        #"##.\!min-h-\[250px\]"#,
+        #"###finbold\.com_middle"#,
+        #"##a[title="x\"y"]"#,
+    ])
+    func escapedSelectorsAreKept(line: String) {
+        #expect(convert(line).count == 1)
+    }
+
+    @Test(arguments: [
+        #"##.a\"#,
+        #"##a[title="x\"]"#,
+        #"##.a\é"#,
+    ])
+    func malformedEscapesAreSkipped(line: String) {
+        #expect(convert(line).isEmpty)
+    }
+
+    @Test func escapesSurviveJSONEncoding() throws {
+        let json = try convert(#"example.com##.h-\[90px\]"#).encodedJSON()
+        #expect(json.contains(#""selector":".h-\\[90px\\]""#))
+    }
+
+    @Test func escapedBracketDoesNotOpenAGroup() {
+        // `\[` is an escaped character, so the later `]` is unbalanced.
+        #expect(convert(#"##.a\[b]"#).isEmpty)
+        #expect(convert(#"##.a\[b\]"#).count == 1)
+    }
+
+    @Test func importantBlocksComeAfterExceptions() {
+        let rules = convert("||tracker.net/x.js$important,script\n@@||tracker.net^$script\n||other.net^$script")
+        #expect(rules.map(\.action.type) == [.block, .ignorePreviousRules, .block])
+        #expect(rules.last?.trigger.urlFilter == #"^[^:]+://+([^:/]+\.)?tracker\.net/x\.js"#)
+        #expect(rules.first?.trigger.urlFilter == #"^[^:]+://+([^:/]+\.)?other\.net[/:?=&]"#)
+    }
+
+    @Test func importantBlocksCountAgainstTheRuleCap() {
+        let output = FilterListConverter.convert("||a.com^$script,important\n||b.com^$script\n||c.com^$script", maxRules: 2)
+        #expect(output.rules.count == 2)
+        #expect(output.rules.last?.trigger.urlFilter.contains("a\\.com") == true)
+    }
+
+    @Test func objectTypeIsDroppedBesideOtherTypes() {
+        #expect(convert("||media.example^$object,script,third-party").first?.trigger.resourceType == ["script"])
+        #expect(convert("||media.example^$object,script,third-party").count == 1)
+        // Alone it would widen into every subresource, so it's skipped.
+        #expect(convert("||media.example^$object").isEmpty)
+        #expect(convert("||media.example^$object,third-party").isEmpty)
+    }
+
     @Test func commentsAndHeadersAreIgnored() {
         let output = FilterListConverter.convert("[Adblock Plus 2.0]\n! Title: x\n\n")
         #expect(output.rules.isEmpty)

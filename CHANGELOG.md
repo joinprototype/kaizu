@@ -2,7 +2,9 @@
 
 ## Unreleased
 
-Kaizu can play soft interface sounds: turn on **Settings → General → Play soft sounds**. They’re off by default. Opening, closing and pinning a tab, switching spaces, making a split and bringing up the command bar each have a short sound of paper, wood or brass, made in code rather than bundled. They play at your macOS alert volume and stay silent when **Play user interface sound effects** is off in System Settings → Sound. Holding ⌘W or swiping through several spaces plays only the first sound.
+Kaizu can play soft paper sounds: turn on **Settings → General → Play soft sounds**. They’re off by default. Opening the command bar unfolds a sheet, opening and closing tabs lays down and draws away a card, pinning presses the paper, switching spaces turns a page and splitting folds a crease. They play only for your own actions while Kaizu is in front, follow the macOS “Play user interface sound effects” setting and alert volume, and a held key or a quick run plays once.
+
+Cookie pop-up rejection now runs out of the page's reach. Kaizu loads DuckDuckGo's autoconsent library in a separate script world that pages can't see or change. Each frame receives only the rules that apply to its address, instead of the full 600 KB script and rule set. Across ten busy news and shopping sites, the pages used about 30% less CPU while loading. Memory use stayed about the same. Rejection worked as before on Cookiebot, CookieYes, Didomi, OneTrust, Sourcepoint and Usercentrics sites.
 
 Quitting Kaizu now writes every profile's cookies to disk before the app exits, and an update waits for WebKit to finish saving site data before it reopens Kaizu. Previously WebKit could still be saving after Kaizu exited, so a quick relaunch after an update could lose a recent login or draft.
 
@@ -59,6 +61,8 @@ If two update checks overlap, quitting Kaizu installs the newest build it has ve
 Choose **History → Recently Archived Tabs** to browse by day, search by page or space name, and restore a tab to its original space.
 
 Press ⌘T and type a title or part of an address to find open tabs across spaces in your current profile. Each match names its space. Selecting it takes you back to the existing tab, including tabs in collapsed folders. Archived tab suggestions are now scoped to the current profile too.
+
+Ad and cookie-banner blocking now covers 155 more hiding filters from EasyList and the Cookie List, the ones that target class names with brackets or colons such as `.h-[90px]`. A tracker block marked `$important` now stays blocked even when another filter allows it.
 
 ## 0.2.5 · November 2, 2026 · Build 10
 

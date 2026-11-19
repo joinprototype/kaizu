@@ -25,6 +25,14 @@ import Testing
             \(output.skipped) skipped, \(json.utf8.count / 1024) KB JSON, \(String(format: "%.2f", elapsed)) s
             """)
 
+        // A block rule may only reach documents inside frames, never the page itself.
+        let blocksPages = output.rules.filter { rule in
+            guard rule.action.type == .block else { return false }
+            guard let types = rule.trigger.resourceType else { return true }
+            return types.contains("document") && rule.trigger.loadContext != ["child-frame"]
+        }
+        #expect(blocksPages.isEmpty, "\(list): \(blocksPages.count) rules could block top-level pages")
+
         #expect(output.rules.count <= FilterListConverter.defaultMaxRules)
         #expect(scoped.count < 65_535)
         if list == "kaizu" {
