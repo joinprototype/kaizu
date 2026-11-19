@@ -1,3 +1,4 @@
+import DesignSystem
 import SwiftUI
 
 /// ⌃Tab: recent tabs as page thumbnails; the highlighted one opens when ⌃ is released.

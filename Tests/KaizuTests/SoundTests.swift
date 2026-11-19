@@ -1,6 +1,7 @@
 import Foundation
 import AVFoundation
 import Testing
+@testable import DesignSystem
 @testable import Kaizu
 
 @MainActor

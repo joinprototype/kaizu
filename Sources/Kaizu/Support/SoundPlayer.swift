@@ -1,5 +1,6 @@
 import AVFoundation
 import AppKit
+import DesignSystem
 
 /// Plays a `Sound` for something the user just did, if they've turned
 /// sounds on (Settings → General; off by default) and macOS plays interface

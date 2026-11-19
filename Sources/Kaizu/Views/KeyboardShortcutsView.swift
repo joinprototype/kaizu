@@ -1,4 +1,5 @@
 import AppKit
+import DesignSystem
 import SwiftUI
 
 /// Help ▸ Keyboard Shortcuts: a card of every shortcut, read when it opens

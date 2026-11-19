@@ -1,3 +1,4 @@
+import DesignSystem
 import SwiftUI
 
 /// Kaizu ▸ About Kaizu: the chart's title block, with the credits a chart

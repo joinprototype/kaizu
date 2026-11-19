@@ -15,7 +15,7 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "Kaizu",
-            dependencies: ["BrowserCore"],
+            dependencies: ["BrowserCore", "DesignSystem"],
             path: "Sources/Kaizu",
             // An AppKit app: everything is main-actor unless it says otherwise.
             swiftSettings: [.defaultIsolation(MainActor.self)],
@@ -28,7 +28,14 @@ let package = Package(
                 ]),
             ]
         ),
-        .testTarget(name: "KaizuTests", dependencies: ["Kaizu"]),
+        .testTarget(name: "KaizuTests", dependencies: ["Kaizu", "DesignSystem"]),
+        // Colours, type, motion, the chart drawings and the paper sounds.
+        // SwiftUI and AppKit only: nothing here knows about tabs or pages.
+        .target(
+            name: "DesignSystem",
+            path: "Sources/DesignSystem",
+            swiftSettings: [.defaultIsolation(MainActor.self)]
+        ),
         // Pure Swift logic with no AppKit/WebKit dependency, so it's unit-testable.
         .target(
             name: "BrowserCore",

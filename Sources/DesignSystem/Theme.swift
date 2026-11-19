@@ -5,38 +5,38 @@ import SwiftUI
 ///
 /// Profiles persist only a hue; `Theme.forHue` maps it to the nearest theme,
 /// so palettes can be retuned without migrating saved sessions.
-struct Theme: Identifiable, Equatable {
-    struct Variant: Equatable {
+public struct Theme: Identifiable, Equatable {
+    public struct Variant: Equatable {
         /// Sidebar/window backdrop, top-leading → bottom-trailing.
-        let backdrop: [Color]
-        let accent: Color
+        public let backdrop: [Color]
+        public let accent: Color
         /// Text and icons drawn on top of `accent`.
-        let onAccent: Color
+        public let onAccent: Color
     }
 
-    let id: String
-    let name: String
-    let hue: Double
+    public let id: String
+    public let name: String
+    public let hue: Double
     let light: Variant
     let dark: Variant
 
-    func variant(_ scheme: ColorScheme) -> Variant {
+    public func variant(_ scheme: ColorScheme) -> Variant {
         scheme == .dark ? dark : light
     }
 
-    func backdrop(_ scheme: ColorScheme) -> LinearGradient {
+    public func backdrop(_ scheme: ColorScheme) -> LinearGradient {
         LinearGradient(colors: variant(scheme).backdrop, startPoint: .topLeading, endPoint: .bottomTrailing)
     }
 
-    func accent(_ scheme: ColorScheme) -> Color {
+    public func accent(_ scheme: ColorScheme) -> Color {
         variant(scheme).accent
     }
 
-    func onAccent(_ scheme: ColorScheme) -> Color {
+    public func onAccent(_ scheme: ColorScheme) -> Color {
         variant(scheme).onAccent
     }
 
-    static func forHue(_ hue: Double) -> Theme {
+    public static func forHue(_ hue: Double) -> Theme {
         all.min { distance($0.hue, hue) < distance($1.hue, hue) } ?? all[0]
     }
 
@@ -49,7 +49,7 @@ struct Theme: Identifiable, Equatable {
 extension Theme {
     /// Heritage inks, drawn from the icon: deep in light mode, softened in
     /// dark mode, so the sidebar stays quiet and the page leads.
-    static let all: [Theme] = [
+    public static let all: [Theme] = [
         Theme(
             id: "claret", name: "Claret", hue: 0.94,
             light: .init(backdrop: [Color(hex: 0xF3E9E6), Color(hex: 0xE9D9D4)], accent: Color(hex: 0x7A2335), onAccent: Color(hex: 0xF7EEE9)),

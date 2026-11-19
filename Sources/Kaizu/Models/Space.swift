@@ -1,4 +1,5 @@
 import BrowserCore
+import DesignSystem
 import Foundation
 
 /// What the sidebar shows: a named, themed set of pinned items and today's

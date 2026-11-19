@@ -1,4 +1,5 @@
 import BrowserCore
+import DesignSystem
 import SwiftUI
 
 /// On an extension's Chrome Web Store or Firefox Add-ons page, whose own

@@ -1,5 +1,6 @@
 import AppKit
 import BrowserCore
+import DesignSystem
 import SwiftUI
 
 enum CommandBarMode: Equatable {

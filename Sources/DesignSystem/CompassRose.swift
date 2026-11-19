@@ -28,11 +28,15 @@ private enum Engraving {
 
 /// The rose from Kaizu's icon, with its fleur-de-lis at north: navy cardinal
 /// points, gilt half-winds, oxblood quarter-winds. Turn it with `rotationEffect`.
-struct CompassRose: View {
+public struct CompassRose: View {
     @Environment(\.colorScheme) private var scheme
     let size: CGFloat
 
-    var body: some View {
+    public init(size: CGFloat) {
+        self.size = size
+    }
+
+    public var body: some View {
         Engraving.plate("rose", size: CGSize(width: size, height: size), scheme: scheme) { RoseDrawing() }
             .frame(width: size, height: size)
     }
@@ -142,16 +146,21 @@ private struct RoseDrawing: View {
 /// point on all 32 bearings, in the chart-makers' colors: dark for the eight
 /// winds, green for the half winds, red for the quarter winds. These stay
 /// put: on a real compass it's the card that turns.
-struct RhumbWeb: View {
+public struct RhumbWeb: View {
     @Environment(\.colorScheme) private var scheme
     let size: CGSize
     let center: CGPoint
+
+    public init(size: CGSize, center: CGPoint) {
+        self.size = size
+        self.center = center
+    }
 
     /// Drawn in steps and stretched to fit: dragging the sidebar's edge goes
     /// through every size, and these lines are too faint to show the stretch.
     private static let step: CGFloat = 32
 
-    var body: some View {
+    public var body: some View {
         let plate = CGSize(
             width: (size.width / Self.step).rounded(.up) * Self.step,
             height: (size.height / Self.step).rounded(.up) * Self.step
@@ -193,11 +202,15 @@ private struct RhumbDrawing: View {
 }
 
 /// A chart's border: a firm rule with a fine one just inside it.
-struct Neatline: View {
+public struct Neatline: View {
     @Environment(\.colorScheme) private var scheme
-    var cornerRadius: CGFloat = 16
+    var cornerRadius: CGFloat
 
-    var body: some View {
+    public init(cornerRadius: CGFloat = 16) {
+        self.cornerRadius = cornerRadius
+    }
+
+    public var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 .strokeBorder(Ink.iron(scheme).opacity(0.42), lineWidth: 1)
@@ -224,19 +237,24 @@ private struct PaperCard: ViewModifier {
 }
 
 extension View {
-    func paperCard(cornerRadius: CGFloat = 16, fill: Double = 1) -> some View {
+    public func paperCard(cornerRadius: CGFloat = 16, fill: Double = 1) -> some View {
         modifier(PaperCard(cornerRadius: cornerRadius, fill: fill))
     }
 }
 
 /// A full chart's edge, inset from what it surrounds: the neatline with the
 /// graticule running inside it.
-struct ChartFrame: View {
+public struct ChartFrame: View {
     @Environment(\.colorScheme) private var scheme
     let cornerRadius: CGFloat
     let inset: CGFloat
 
-    var body: some View {
+    public init(cornerRadius: CGFloat, inset: CGFloat) {
+        self.cornerRadius = cornerRadius
+        self.inset = inset
+    }
+
+    public var body: some View {
         ZStack {
             Neatline(cornerRadius: cornerRadius)
             Graticule()

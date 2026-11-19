@@ -1,4 +1,5 @@
 import AppKit
+import DesignSystem
 import SwiftUI
 
 /// ⌃Tab switcher: hold Control and tap Tab to cycle through the space's

@@ -6,7 +6,7 @@ import Foundation
 /// nothing to bundle and nothing borrowed. Each is short, quiet and soft,
 /// swelling in rather than clicking. `SoundPlayer` decides when one plays;
 /// it's off unless the user turns it on.
-nonisolated enum Sound: String, CaseIterable, Sendable {
+public nonisolated enum Sound: String, CaseIterable, Sendable {
     /// The command bar comes up: a small hand bell on the chart table.
     case commandBar
     /// A tab opens from the command bar, or comes back with ⇧⌘T: a card laid down.
@@ -22,12 +22,12 @@ nonisolated enum Sound: String, CaseIterable, Sendable {
     /// A split made or a pane added: dividers set down, two light knocks.
     case split
 
-    static let sampleRate = 44_100.0
+    public static let sampleRate = 44_100.0
     /// Nothing runs longer than this; they're feedback, not music.
     static let longest = 0.25
 
     /// The sound as mono samples at `sampleRate`, from silence to silence.
-    func render(sampleRate rate: Double = Sound.sampleRate) -> [Float] {
+    public func render(sampleRate rate: Double = Sound.sampleRate) -> [Float] {
         switch self {
         case .commandBar:
             // A folded sheet opened out.

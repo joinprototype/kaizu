@@ -1,5 +1,6 @@
 import AppKit
 import BrowserCore
+import DesignSystem
 import SwiftUI
 
 /// Split view: up to four of a space's tabs, in rows and columns in any mix.

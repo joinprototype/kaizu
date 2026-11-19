@@ -19,35 +19,7 @@ permissions:
   contents: read
 
 jobs:
-  changes:
-    name: Check changed files
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    outputs:
-      needs_mac: ${{ steps.paths.outputs.needs_mac }}
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 2
-          persist-credentials: false
-      - id: paths
-        run: |
-          # Compare the PR's merge result with the exact base commit it was tested against.
-          base=$(git rev-parse HEAD^1)
-          if git diff --quiet --no-renames "$base" HEAD -- . ':(top,exclude,literal)README.md' ':(top,exclude,literal)CHANGELOG.md' ':(top,exclude,glob)docs/**/*.md'; then
-            # Markdown uses trailing spaces for line breaks. Keep Git's conflict-marker check.
-            git -c core.whitespace=-blank-at-eol diff --check "$base" HEAD
-            echo "Documentation-only changes passed the Git diff check."
-            echo "needs_mac=false" >> "$GITHUB_OUTPUT"
-          else
-            status=$?
-            [[ "$status" == 1 ]] || exit "$status"
-            echo "needs_mac=true" >> "$GITHUB_OUTPUT"
-          fi
-
   verify:
-    needs: changes
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.needs_mac == 'true') }}
     runs-on: xcode-27
     timeout-minutes: 20
     outputs:

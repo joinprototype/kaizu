@@ -1,4 +1,5 @@
 import BrowserCore
+import DesignSystem
 import SwiftUI
 
 /// File → Import from Arc…: what `ArcImport` plans, applied to the live store.

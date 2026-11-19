@@ -1,5 +1,6 @@
 import AppKit
 import BrowserCore
+import DesignSystem
 import SwiftUI
 
 /// Links from other apps (with Kaizu as the default browser) and the

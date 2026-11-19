@@ -1,3 +1,4 @@
+import DesignSystem
 import SwiftUI
 
 /// A pinned-section entry, rendered recursively so folders can nest.

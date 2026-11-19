@@ -1,3 +1,4 @@
+import DesignSystem
 import SwiftUI
 
 /// Window root: tinted backdrop, sidebar on the left, page card on the right.

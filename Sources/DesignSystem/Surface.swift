@@ -2,18 +2,18 @@ import SwiftUI
 
 /// Neutral, opaque surfaces for chrome that floats over web content.
 /// Never use materials over pages: the page's colors bleed through.
-enum Surface {
+public enum Surface {
     /// Command bar, toasts, popovers.
-    static func elevated(_ scheme: ColorScheme) -> Color {
+    public static func elevated(_ scheme: ColorScheme) -> Color {
         scheme == .dark ? Color(hex: 0x252428) : .white
     }
 
-    static func hairline(_ scheme: ColorScheme) -> Color {
+    public static func hairline(_ scheme: ColorScheme) -> Color {
         scheme == .dark ? .white.opacity(0.1) : .black.opacity(0.08)
     }
 
     /// Dims the window behind modal chrome.
-    static func scrim(_ scheme: ColorScheme) -> Color {
+    public static func scrim(_ scheme: ColorScheme) -> Color {
         .black.opacity(scheme == .dark ? 0.4 : 0.18)
     }
 
@@ -24,7 +24,7 @@ enum Surface {
 
     /// Paper's tooth: dark and light flecks, so it shows on any color. A
     /// tile made once, always the same.
-    static let grain: NSImage = {
+    public static let grain: NSImage = {
         let size = 192
         var seed: UInt64 = 0x4B41495A55
         func next() -> UInt64 {
@@ -51,42 +51,42 @@ enum Surface {
     }()
 
     /// Vellum, where Kaizu draws its own pages (Reader's `--paper`).
-    static func paper(_ scheme: ColorScheme) -> Color {
+    public static func paper(_ scheme: ColorScheme) -> Color {
         Color(hex: scheme == .dark ? 0x1C1A17 : 0xF4EFE3)
     }
 }
 
 /// The chart-maker's inks, from the icon's compass rose.
-enum Ink {
+public enum Ink {
     /// Iron gall: what headings are written in.
-    static func iron(_ scheme: ColorScheme) -> Color {
+    public static func iron(_ scheme: ColorScheme) -> Color {
         Color(hex: scheme == .dark ? 0xEFE6CF : 0x1C2541)
     }
 
-    static func gilt(_ scheme: ColorScheme) -> Color {
+    public static func gilt(_ scheme: ColorScheme) -> Color {
         Color(hex: scheme == .dark ? 0xD2B063 : 0x9A7A2E)
     }
 
-    static func claret(_ scheme: ColorScheme) -> Color {
+    public static func claret(_ scheme: ColorScheme) -> Color {
         Color(hex: scheme == .dark ? 0xD9A08B : 0x8C3A32)
     }
 
-    static func verdigris(_ scheme: ColorScheme) -> Color {
+    public static func verdigris(_ scheme: ColorScheme) -> Color {
         Color(hex: scheme == .dark ? 0x8FB3A0 : 0x3F6B58)
     }
 }
 
 /// Translucent fills for controls that sit on a theme backdrop.
-enum SidebarFill {
-    static func subtle(_ scheme: ColorScheme) -> Color {
+public enum SidebarFill {
+    public static func subtle(_ scheme: ColorScheme) -> Color {
         scheme == .dark ? .white.opacity(0.07) : .white.opacity(0.5)
     }
 
-    static func hover(_ scheme: ColorScheme) -> Color {
+    public static func hover(_ scheme: ColorScheme) -> Color {
         scheme == .dark ? .white.opacity(0.06) : .white.opacity(0.35)
     }
 
-    static func selected(_ scheme: ColorScheme) -> Color {
+    public static func selected(_ scheme: ColorScheme) -> Color {
         scheme == .dark ? .white.opacity(0.13) : .white.opacity(0.9)
     }
 }

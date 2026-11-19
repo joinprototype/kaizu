@@ -1,4 +1,5 @@
 import BrowserCore
+import DesignSystem
 import SwiftUI
 
 /// File → Import Browsing Data…: visited pages go to the space's profile,

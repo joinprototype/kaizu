@@ -1,4 +1,5 @@
 import BrowserCore
+import DesignSystem
 import Foundation
 
 /// The page shown when a navigation fails (DNS, offline, TLS…): open water,

@@ -1,4 +1,5 @@
 import AppKit
+import DesignSystem
 import SwiftUI
 
 /// Arc's Peek: links from favorites and pinned tabs to other sites open in a
