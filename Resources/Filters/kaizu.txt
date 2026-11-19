@@ -5,7 +5,8 @@
 !
 ! --- YouTube ---
 ! In-page ad slots. Ads inside the player are handled by
-! Resources/Scripts/youtube-ads.js, which strips them from player responses.
+! Resources/Scripts/youtube-ads.js, which strips the pre-roll from a directly
+! opened page and hides any ad that still plays.
 youtube.com##ytd-ad-slot-renderer
 youtube.com##ytd-in-feed-ad-layout-renderer
 youtube.com##ytd-promoted-sparkles-web-renderer
