@@ -84,4 +84,24 @@ final class PageWatchTests {
         #expect(await PageWatcher.text(of: "#gone", in: view, patience: .milliseconds(600)) == nil)
         #expect(await PageWatcher.text(of: "not a [selector", in: view, patience: .milliseconds(600)) == nil)
     }
+
+    /// Nobody sees the page being checked: dialogs, windows and app links
+    /// get nowhere, and the part is still read.
+    @Test func checkedPagesGetNoDialogsOrWindows() async throws {
+        _ = NSApplication.shared
+        let html = """
+            <body><b id=price>$12</b><script>
+            alert("hi"); confirm("sure?"); prompt("name?");
+            window.open("https://example.com/");
+            location.href = "zoommtg://join";
+            </script>
+            """
+        let url = try #require(URL(string: "data:text/html," + html.addingPercentEncoding(withAllowedCharacters: .alphanumerics)!))
+        let part = WatchedPart(id: UUID(), url: url, selector: "#price", title: "", profileID: UUID(), text: "$10")
+        let watcher = PageWatcher(app: nil)
+        let started = ContinuousClock.now
+        let text = await watcher.read(part, profile: Profile(name: "Temporary", isPrivate: true))
+        #expect(text == "$12")
+        #expect(ContinuousClock.now - started < .seconds(10))
+    }
 }

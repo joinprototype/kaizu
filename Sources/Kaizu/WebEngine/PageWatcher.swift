@@ -6,7 +6,7 @@ import WebKit
 /// web view of its own, out of sight, with its profile's cookies (so a
 /// signed-in price is the one you'd see) and the usual blocking. One page
 /// at a time, at most once an hour each, and never in private windows.
-final class PageWatcher: NSObject, WKNavigationDelegate {
+final class PageWatcher: NSObject, WKNavigationDelegate, WKUIDelegate {
     static let interval: TimeInterval = 60 * 60
     /// Pages that draw their content with scripts get this long to show the part.
     static let patience: Duration = .seconds(15)
@@ -18,7 +18,7 @@ final class PageWatcher: NSObject, WKNavigationDelegate {
     private var isChecking = false
     private var loaded: CheckedContinuation<Bool, Never>?
 
-    init(app: AppModel) {
+    init(app: AppModel?) {
         self.app = app
     }
 
@@ -72,9 +72,11 @@ final class PageWatcher: NSObject, WKNavigationDelegate {
         }
         let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 1280, height: 900), configuration: configuration)
         webView.navigationDelegate = self
+        webView.uiDelegate = self
         defer {
             webView.stopLoading()
             webView.navigationDelegate = nil
+            webView.uiDelegate = nil
         }
         // A page that never finishes (a stalled request) mustn't hold up the rest.
         let timeout = Task { [weak self] in
@@ -133,6 +135,49 @@ final class PageWatcher: NSObject, WKNavigationDelegate {
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         finish(false)
+    }
+
+    // Nobody's looking at this page: it gets no windows, dialogs, devices
+    // or apps, and can't leave the web.
+
+    func webView(
+        _ webView: WKWebView,
+        decidePolicyFor navigationAction: WKNavigationAction,
+        decisionHandler: @escaping @MainActor @Sendable (WKNavigationActionPolicy) -> Void
+    ) {
+        let scheme = navigationAction.request.url?.scheme?.lowercased() ?? ""
+        let allowed = !navigationAction.shouldPerformDownload && ["http", "https", "about", "blob", "data"].contains(scheme)
+        decisionHandler(allowed ? .allow : .cancel)
+    }
+
+    func webView(
+        _ webView: WKWebView,
+        createWebViewWith configuration: WKWebViewConfiguration,
+        for navigationAction: WKNavigationAction,
+        windowFeatures: WKWindowFeatures
+    ) -> WKWebView? {
+        nil
+    }
+
+    func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String,
+                 initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping @MainActor @Sendable () -> Void) {
+        completionHandler()
+    }
+
+    func webView(_ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String,
+                 initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping @MainActor @Sendable (Bool) -> Void) {
+        completionHandler(false)
+    }
+
+    func webView(_ webView: WKWebView, runJavaScriptTextInputPanelWithPrompt prompt: String, defaultText: String?,
+                 initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping @MainActor @Sendable (String?) -> Void) {
+        completionHandler(nil)
+    }
+
+    func webView(_ webView: WKWebView, requestMediaCapturePermissionFor origin: WKSecurityOrigin,
+                 initiatedByFrame frame: WKFrameInfo, type: WKMediaCaptureType,
+                 decisionHandler: @escaping @MainActor @Sendable (WKPermissionDecision) -> Void) {
+        decisionHandler(.deny)
     }
 
     private func finish(_ ok: Bool) {
