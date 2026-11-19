@@ -64,6 +64,7 @@ final class Settings {
         var searchShortcuts: [SearchShortcut]?
         var quickBarKey: QuickBarKey?
         var hiddenItems: [String: [String]] = [:]
+        var interfaceSounds = false
 
         init() {}
 
@@ -82,6 +83,7 @@ final class Settings {
             searchShortcuts = try? container.decode([SearchShortcut].self, forKey: .searchShortcuts)
             quickBarKey = try? container.decode(QuickBarKey.self, forKey: .quickBarKey)
             hiddenItems = (try? container.decode([String: [String]].self, forKey: .hiddenItems)) ?? defaults.hiddenItems
+            interfaceSounds = (try? container.decode(Bool.self, forKey: .interfaceSounds)) ?? defaults.interfaceSounds
         }
     }
 
@@ -116,9 +118,15 @@ final class Settings {
     var quickBarKey: QuickBarKey? { didSet { save() } }
     /// "Hide Distracting Items": CSS selectors hidden per site.
     var hiddenItems: [String: [String]] { didSet { save() } }
+    /// Off by default: soft sounds for opening, closing and pinning tabs,
+    /// switching spaces, splitting and the command bar (see `Sound`).
+    var interfaceSounds: Bool { didSet { save() } }
 
-    init() {
-        let stored = UserDefaults.standard.data(forKey: Self.key)
+    @ObservationIgnored private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        let stored = defaults.data(forKey: Self.key)
             .flatMap { try? JSONDecoder().decode(Snapshot.self, from: $0) } ?? Snapshot()
         searchEngine = stored.searchEngine
         externalLinks = stored.externalLinks
@@ -131,6 +139,7 @@ final class Settings {
         searchShortcuts = stored.searchShortcuts ?? SearchShortcut.builtIn
         quickBarKey = stored.quickBarKey
         hiddenItems = stored.hiddenItems
+        interfaceSounds = stored.interfaceSounds
     }
 
     private func save() {
@@ -146,7 +155,8 @@ final class Settings {
         snapshot.searchShortcuts = searchShortcuts == SearchShortcut.builtIn ? nil : searchShortcuts
         snapshot.quickBarKey = quickBarKey
         snapshot.hiddenItems = hiddenItems
-        UserDefaults.standard.set(try? JSONEncoder().encode(snapshot), forKey: Self.key)
+        snapshot.interfaceSounds = interfaceSounds
+        defaults.set(try? JSONEncoder().encode(snapshot), forKey: Self.key)
     }
 }
 
