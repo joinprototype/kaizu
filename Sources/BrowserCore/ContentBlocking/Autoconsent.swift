@@ -34,7 +34,7 @@ public enum Autoconsent {
         }
     }
 
-    /// The library's settings. As in v1 (its standalone build) apart from
+    /// The library's settings. As in its standalone build apart from
     /// `isMainWorld`, which sends page-state checks to the app, and logging.
     public static let configJSON = """
         {"enabled":true,"autoAction":"optOut","disabledCmps":[],"enablePrehide":true,"enableCosmeticRules":true,\
