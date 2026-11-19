@@ -7,7 +7,7 @@ import Testing
         FilterListConverter.convert(text).rules
     }
 
-    private let subresources = ["font", "image", "media", "raw", "script", "style-sheet", "svg-document"]
+    private let subresources = ["fetch", "font", "image", "media", "other", "script", "style-sheet", "svg-document", "websocket"]
 
     @Test func domainAnchorBlocksSubresourcesAndFrames() {
         let rules = convert("||ads.example.com^")
@@ -36,9 +36,18 @@ import Testing
         ])
     }
 
+    @Test func trackingRequestsUseDistinctWebKitTypes() {
+        #expect(convert("/_blazor/*$ping").first?.trigger.resourceType == ["other"])
+        #expect(convert("/api/collect|$ping,xmlhttprequest").first?.trigger.resourceType == ["fetch", "other"])
+        #expect(convert("@@||chat.example.com/ws/$websocket").first?.trigger.resourceType == ["websocket"])
+        let exceptXHR = convert("||metrics.example.com^$~xhr").first?.trigger.resourceType
+        #expect(exceptXHR == subresources.filter { $0 != "fetch" })
+        #expect(convert("||metrics.example.com^$xhr,websocket,~websocket").first?.trigger.resourceType == ["fetch"])
+    }
+
     @Test func excludedTypesAreSubtracted() {
         let rule = convert("||tracker.net^$~image,~subdocument").first
-        #expect(rule?.trigger.resourceType == ["font", "media", "raw", "script", "style-sheet", "svg-document"])
+        #expect(rule?.trigger.resourceType == ["fetch", "font", "media", "other", "script", "style-sheet", "svg-document", "websocket"])
         #expect(convert("||tracker.net^$~image,~subdocument").count == 1)
     }
 

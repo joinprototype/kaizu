@@ -15,7 +15,7 @@ public enum FilterListConverter {
     }
 
     /// Bump when conversion output changes, so cached compiled lists are rebuilt.
-    public static let version = 2
+    public static let version = 3
 
     /// WebKit compiles far larger lists, but Safari caps content blockers at
     /// 150k rules and compile time grows with size.
@@ -302,16 +302,16 @@ private extension CharacterSet {
 // MARK: - Network filters
 
 private enum NetworkFilter {
-    /// WebKit resource types per filter option. XHR/fetch/WebSocket/ping are
-    /// all "raw" in WebKit's oldest, universally supported vocabulary.
+    /// WebKit classifies XHR as fetch. Its "other" group covers both link pings
+    /// and sendBeacon, along with miscellaneous loads such as manifest requests.
     static let typeMap: [String: String] = [
         "script": "script", "image": "image", "stylesheet": "style-sheet", "css": "style-sheet",
-        "font": "font", "media": "media", "xmlhttprequest": "raw", "xhr": "raw",
-        "websocket": "raw", "ping": "raw", "other": "raw",
+        "font": "font", "media": "media", "xmlhttprequest": "fetch", "xhr": "fetch",
+        "websocket": "websocket", "ping": "other", "other": "other",
     ]
     /// Everything except documents, so an untyped filter never blocks a page
     /// the user navigates to (subframe documents get their own rule).
-    static let subresourceTypes = ["font", "image", "media", "raw", "script", "style-sheet", "svg-document"]
+    static let subresourceTypes = ["fetch", "font", "image", "media", "other", "script", "style-sheet", "svg-document", "websocket"]
 
     struct Options {
         var loadType: [String]?
@@ -395,7 +395,7 @@ private enum NetworkFilter {
 
         var subresource: [String]
         if !options.types.isEmpty {
-            subresource = options.types.sorted()
+            subresource = options.types.subtracting(options.excludedTypes).sorted()
         } else if !options.excludedTypes.isEmpty {
             subresource = subresourceTypes.filter { !options.excludedTypes.contains($0) }
         } else {
