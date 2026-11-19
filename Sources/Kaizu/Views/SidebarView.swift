@@ -90,7 +90,7 @@ private struct SidebarChart: View {
     var body: some View {
         GeometryReader { geometry in
             // The rose turns to any bearing, so it must fit whole in a circle this wide.
-            let side = max(0, min(geometry.size.width - Self.margin * 2, 240))
+            let side = max(0, min(geometry.size.width - Self.margin * 2, 160))
             let center = CGPoint(x: geometry.size.width / 2, y: geometry.size.height - Self.footer - side / 2)
             ZStack {
                 RhumbWeb(size: geometry.size, center: center)
@@ -117,7 +117,7 @@ private struct TurningRose: View {
         let swipe = Double(store.spaceSwipeOffset / max(store.sidebarWidth, 1))
         CompassRose(size: Self.size)
             // An empty page has its own rose.
-            .opacity(store.selectedTab == nil ? 0 : 0.22)
+            .opacity(store.selectedTab == nil ? 0 : 0.16)
             .animation(Motion.hover, value: store.selectedTab == nil)
             .rotationEffect(.degrees((Double(index) - swipe) * Self.turn))
     }
