@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+On a Force Touch trackpad, Kaizu taps lightly when a drag lands somewhere: a tab reaching a gap in the sidebar or a new place in a split, and a split divider reaching the point where its two panes are the same size, where it now also holds for a moment.
+
 Hold ⌘ for a moment and the sidebar shows which tab each of ⌘1–9 goes to: the first eight visible tabs, from Favorites down, and ⌘9 for the last. The numbers go away when you let go, press a key or click.
 
 VoiceOver can use the sidebar. Tabs, folders, favorites and New Tab read as buttons by name, say which one is selected, and open with VoiceOver's press; a tab's Close and Mute, which only show on hover, are in VoiceOver's actions (VO-⌘-Space), and folders say whether they're expanded. Icon buttons (Back, Reload, Copy Link, the shield, the space switcher, Remove in Settings, Show in Finder) are read by name instead of by icon, without their keyboard shortcut.

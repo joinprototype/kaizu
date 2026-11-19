@@ -242,6 +242,20 @@ extension SplitNode {
         }
     }
 
+    /// How far `divider` would move for the panes either side of it to be
+    /// the same size: where dragging it stops for a moment.
+    public func distanceToEvenPair(_ divider: Divider) -> Double? {
+        guard let children = children(at: divider.path[...]), divider.index + 1 < children.count else { return nil }
+        let pair = children[divider.index].share + children[divider.index + 1].share
+        return (pair / 2 - children[divider.index].share) * divider.length
+    }
+
+    private func children(at path: ArraySlice<Int>) -> [SplitChild]? {
+        guard case .group(_, let children) = self else { return nil }
+        guard let index = path.first else { return children }
+        return children.indices.contains(index) ? children[index].node.children(at: path.dropFirst()) : nil
+    }
+
     /// With `divider`'s group evened out; groups inside it keep their own shares.
     public func evened(_ divider: Divider) -> SplitNode {
         changingGroup(at: divider.path[...]) { children in

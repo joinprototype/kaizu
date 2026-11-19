@@ -207,6 +207,9 @@ private struct TabDropTarget: ViewModifier {
             guard let tab = drags.first.flatMap(store.tab) else { return false }
             store.move(tab, to: destination)
             return true
-        } isTargeted: { isTargeted = $0 }
+        } isTargeted: {
+            if $0, !isTargeted { Haptics.tick() }
+            isTargeted = $0
+        }
     }
 }
