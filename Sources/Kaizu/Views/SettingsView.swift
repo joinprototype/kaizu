@@ -68,6 +68,23 @@ private struct GeneralSettings: View {
                 FooterText("The video floats over everything while you browse other tabs, and goes back into its page when you return.")
             }
             Section {
+                Toggle("Play soft sounds", isOn: $settings.interfaceSounds)
+                    .onChange(of: settings.interfaceSounds) { _, isOn in
+                        if isOn {
+                            store.sounds.play(.pin)
+                            store.sounds.prepare()
+                        } else {
+                            store.sounds.unload()
+                        }
+                    }
+            } footer: {
+                if settings.interfaceSounds, !SoundPlayer.System.live.allowsInterfaceSounds() {
+                    FooterText("“Play user interface sound effects” is off in System Settings → Sound, so Kaizu stays quiet too.")
+                } else {
+                    FooterText("Paper, wood and a little brass: when you open, close or pin a tab, switch spaces, split, or bring up the command bar. They play at your alert volume and follow macOS’s interface sound setting.")
+                }
+            }
+            Section {
                 Picker("Quick search from any app", selection: $settings.quickBarKey) {
                     Text("Off").tag(Settings.QuickBarKey?.none)
                     ForEach(Settings.QuickBarKey.allCases, id: \.self) { Text($0.title).tag(Optional($0)) }

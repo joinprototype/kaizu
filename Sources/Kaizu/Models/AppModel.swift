@@ -26,6 +26,7 @@ final class AppModel {
     let contentBlocker = ContentBlocker()
     let extensions = ExtensionHost()
     let history = try? HistoryStore(fileURL: AppPaths.support.appending(path: "history.sqlite"))
+    @ObservationIgnored private(set) lazy var sounds = SoundPlayer(settings: settings)
 
     @ObservationIgnored var closedTabs: [ClosedTab] = []
     @ObservationIgnored var littleWindows: [LittleWindowController] = []
@@ -55,6 +56,7 @@ final class AppModel {
         }
         restore(session)
         loadChoices()
+        sounds.prepare()
         startArchiving()
         startHibernating()
         startMediaMonitoring()

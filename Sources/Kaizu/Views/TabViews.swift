@@ -74,7 +74,7 @@ struct TabRow: View {
                 RowAction(systemName: "rectangle.split.2x1", help: "Open in Split View (⌃⇧=)") { store.addToSplit(tab) }
             }
             if isHovering {
-                RowAction(systemName: "xmark", help: "Close Tab (⌘W)", weight: .bold) { store.close(tab) }
+                RowAction(systemName: "xmark", help: "Close Tab (⌘W)", weight: .bold) { store.userClose(tab) }
             }
         }
         .sidebarRow(depth: depth, isSelected: isSelected, isHovering: isHovering)
@@ -289,7 +289,7 @@ private struct TabContextMenu: View {
             Button("Move to New Window") { store.moveToNewWindow(tab) }
         }
         Divider()
-        Button(isToday ? "Close Tab" : "Reset Tab") { store.close(tab) }
+        Button(isToday ? "Close Tab" : "Reset Tab") { store.userClose(tab) }
     }
 }
 

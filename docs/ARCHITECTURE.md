@@ -181,6 +181,12 @@ struct Command: Identifiable {
   is redrawn whenever anything in the window animates.
 - `Motion`: named springs (`.snap` for chrome, `.pop` for small moments of delight,
   `.glide` for layout) plus Reduce Motion handling in one place.
+- `Sound`: the interface sounds, synthesized from struck tones and filtered
+  noise with nothing bundled. `Support/SoundPlayer` checks the setting (off
+  by default) and macOS's interface-sound setting, and drops repeats.
+  `SoundEngine` plays the sounds on its own queue with one `AVAudioEngine`,
+  which stops when idle. Sounds are only for user actions, never for events
+  a page can repeat.
 - `Metrics`: radii, spacing, sidebar dimensions.
 
 ## Testing & dev loop
