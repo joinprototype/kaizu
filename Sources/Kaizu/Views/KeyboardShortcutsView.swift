@@ -1,8 +1,9 @@
 import AppKit
 import SwiftUI
 
-/// Help ▸ Keyboard Shortcuts: a card of every shortcut, read from the menus
-/// when it opens, so it can't fall out of date.
+/// Help ▸ Keyboard Shortcuts: a card of every shortcut, read when it opens
+/// from the menu bar `CommandRegistry` builds (so AppKit's own items, such
+/// as Emoji & Symbols, show too), so it can't fall out of date.
 struct KeyboardShortcutsView: View {
     @Environment(\.colorScheme) private var scheme
 
@@ -22,8 +23,8 @@ struct KeyboardShortcutsView: View {
         guard let menu = item.submenu else { return nil }
         menu.delegate?.menuNeedsUpdate?(menu)
         let shortcuts = menu.items.compactMap { entry -> Shortcut? in
-            guard !entry.isHidden, let keys = BrowserStore.shortcut(of: entry) else { return nil }
-            return Shortcut(name: entry.title.replacingOccurrences(of: "…", with: ""), keys: keys)
+            guard !entry.isHidden, let keys = entry.shortcutLabel else { return nil }
+            return Shortcut(name: (entry.ownCommand?.title ?? entry.title).replacingOccurrences(of: "…", with: ""), keys: keys)
         }
         return shortcuts.isEmpty ? nil : Group(title: menu.title, shortcuts: shortcuts)
     }

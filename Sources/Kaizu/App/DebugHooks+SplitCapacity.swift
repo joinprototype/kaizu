@@ -19,7 +19,7 @@ extension DebugHooks {
         let selected = store.selectedTab
         require(space.splitTabs.count == 4 && selected === tabs[3], "Expected a full mixed split")
         guard let menuItem = NSApp.mainMenu?.item(withTitle: "View")?.submenu?
-            .item(withTitle: "Split with Recent Tab") as? ActionMenuItem else { require(false, "Missing View menu command"); return }
+            .item(withTitle: "Split with Recent Tab") as? CommandMenuItem else { require(false, "Missing View menu command"); return }
         require(!menuItem.validateMenuItem(menuItem) && !store.paletteCommands.contains { $0.id == "tab.split" },
                 "Full split still offers the recent-tab action")
         store.splitWithRecentTab()

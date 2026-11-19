@@ -125,20 +125,38 @@ WindowModel (one per window; today's `BrowserStore`)
   `stores` (session, history sweeps, Spotlight, extensions) never sees it.
   Links from other apps, Spotlight and Settings use `regularFront`.
 
-## Proposed command registry
+## Command registry
+
+`App/CommandRegistry.swift` declares the main menu as data: `MenuSpec`s of
+`MenuEntry` (a `Command`, a separator or a submenu), in menu order.
 
 ```swift
 struct Command: Identifiable {
-    let id: CommandID            // "tab.close", "space.next", "sidebar.toggle"
+    let id: String               // "file.newTab", "view.reader"
     let title: String
-    let shortcut: KeyboardShortcut?
-    let isAvailable: (CommandContext) -> Bool
-    let perform: (CommandContext) -> Void
+    let key: Key?                // character + modifiers; nil for none
+    let isHidden: Bool           // hidden, shortcut still works (⌘1…⌘9)
+    let action: Action           // .run { app in … } or .send(#selector(…))
+    let isEnabled: (@MainActor (AppModel) -> Bool)?
+    let isOn: (@MainActor (AppModel) -> Bool)?   // checkmark
 }
 ```
 
-`MainMenu` is generated from the registry, the command bar searches it
-("Copy URL", "New Space"…), and shortcuts can become user-remappable later.
+- `MainMenu.make(app:)` builds the menu bar from it. `.run` commands become
+  `CommandMenuItem`s, which validate through `isEnabled`/`isOn`. `.send`
+  commands (Undo, Copy, Hide, Minimize, Enter Full Screen…) stay plain items
+  that the responder chain answers and validates, as AppKit expects.
+- A menu that follows the model is `.dynamic`: Spaces is rebuilt from
+  `CommandRegistry.spaceEntries` each time it opens (a `DynamicMenu`).
+- The command bar's menu results and the Keyboard Shortcuts card walk the
+  built menu bar and take each of our items from its `Command`. Items that
+  AppKit owns (the `.send` ones, which it may retitle or rekey, and those it
+  inserts: Close All, AutoFill, Start Dictation, Emoji & Symbols, the window
+  list) are read as they stand. Menu results keep their `menu.<path>` ids,
+  which is what learned picks are stored under.
+- The command bar's own curated commands (`paletteCommands`: state-dependent
+  titles, symbols, keywords) take their shortcut hints from the registry.
+- Shortcuts can become user-remappable later.
 
 ## Persistence
 
@@ -205,7 +223,8 @@ struct Command: Identifiable {
 | Shared state | `Models/AppModel.swift` + `AppModel+Persistence/Archive/Hibernation/Choices/Spotlight/QuickBar/DataImport.swift` |
 | A window's state and actions | `Models/BrowserStore.swift` + `BrowserStore+Tabs/Spaces/Split/Recents/Find/Peek/Reader/External/Privacy/Commands.swift`, `App/BrowserWindowController.swift` |
 | A tab and its web view | `Models/BrowserTab.swift` (navigation delegate, mute, picture in picture), `BrowserTab+UIDelegate.swift` (dialogs, popups, permissions), `WebEngine/MediaEvents.swift` |
-| Command bar | `Views/CommandBar.swift`, `Views/KeyTextField.swift` (inline completion); answers in `BrowserCore/QuickAnswer.swift`, `CurrencyConversion.swift`, `TimeZoneAnswer.swift`, `SearchShortcut.swift`, `InlineCompletion.swift`; command registry in `BrowserStore+Commands.swift` |
+| Command bar | `Views/CommandBar.swift`, `Views/KeyTextField.swift` (inline completion); answers in `BrowserCore/QuickAnswer.swift`, `CurrencyConversion.swift`, `TimeZoneAnswer.swift`, `SearchShortcut.swift`, `InlineCompletion.swift`; commands it offers in `BrowserStore+Commands.swift` |
+| Menus and commands | `App/Command.swift` (`Command`, `MenuSpec`), `App/CommandRegistry.swift` (every main-menu command), `App/MainMenu.swift` (builds the menu bar) |
 | Privacy | `WebEngine/ContentBlocker.swift` (rule lists, page scripts, per-site pause), `AutoconsentBridge.swift` with `BrowserCore/ContentBlocking/Autoconsent.swift` (cookie pop-ups: per-frame rules, page-state checks by snippet id), `RuleListCompiler.swift` (compiles in a short-lived copy of the app, started with `--compile-rule-list`), `FilterListUpdater.swift`, `BrowserCore/ContentBlocking/`, `TrackingParameters.swift` |
 | Extensions | `WebEngine/ExtensionHost.swift`, `ExtensionAdapters.swift`, `Views/ExtensionViews.swift` |
 | Page right-click menu | `WebEngine/PageContextMenu.swift`: `PageWebView` edits WebKit's menu as it opens. Its item identifiers aren't public, so an item WebKit renames just stays as it was. Link destinations fire WebKit's own item, which knows the link, and `createWebViewWith` routes it. |
@@ -233,7 +252,8 @@ The core library and per-window model are in place. Remaining work can be split 
 2. Extract `DesignSystem` target (no deps, easy win).
 3. Extract `WebEngine`: split `BrowserTab` into `Tab` + `PageController`.
 4. Extract `BrowserCore` models + `Storage`; add `schemaVersion`.
-5. Introduce `Command`s and generate menus from them. (`AppModel` split off
-   for multiple windows; `BrowserStore` is the window model, name unchanged.)
+5. ~~Introduce `Command`s and generate menus from them.~~ Done: see Command
+   registry. (`AppModel` split off for multiple windows; `BrowserStore` is the
+   window model, name unchanged.)
 6. ~~Session v2: Profile/Space split with migration.~~ Done: records and the
    v1→v2 migration live in `BrowserCore/Session` with tests.
