@@ -75,7 +75,7 @@ extension DebugHooks {
         await check("private resume preserves the regular pause", regular, hidden: false)
         await check("private resume protects the selected site", one, hidden: true)
         await check("the other window inherits the regular pause", two, hidden: false)
-        let persisted = Set(UserDefaults.standard.stringArray(forKey: "blockingPausedSites") ?? [])
+        let persisted = Set(AppDefaults.shared.stringArray(forKey: "blockingPausedSites") ?? [])
         precondition(persisted == previousPauses.union(["example.test"]))
         toggle(parent, regular)
         for tab in tabs { await check("removing the regular pause", tab, hidden: true) }

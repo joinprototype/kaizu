@@ -71,12 +71,12 @@ extension DebugHooks {
             await blocker.refreshLists()
             check("nothing changes while the check isn't due", await stored() == before)
 
-            UserDefaults.standard.set(0.0, forKey: lastCheckKey)
+            AppDefaults.shared.set(0.0, forKey: lastCheckKey)
             let started = ContinuousClock.now
             await blocker.refreshLists()
             let after = await stored()
             FileHandle.standardError.write(Data("QA listrefresh refreshed in \(started.duration(to: .now))\n".utf8))
-            check("the check is recorded", UserDefaults.standard.double(forKey: lastCheckKey) > 0)
+            check("the check is recorded", AppDefaults.shared.double(forKey: lastCheckKey) > 0)
             check("lists changed", after != before)
             check("a list that didn't change kept its copy", after.contains { $0.hasPrefix("kaizu-") && before.contains($0) })
             for name in ContentBlocker.listNames {

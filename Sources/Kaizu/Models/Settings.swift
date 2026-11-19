@@ -124,7 +124,7 @@ final class Settings {
 
     @ObservationIgnored private let defaults: UserDefaults
 
-    init(defaults: UserDefaults = .standard) {
+    init(defaults: UserDefaults = AppDefaults.shared) {
         self.defaults = defaults
         let stored = defaults.data(forKey: Self.key)
             .flatMap { try? JSONDecoder().decode(Snapshot.self, from: $0) } ?? Snapshot()
