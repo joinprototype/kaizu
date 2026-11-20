@@ -36,7 +36,8 @@ extension DebugHooks {
                 return values?.contains("kaizu-qa") == true && values?.contains("not-a-real-password") == true
             }
             check("the page's fields hold the login", filled)
-            check("the picker closed", !fill.isPickerShown)
+            // Closing animates: the popover says it's shown until it's gone.
+            check("the picker closed", await until(2) { !fill.isPickerShown })
             NSApp.terminate(nil)
         }
     }
