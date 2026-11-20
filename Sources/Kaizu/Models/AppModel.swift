@@ -52,7 +52,7 @@ final class AppModel {
     private weak var lastRegularStore: BrowserStore?
 
     init(session: SessionFiles.Opened?) {
-        contentBlocker.standardScripts = [MediaEvents.script] + SiteNotifications.scripts
+        contentBlocker.standardScripts = [MediaEvents.script] + SiteNotifications.scripts + [PasswordFill.script].compactMap { $0 }
         contentBlocker.start()
         extensions.app = self
         Task {

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+Kaizu can fill logins from Apple’s Passwords app. Click into a login field and press the key at its right end, or choose **Edit → Fill from Passwords…** (⌥⌘\\). In the picker, choose **Passwords…**, unlock with Touch ID and pick a login: Kaizu fills it into the page and forgets it. Kaizu never reads your saved passwords; macOS hands over only the login you pick. A login goes only to the site it was picked on. On sign-ins that ask for the username first, the password waits up to two minutes for that site’s password page. The key appears on fields in the page itself, not in embedded frames, where the menu command works instead.
+
 In the command bar, ⌘↩ opens the chosen page in a background tab and ⌥↩ opens it beside the current page in a split. The hints at the bottom of the bar show them while a page is selected.
 
 On a Force Touch trackpad, Kaizu taps lightly when a drag lands somewhere: a tab reaching a gap in the sidebar or a new place in a split, and a split divider reaching the point where its two panes are the same size, where it now also holds for a moment.

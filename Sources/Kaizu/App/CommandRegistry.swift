@@ -99,6 +99,10 @@ enum CommandRegistry {
         .command(Command("edit.delete", "Delete", send: #selector(NSText.delete(_:)))),
         .command(Command("edit.selectAll", "Select All", key: "a", send: #selector(NSText.selectAll(_:)))),
         .separator,
+        .command(Command("edit.fillFromPasswords", "Fill from Passwords…", key: "\\", modifiers: [.command, .option]) {
+            $0.front.commandTab?.passwordFill?.openFromMenu()
+        }),
+        .separator,
         .submenu(spellingMenu),
         .separator,
         .command(Command("edit.find", "Find…", key: "f") { if inMainWindow($0) { $0.front.showFindBar() } }),

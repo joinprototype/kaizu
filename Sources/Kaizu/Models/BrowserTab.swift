@@ -33,6 +33,8 @@ final class BrowserTab: NSObject, Identifiable {
     /// Last time the tab was in front; today tabs left alone get archived.
     @ObservationIgnored var lastActiveAt: Date?
     @ObservationIgnored weak var app: AppModel?
+    /// Fills logins from the Passwords app; nil on extension pages.
+    @ObservationIgnored var passwordFill: PasswordFill?
     /// The window showing this tab, or the one it belongs to while it's off
     /// screen. Never simply the one in front: a private page's popup could
     /// land outside its window, with its cookies and into the session.
@@ -155,6 +157,7 @@ final class BrowserTab: NSObject, Identifiable {
                 MediaEvents.install(on: controller, for: self)
                 HiddenItems.install(on: controller, for: self)
                 SiteNotifications.install(on: controller, for: self)
+                passwordFill = PasswordFill.install(on: controller, for: self)
             }
             contentController = controller
         }
