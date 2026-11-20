@@ -11,7 +11,7 @@ import WebKit
 /// the web view itself has focus, so it can never take the keyboard from
 /// the address bar or another field the user is typing in. In full screen
 /// it leaves the ad to youtube-ads.js, which runs it through quickly.
-final class YouTubeSkip: NSObject, WKScriptMessageHandler {
+package final class YouTubeSkip: NSObject, WKScriptMessageHandler {
     static let handlerName = "kaizuYouTubeSkip"
     static var world: WKContentWorld { .defaultClient }
 
@@ -40,7 +40,7 @@ final class YouTubeSkip: NSObject, WKScriptMessageHandler {
         host == "youtube.com" || host.hasSuffix(".youtube.com")
     }
 
-    func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+    package func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
         let origin = message.frameInfo.securityOrigin
         guard message.frameInfo.isMainFrame, origin.protocol == "https", Self.isYouTube(origin.host),
               let webView = message.webView, let window = webView.window,

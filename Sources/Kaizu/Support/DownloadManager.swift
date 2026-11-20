@@ -1,4 +1,5 @@
 import AppKit
+import Storage
 import WebKit
 
 /// Saves every download straight to ~/Downloads (no prompt, like Safari's

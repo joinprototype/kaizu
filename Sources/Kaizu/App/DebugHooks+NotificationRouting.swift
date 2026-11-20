@@ -1,5 +1,6 @@
 #if DEBUG
 import AppKit
+import Storage
 import WebKit
 
 extension DebugHooks {

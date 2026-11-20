@@ -1,11 +1,12 @@
 import DesignSystem
 import Foundation
 import OSLog
+import Storage
 
 /// Keeps filter lists fresh: the app ships snapshots, and once a day we fetch
 /// newer copies into Application Support. List authors expect updates every
 /// few days ("! Expires: 4 days").
-enum FilterListUpdater {
+package enum FilterListUpdater {
     static let sources: [String: URL] = [
         "easylist": URL(string: "https://easylist.to/easylist/easylist.txt")!,
         "easyprivacy": URL(string: "https://easylist.to/easylist/easyprivacy.txt")!,
@@ -32,7 +33,7 @@ enum FilterListUpdater {
     }
 
     /// When the newest list in use last changed, for reports.
-    static var lastChanged: Date? {
+    package static var lastChanged: Date? {
         sources.keys
             .flatMap { name in
                 [directory.appending(path: "\(name).txt"), BundledResource.url(named: name, extension: "txt", in: "Filters")]

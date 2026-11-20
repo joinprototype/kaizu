@@ -1,5 +1,6 @@
 #if DEBUG
 import AppKit
+import WebEngine
 import WebKit
 
 extension DebugHooks {

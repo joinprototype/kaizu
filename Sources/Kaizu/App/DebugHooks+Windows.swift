@@ -2,6 +2,7 @@
 import AppKit
 import BrowserCore
 import DesignSystem
+import Storage
 import WebKit
 
 extension DebugHooks {

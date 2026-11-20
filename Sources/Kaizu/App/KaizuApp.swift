@@ -1,5 +1,7 @@
 import AppKit
 import BrowserCore
+import Storage
+import WebEngine
 
 @main
 enum KaizuApp {

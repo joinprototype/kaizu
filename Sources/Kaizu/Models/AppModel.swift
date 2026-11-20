@@ -1,6 +1,8 @@
 import AppKit
 import BrowserCore
 import Foundation
+import Storage
+import WebEngine
 
 /// What every window shares: profiles, spaces and their tabs, the archive
 /// and the services behind them. What differs between windows (which space

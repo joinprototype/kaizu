@@ -1,4 +1,5 @@
 import AppKit
+import WebEngine
 
 /// Help → Report a Bug: what the user wrote plus, if they agree, diagnostics,
 /// zipped in a temporary folder and attached to a Mail draft. Nothing leaves

@@ -237,7 +237,7 @@ Make the codebase ready to grow (details in [ARCHITECTURE.md](ARCHITECTURE.md)).
 - [x] GitHub Actions runs Swift tests, builds the release app and verifies its bundle on Xcode 27
 - [ ] Agree on formatting rules before enabling a lint check
 - [x] `Tests/` with Swift Testing: filter conversion, sessions, history, URL input, quick answers, completion (53 tests) **S**
-- [ ] Split into modules: DesignSystem → WebEngine → BrowserCore + Storage **M**
+- [ ] Split into modules: DesignSystem → WebEngine → BrowserCore + Storage **M**. Started Nov 19: `Storage` (paths, preferences, log) and `WebEngine` (content blocking, user agent) are their own targets; tabs, extensions and notifications still live in the app
 - [x] `AppModel` (what windows share) + one `BrowserStore` per window **M**
 - [x] `Command` registry drives menus **S**
 - [x] Session `schemaVersion` + migrator; Profile/Space split (v2) **M**

@@ -1,5 +1,6 @@
 import AppKit
 @preconcurrency import UserNotifications
+import WebEngine
 import WebKit
 
 /// Checks watched parts of pages (see `PageWatches`): each page loads in a

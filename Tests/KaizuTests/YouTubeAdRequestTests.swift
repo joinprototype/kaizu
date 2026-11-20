@@ -1,6 +1,7 @@
-import Testing
-import WebKit
 @testable import Kaizu
+import Testing
+@testable import WebEngine
+import WebKit
 
 /// youtube-ads.js asks YouTube for in-page videos without an ad by adding
 /// two fields to the player request's `params`. Run against the real script

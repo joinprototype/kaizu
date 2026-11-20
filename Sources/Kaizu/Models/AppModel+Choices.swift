@@ -1,5 +1,6 @@
 import BrowserCore
 import Foundation
+import Storage
 
 /// The command bar learning what you pick (see ChoiceMemory), per profile,
 /// kept in Choices.json next to the session. Clear History forgets it.

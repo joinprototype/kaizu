@@ -1,6 +1,7 @@
 import BrowserCore
 import DesignSystem
 import OSLog
+import Storage
 import WebKit
 
 /// Rejects cookie pop-ups with DuckDuckGo's autoconsent, the way DuckDuckGo's
@@ -13,10 +14,10 @@ import WebKit
 /// can apply to its address (`Autoconsent.Rules`). Checks that must read the
 /// page's own globals are run here, in the page's world, by snippet id only:
 /// see `Autoconsent.Snippets` for the trust boundary.
-final class AutoconsentBridge: NSObject, WKScriptMessageHandlerWithReply {
+package final class AutoconsentBridge: NSObject, WKScriptMessageHandlerWithReply {
     static let handlerName = "kaizuAutoconsent"
     /// Where the script runs, and where debug builds read what it did.
-    static var world: WKContentWorld { .defaultClient }
+    package static var world: WKContentWorld { .defaultClient }
 
     /// Runs in every frame: many consent pop-ups live in iframes.
     static let script: WKUserScript? = {
@@ -34,10 +35,10 @@ final class AutoconsentBridge: NSObject, WKScriptMessageHandlerWithReply {
 
     #if DEBUG
     /// What frames were sent, for QA hooks.
-    static var framesServed = 0
-    static var mainFramesServed = 0
-    static var bytesServed = 0
-    static var evaluations = 0
+    package static var framesServed = 0
+    package static var mainFramesServed = 0
+    package static var bytesServed = 0
+    package static var evaluations = 0
     #endif
 
     private nonisolated static func load<T>(_ name: String, _ parse: (Data) throws -> T) -> T? {
@@ -67,7 +68,7 @@ final class AutoconsentBridge: NSObject, WKScriptMessageHandlerWithReply {
         controller.addScriptMessageHandler(shared, contentWorld: world, name: handlerName)
     }
 
-    func userContentController(
+    package func userContentController(
         _ controller: WKUserContentController,
         didReceive message: WKScriptMessage,
         replyHandler: @escaping @MainActor @Sendable (Any?, String?) -> Void
