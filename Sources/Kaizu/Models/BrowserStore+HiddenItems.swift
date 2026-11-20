@@ -1,6 +1,7 @@
 import AppKit
 import DesignSystem
 import SwiftUI
+import WebEngine
 
 /// "Hide Distracting Items" (see HiddenItems): pick parts of the page in
 /// front to hide them on that site from now on.

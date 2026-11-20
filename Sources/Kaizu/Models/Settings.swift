@@ -1,6 +1,7 @@
 import BrowserCore
 import Foundation
 import Storage
+import WebEngine
 
 /// User preferences, persisted as one JSON value in UserDefaults.
 @Observable

@@ -1,5 +1,6 @@
 import BrowserCore
 import SwiftUI
+import WebEngine
 
 /// Safari's "Settings for this website", from the address pill's lock:
 /// everything Kaizu remembers about the site in one place.

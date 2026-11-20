@@ -3,6 +3,7 @@ import BrowserCore
 import CoreSpotlight
 import DesignSystem
 import Storage
+import WebEngine
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let app: AppModel
