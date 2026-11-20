@@ -1,6 +1,7 @@
 #if DEBUG
 import AppKit
 import SwiftUI
+import WebEngine
 import WebKit
 
 extension DebugHooks {

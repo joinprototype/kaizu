@@ -6,45 +6,39 @@ import WebKit
 /// scripts and their message handler live in their own content world, so
 /// pages can't call them; the style sheet itself is in the page's DOM,
 /// where a page could find it, like any page change an extension makes.
-final class HiddenItems: NSObject, WKScriptMessageHandler {
+package final class HiddenItems: NSObject, WKScriptMessageHandler {
     /// The same picker also chooses a part of the page to watch.
-    enum Purpose: String {
+    package enum Purpose: String {
         case hide, watch
     }
 
-    static let world = WKContentWorld.world(name: "KaizuHiddenItems")
+    package static let world = WKContentWorld.world(name: "KaizuHiddenItems")
     private static let handlerName = "kaizuHide"
     /// Per site: enough for any real clean-up, not for a page spamming picks.
-    static let maximumPerSite = 64
-    static let maximumSelectorLength = 400
-    private weak var tab: BrowserTab?
+    package static let maximumPerSite = 64
+    package static let maximumSelectorLength = 400
+    private weak var host: (any HiddenItemsHost)?
 
-    static func install(on controller: WKUserContentController, for tab: BrowserTab) {
+    package static func install(on controller: WKUserContentController, for host: any HiddenItemsHost) {
         let handler = HiddenItems()
-        handler.tab = tab
+        handler.host = host
         controller.add(handler, contentWorld: world, name: handlerName)
     }
 
-    /// A picked item's selector, from the picking script: only while the
-    /// user is picking on this tab, for what they're picking for, from its
-    /// main frame, and from the page the tab is on (not one it's just leaving).
-    func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
-        guard let tab, !tab.profile.isPrivate, let store = tab.store, store.hidingItemsTabID == tab.id,
-              message.frameInfo.isMainFrame, let body = message.body as? [String: Any],
-              body["purpose"] as? String == store.pickingPurpose.rawValue,
-              let selector = body["selector"] as? String, selector.count <= Self.maximumSelectorLength,
-              message.frameInfo.securityOrigin.host == tab.url?.host()
+    /// A picked item's selector, from the picking script and the page's main
+    /// frame; the host decides whether it counts.
+    package func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard message.frameInfo.isMainFrame, let body = message.body as? [String: Any],
+              let purpose = (body["purpose"] as? String).flatMap(Purpose.init(rawValue:)),
+              let selector = body["selector"] as? String, selector.count <= Self.maximumSelectorLength
         else { return }
-        switch store.pickingPurpose {
-        case .hide: store.settings.hide(selector, on: tab.url)
-        case .watch: store.watchPicked(selector, text: body["text"] as? String ?? "", on: tab)
-        }
+        host?.picked(selector, text: body["text"] as? String ?? "", for: purpose, on: message.frameInfo.securityOrigin.host)
     }
 
     /// Hides the site's remembered items; safe to call again (it replaces
     /// its own style sheet). Each rule is added on its own, so one that
     /// doesn't parse can't take the others with it.
-    static func apply(_ selectors: [String], in webView: WKWebView) {
+    package static func apply(_ selectors: [String], in webView: WKWebView) {
         webView.callAsyncJavaScript(
             """
             const apply = () => {
@@ -70,11 +64,11 @@ final class HiddenItems: NSObject, WKScriptMessageHandler {
         )
     }
 
-    static func startPicking(in webView: WKWebView, for purpose: Purpose = .hide) {
+    package static func startPicking(in webView: WKWebView, for purpose: Purpose = .hide) {
         webView.callAsyncJavaScript(pickingScript, arguments: ["purpose": purpose.rawValue], in: nil, in: world, completionHandler: nil)
     }
 
-    static func stopPicking(in webView: WKWebView) {
+    package static func stopPicking(in webView: WKWebView) {
         webView.evaluateJavaScript("window.__kaizuStopHiding?.(); 0", in: nil, in: world) { _ in }
     }
 
@@ -167,4 +161,12 @@ final class HiddenItems: NSObject, WKScriptMessageHandler {
       return 0;
     })()
     """
+}
+
+/// Where picks from the picker go: the tab, which knows whether its window
+/// is picking on it, for what, and on which page.
+package protocol HiddenItemsHost: AnyObject {
+    /// `host` is the frame's origin, so a pick from a page the tab is
+    /// leaving can be told apart.
+    func picked(_ selector: String, text: String, for purpose: HiddenItems.Purpose, on host: String)
 }

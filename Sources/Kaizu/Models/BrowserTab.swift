@@ -1,5 +1,6 @@
 import AppKit
 import BrowserCore
+import WebEngine
 import WebKit
 
 /// A tab owns its WKWebView, created lazily the first time the tab is shown
