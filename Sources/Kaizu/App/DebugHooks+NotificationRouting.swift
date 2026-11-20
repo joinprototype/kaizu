@@ -1,6 +1,7 @@
 #if DEBUG
 import AppKit
 import Storage
+import WebEngine
 import WebKit
 
 extension DebugHooks {
@@ -41,7 +42,7 @@ extension DebugHooks {
             let work = app.openWindow(on: workSpace)
             let tab = work.openTab(nil)
             var posted: SiteNotificationDestination?
-            SiteNotifications.onDeliver = { _, destination in posted = destination }
+            SiteNotifications.onDeliver = { _, userInfo in posted = SiteNotificationDestination(userInfo: userInfo) }
             app.settings.setPermission(SiteNotifications.permission, to: true, on: address.host()!)
             tab.webView.loadSimulatedRequest(URLRequest(url: address), responseHTML: """
                 <!doctype html><title>Notification routing</title><script>

@@ -19,49 +19,48 @@ import WebKit
 /// Developer ID means every build of Kaizu. So a notification also waits on
 /// its tab, a dot in the sidebar and a count on the Dock, and the Dock icon
 /// bounces when macOS wouldn't take it.
-final class SiteNotifications: NSObject, WKScriptMessageHandlerWithReply {
+package final class SiteNotifications: NSObject, WKScriptMessageHandlerWithReply {
     /// Its key in `Settings.sitePermissions`.
-    static let permission = "notifications"
+    package static let permission = "notifications"
     private static let world = WKContentWorld.world(name: "KaizuNotifications")
     private static let handlerName = "kaizuNotifications"
     private static let maximumTitle = 200
     private static let maximumBody = 1000
     #if DEBUG
     /// Tells the QA hook what was handed to macOS.
-    static var onDeliver: ((String, SiteNotificationDestination) -> Void)?
+    package static var onDeliver: ((String, [String: String]) -> Void)?
     #endif
 
-    private weak var tab: BrowserTab?
+    private weak var tab: (any SiteNotificationsHost)?
     private var isAsking = false
 
     /// Main frames only, as in Safari. Part of the content blocker's
     /// standard scripts, which it puts back whenever it replaces them.
-    static let scripts = [
+    package static let scripts = [
         WKUserScript(source: relayScript, injectionTime: .atDocumentStart, forMainFrameOnly: true, in: world),
         WKUserScript(source: pageScript, injectionTime: .atDocumentStart, forMainFrameOnly: true, in: .page),
     ]
 
-    static func install(on controller: WKUserContentController, for tab: BrowserTab) {
+    package static func install(on controller: WKUserContentController, for tab: any SiteNotificationsHost) {
         let handler = SiteNotifications()
         handler.tab = tab
         controller.addScriptMessageHandler(handler, contentWorld: world, name: handlerName)
     }
 
     /// Nil without a bundle, as in development, where asking for it crashes.
-    static var center: UNUserNotificationCenter? {
+    package static var center: UNUserNotificationCenter? {
         Bundle.main.bundleIdentifier == nil ? nil : .current()
     }
 
     /// macOS asks once; after that this reports its answer. Nil when it
     /// won't deal with this build at all, so there's nothing to ask you.
-    static func requestDelivery() async -> Bool? {
+    package static func requestDelivery() async -> Bool? {
         try? await center?.requestAuthorization(options: [.alert, .sound])
     }
 
     /// Tells the page that showed a notification it was clicked.
-    static func fireClick(on tab: BrowserTab, notification id: String) {
-        guard tab.isLoaded else { return }
-        tab.webView.callAsyncJavaScript(
+    package static func fireClick(in webView: WKWebView, notification id: String) {
+        webView.callAsyncJavaScript(
             "window.dispatchEvent(new CustomEvent('kaizu-notification-click', { detail }))",
             arguments: ["detail": id],
             in: nil,
@@ -73,7 +72,7 @@ final class SiteNotifications: NSObject, WKScriptMessageHandlerWithReply {
     /// Only a main frame over HTTPS, as in other browsers; anything else
     /// hears nothing. Goes by the frame's own origin: the first question
     /// arrives as the page starts, before the web view reports its address.
-    func userContentController(
+    package func userContentController(
         _ controller: WKUserContentController,
         didReceive message: WKScriptMessage,
         replyHandler: @escaping @MainActor @Sendable (Any?, String?) -> Void
@@ -91,7 +90,7 @@ final class SiteNotifications: NSObject, WKScriptMessageHandlerWithReply {
             replyHandler(Self.state(answer), nil)
         case "request":
             if let answer { return replyHandler(Self.state(answer), nil) }
-            if tab.profile.isPrivate {
+            if tab.isInPrivateWindow {
                 // As long as a person takes over the question, or a page
                 // could spot a private window by timing the answer.
                 Task {
@@ -104,8 +103,7 @@ final class SiteNotifications: NSObject, WKScriptMessageHandlerWithReply {
             ask(host: host, tab: tab, window: window) { replyHandler(Self.state($0), nil) }
         case "show":
             guard answer == true else { return replyHandler(false, nil) }
-            let destination = SiteNotificationDestination(tab: tab, page: body["id"] as? String ?? "",
-                                                          url: message.frameInfo.request.url)
+            let destination = tab.notificationDestination(page: body["id"] as? String ?? "", url: message.frameInfo.request.url)
             Task {
                 tab.noteNotification(deliveredByMacOS: await Self.deliver(body, host: host, tab: tab, destination: destination))
                 replyHandler(true, nil)
@@ -124,14 +122,14 @@ final class SiteNotifications: NSObject, WKScriptMessageHandlerWithReply {
     }
 
     /// The same tag replaces the site's earlier notification, as in the spec.
-    private static func identifier(_ body: [String: Any], host: String, tab: BrowserTab) -> String {
+    private static func identifier(_ body: [String: Any], host: String, tab: any SiteNotificationsHost) -> String {
         if let tag = body["tag"] as? String, !tag.isEmpty { return "\(host) \(tag)" }
         return "\(tab.id) \(body["id"] as? String ?? "")"
     }
 
     /// Asks in the tab's window, and remembers the answer: the question is
     /// only worth asking once.
-    private func ask(host: String, tab: BrowserTab, window: NSWindow, completion: @escaping @MainActor (Bool?) -> Void) {
+    private func ask(host: String, tab: any SiteNotificationsHost, window: NSWindow, completion: @escaping @MainActor (Bool?) -> Void) {
         isAsking = true
         let alert = NSAlert()
         alert.messageText = "Allow “\(host)” to send you notifications?"
@@ -150,8 +148,8 @@ final class SiteNotifications: NSObject, WKScriptMessageHandlerWithReply {
         }
     }
 
-    private static func deliver(_ body: [String: Any], host: String, tab: BrowserTab,
-                                destination: SiteNotificationDestination) async -> Bool {
+    private static func deliver(_ body: [String: Any], host: String, tab: any SiteNotificationsHost,
+                                destination: [String: String]) async -> Bool {
         let title = String((body["title"] as? String ?? "").prefix(maximumTitle))
         #if DEBUG
         onDeliver?("\(host): \(title)", destination)
@@ -165,7 +163,7 @@ final class SiteNotifications: NSObject, WKScriptMessageHandlerWithReply {
         if body["silent"] as? Bool != true {
             content.sound = .default
         }
-        content.userInfo = destination.userInfo
+        content.userInfo = destination
         if let icon = icon(of: tab) {
             content.attachments = [icon]
         }
@@ -180,7 +178,7 @@ final class SiteNotifications: NSObject, WKScriptMessageHandlerWithReply {
     }
 
     /// macOS takes the file away, so each notification gets its own copy.
-    private static func icon(of tab: BrowserTab) -> UNNotificationAttachment? {
+    private static func icon(of tab: any SiteNotificationsHost) -> UNNotificationAttachment? {
         guard let data = tab.favicon?.tiffRepresentation,
               let png = NSBitmapImageRep(data: data)?.representation(using: .png, properties: [:])
         else { return nil }
@@ -297,33 +295,17 @@ final class SiteNotifications: NSObject, WKScriptMessageHandlerWithReply {
     """
 }
 
-extension AppModel {
-    /// The Dock's count of notifications you haven't looked at yet, and of
-    /// watched pages that changed since you last opened them.
-    func updateDockBadge() {
-        let waiting = Set(spaces.flatMap(\.allTabs)).reduce(0) { $0 + $1.unreadNotifications } + watches.unseenCount
-        NSApp.dockTile.badgeLabel = waiting > 0 ? String(waiting) : nil
-    }
-}
-
-/// Answers macOS when a notification is about to show or was clicked.
-final class NotificationClicks: NSObject, UNUserNotificationCenterDelegate {
-    private let app: AppModel
-
-    init(app: AppModel) {
-        self.app = app
-    }
-
-    /// By default macOS keeps quiet while the app is in front.
-    func userNotificationCenter(
-        _ center: UNUserNotificationCenter,
-        willPresent notification: UNNotification
-    ) async -> UNNotificationPresentationOptions {
-        [.banner, .list, .sound]
-    }
-
-    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
-        let destination = SiteNotificationDestination(userInfo: response.notification.request.content.userInfo)
-        app.openNotification(destination)
-    }
+/// The tab a page's notifications come from: it keeps the site's answer,
+/// marks what you haven't seen, and says where a click should lead.
+package protocol SiteNotificationsHost: AnyObject {
+    var id: UUID { get }
+    var isInPrivateWindow: Bool { get }
+    var favicon: NSImage? { get }
+    /// Your answer about `host`'s notifications, if you gave one.
+    func notificationAnswer(for host: String) -> Bool?
+    func setNotifications(_ allowed: Bool?, for host: String)
+    func noteNotification(deliveredByMacOS delivered: Bool)
+    /// Stored by macOS with the notification, so a click can find its way
+    /// back, even after a restart.
+    func notificationDestination(page: String, url: URL?) -> [String: String]
 }
