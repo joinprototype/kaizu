@@ -108,9 +108,19 @@ struct CommandBar: View {
         return results
     }
 
+    /// The selected row opens a page, which ⌘↩ and ⌥↩ can put elsewhere.
+    private var opensPage: Bool {
+        guard mode != .quick, suggestions.indices.contains(selection) else { return false }
+        switch suggestions[selection] {
+        case .url, .history, .search, .shortcut: return true
+        default: return false
+        }
+    }
+
     private func choose(_ suggestion: Suggestion) {
         store.app.learn(suggestion, for: text, in: store.activeSpace.profile)
-        store.perform(suggestion, mode: mode)
+        // The keys held with ↩ (or the click) pick where a page goes.
+        store.perform(suggestion, mode: mode, target: CommandBarTarget(NSApp.currentEvent?.modifierFlags ?? []))
     }
 
     /// Asks the search engine (if allowed) once typing pauses. Never for
@@ -258,7 +268,14 @@ struct CommandBar: View {
             Divider().opacity(0.6)
             HStack(spacing: 14) {
                 KeyHint(keys: "↩", label: "open")
-                KeyHint(keys: "↑↓", label: "select")
+                if opensPage {
+                    KeyHint(keys: "⌘↩", label: "background")
+                    if store.selectedTab != nil, store.canAddSplitPane {
+                        KeyHint(keys: "⌥↩", label: "split")
+                    }
+                } else {
+                    KeyHint(keys: "↑↓", label: "select")
+                }
                 KeyHint(keys: "esc", label: "close")
                 Spacer()
                 Text("Try 20+20, 100 usd to eur, time in tokyo")

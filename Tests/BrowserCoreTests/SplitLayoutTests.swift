@@ -268,7 +268,21 @@ import Testing
         #expect(abs(after[3] - 0.15) < 1e-9)
     }
 
-    @Test func evenedActsOnItsOwnGroup() throws {
+    /// Where dragging a divider stops for a moment: its two panes equal,
+    /// whatever the rest of its group does.
+    @Test func theEvenPointOfADivider() throws {
+        let row = SplitNode.row([a, b, c], shares: [0.5, 0.2, 0.3])
+        let dividers = row.geometry(in: bounds, gap: 8).dividers
+        let first = try #require(dividers.first), second = try #require(dividers.last)
+        let toEven = try #require(row.distanceToEvenPair(first))
+        #expect(abs(toEven - (-0.15 * first.length)) < 1e-9)
+        let moved = shares(row.resized(first, by: toEven))
+        #expect(abs(moved[0] - 0.35) < 1e-9 && abs(moved[1] - 0.35) < 1e-9 && abs(moved[2] - 0.3) < 1e-9)
+        #expect(abs((row.distanceToEvenPair(second) ?? .nan) - 0.05 * second.length) < 1e-9)
+        #expect(SplitNode.row([a, b]).distanceToEvenPair(first).map { abs($0) < 1e-9 } == true)
+    }
+
+        @Test func evenedActsOnItsOwnGroup() throws {
         var layout = bento
         let geometry = layout.geometry(in: bounds, gap: 8)
         let rule = try #require(geometry.dividers.first { $0.direction == .stacked })

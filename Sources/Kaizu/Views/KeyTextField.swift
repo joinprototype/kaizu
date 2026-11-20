@@ -59,6 +59,11 @@ struct KeyTextField: NSViewRepresentable {
             self.parent = parent
         }
 
+        private static func isCommandReturn(_ event: NSEvent?) -> Bool {
+            guard let event, event.type == .keyDown, [36, 76].contains(event.keyCode) else { return false }
+            return event.modifierFlags.intersection([.command, .shift, .option, .control]) == .command
+        }
+
         func controlTextDidChange(_ notification: Notification) {
             guard !isCompleting, let field = notification.object as? NSTextField else { return }
             let typed = field.stringValue
@@ -89,10 +94,14 @@ struct KeyTextField: NSViewRepresentable {
                 parent.onMove(-1)
             case #selector(NSResponder.moveDown(_:)):
                 parent.onMove(1)
-            case #selector(NSResponder.insertNewline(_:)):
+            // ⌥↩ too: what to do with it is the field's owner's to say.
+            case #selector(NSResponder.insertNewline(_:)), #selector(NSResponder.insertNewlineIgnoringFieldEditor(_:)):
                 parent.onSubmit()
             case #selector(NSResponder.cancelOperation(_:)):
                 parent.onCancel()
+            // ⌘↩ has no binding, so it arrives as a no-op.
+            case Selector(("noop:")) where Self.isCommandReturn(NSApp.currentEvent):
+                parent.onSubmit()
             default:
                 return false
             }

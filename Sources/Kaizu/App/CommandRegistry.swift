@@ -137,6 +137,9 @@ enum CommandRegistry {
         .command(Command("view.hideDistractingItems", "Hide Distracting Items…") { app in
             if let tab = app.front.commandTab { app.front.beginHidingItems(on: tab) }
         }),
+        .command(Command("view.watchPart", "Watch Part of Page…") { app in
+            if let tab = app.front.commandTab { app.front.beginHidingItems(on: tab, for: .watch) }
+        }),
         .separator,
         .command(Command("view.reload", "Reload Page", key: "r") { $0.front.commandTab?.reload() }),
         .command(Command("view.reloadIgnoringCache", "Reload Ignoring Cache", key: "r", modifiers: [.command, .option]) {

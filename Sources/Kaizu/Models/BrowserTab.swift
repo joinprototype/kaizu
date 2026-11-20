@@ -62,6 +62,11 @@ final class BrowserTab: NSObject, Identifiable {
     @ObservationIgnored var mediaFrames: [WKFrameInfo] = []
     /// Its video was floated automatically on switching away.
     @ObservationIgnored var isInAutoPictureInPicture = false
+    /// Web views left behind by crossing between web pages and extension
+    /// pages, whose back/forward lists WebKit can't join: Back and Forward
+    /// step into them once the current one runs out. Not saved.
+    @ObservationIgnored var crossedBack: [CrossedPage] = []
+    @ObservationIgnored var crossedForward: [CrossedPage] = []
 
     init(
         id: UUID = UUID(),
