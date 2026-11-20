@@ -1,4 +1,6 @@
 import AppKit
+@preconcurrency import UserNotifications
+import WebEngine
 
 /// Stored by macOS with the notification, so a click can arrive after a restart.
 nonisolated struct SiteNotificationDestination: Sendable {
@@ -50,7 +52,9 @@ extension AppModel {
             window = store(showing: tab) ?? notificationWindow(for: liveSpace)
             let owner = window.activeSpace.tab(id: tab.id) === tab ? window.activeSpace : liveSpace
             window.select(tab, in: owner)
-            SiteNotifications.fireClick(on: tab, notification: destination.page)
+            if tab.isLoaded {
+                SiteNotifications.fireClick(in: tab.webView, notification: destination.page)
+            }
         } else {
             guard let url = destination.url, url.scheme == "https", url.host() != nil else { return }
             // Older notifications carried only a tab ID and URL. The closed-tab
@@ -73,5 +77,36 @@ extension AppModel {
     private func notificationWindow(for space: Space) -> BrowserStore {
         if regularFront.activeSpace === space { return regularFront }
         return stores.first { $0.activeSpace === space } ?? regularFront
+    }
+}
+
+extension AppModel {
+    /// The Dock's count of notifications you haven't looked at yet, and of
+    /// watched pages that changed since you last opened them.
+    func updateDockBadge() {
+        let waiting = Set(spaces.flatMap(\.allTabs)).reduce(0) { $0 + $1.unreadNotifications } + watches.unseenCount
+        NSApp.dockTile.badgeLabel = waiting > 0 ? String(waiting) : nil
+    }
+}
+
+/// Answers macOS when a notification is about to show or was clicked.
+final class NotificationClicks: NSObject, UNUserNotificationCenterDelegate {
+    private let app: AppModel
+
+    init(app: AppModel) {
+        self.app = app
+    }
+
+    /// By default macOS keeps quiet while the app is in front.
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification
+    ) async -> UNNotificationPresentationOptions {
+        [.banner, .list, .sound]
+    }
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
+        let destination = SiteNotificationDestination(userInfo: response.notification.request.content.userInfo)
+        app.openNotification(destination)
     }
 }

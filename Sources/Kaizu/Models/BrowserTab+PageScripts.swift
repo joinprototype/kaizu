@@ -3,6 +3,14 @@ import WebKit
 
 extension BrowserTab: MediaEventsListener {}
 
+extension BrowserTab: SiteNotificationsHost {
+    var isInPrivateWindow: Bool { profile.isPrivate }
+
+    func notificationDestination(page: String, url: URL?) -> [String: String] {
+        SiteNotificationDestination(tab: self, page: page, url: url).userInfo
+    }
+}
+
 extension BrowserTab: HiddenItemsHost {
     /// Counts only while its window is picking on this tab, for what it's
     /// picking for, on the page the tab is on (not one it's just leaving),
