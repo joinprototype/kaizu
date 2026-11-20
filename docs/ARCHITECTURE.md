@@ -5,9 +5,9 @@ clean as features pile up. Read this before adding a feature.
 
 ## Boundaries in the current build
 
-SwiftPM builds the `Kaizu` executable, the `BrowserCore` and `DesignSystem` libraries and two test targets. Session formats and migrations, Arc import planning, history, split layout calculations and filter conversion live in BrowserCore. They can be exercised without opening a browser window. `DesignSystem` holds the colors, type, motion, chart art and interface sounds, and knows nothing about tabs or pages.
+SwiftPM builds the `Kaizu` executable, the `BrowserCore`, `DesignSystem`, `Storage` and `WebEngine` libraries and two test targets. Session formats and migrations, Arc import planning, history, split layout calculations and filter conversion live in BrowserCore. They can be exercised without opening a browser window. `DesignSystem` holds the colors, type, motion, chart art and interface sounds, and knows nothing about tabs or pages.
 
-The executable contains the UI, app and window models, and WebKit integration. Its folders organize responsibilities within one target. `AppModel` owns shared spaces and profiles. Each `BrowserStore` owns one window’s selection and overlays. `BrowserTab` currently owns page state, creates its web view, observes navigation and handles media. Several views and models import WebKit directly.
+`Storage` holds where Kaizu keeps its things: the support folder, its own preferences (a separate set for QA runs) and the unified log. `WebEngine` holds the WebKit integration that needs none of the app's models: content blocking (rule list compilation, filter list updates, imported lists, the autoconsent bridge), YouTube's skip relay and the user agent. The executable contains the UI, app and window models, and the WebKit integration that's still tied to them (tabs, extensions, notifications, page watching). Its folders organize responsibilities within one target. `AppModel` owns shared spaces and profiles. Each `BrowserStore` owns one window’s selection and overlays. `BrowserTab` currently owns page state, creates its web view, observes navigation and handles media. Several views and models import WebKit directly.
 
 ## Design goals
 
@@ -38,10 +38,14 @@ The executable contains the UI, app and window models, and WebKit integration. I
 SwiftPM targets give us compile-time boundaries (a view literally can't import
 WebKit), faster incremental builds, and testable cores.
 
-Today there are three: the `Kaizu` executable (`Sources/Kaizu`), `BrowserCore`
-and `DesignSystem`. `DesignSystem` imports only SwiftUI and AppKit, never the
-app or `BrowserCore`, so what the app uses from it is `public` and the rest
-stays internal. It also holds `BundledResource`, which finds bundled fonts and
+Today there are five: the `Kaizu` executable (`Sources/Kaizu`), `BrowserCore`,
+`DesignSystem`, `Storage` and `WebEngine`. `DesignSystem` imports only SwiftUI
+and AppKit, never the app or `BrowserCore`, so what the app uses from it is
+`public` and the rest stays internal. `Storage` and `WebEngine` share only
+`package` API with the app: visible inside this package, never outside it, so
+splitting a module off doesn't widen anything to the world. `WebEngine` may
+import `BrowserCore`, `DesignSystem` (for `BundledResource`) and `Storage`, and
+never the app. It also holds `BundledResource`, which finds bundled fonts and
 scripts (in the app bundle, or the repo's `Resources/` when run unbundled).
 The layout below is where the rest is heading.
 

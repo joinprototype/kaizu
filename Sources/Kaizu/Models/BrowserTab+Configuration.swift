@@ -1,3 +1,4 @@
+import WebEngine
 import WebKit
 
 extension BrowserTab {

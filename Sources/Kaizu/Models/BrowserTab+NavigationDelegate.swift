@@ -1,5 +1,6 @@
 import AppKit
 import BrowserCore
+import Storage
 import WebKit
 
 extension BrowserTab: WKNavigationDelegate {

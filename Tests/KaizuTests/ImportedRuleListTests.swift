@@ -1,7 +1,8 @@
 import AppKit
-import Testing
-import WebKit
 @testable import Kaizu
+import Testing
+@testable import WebEngine
+import WebKit
 
 @MainActor
 struct ImportedRuleListTests {

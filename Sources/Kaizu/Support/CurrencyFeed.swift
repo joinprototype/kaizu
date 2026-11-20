@@ -1,5 +1,6 @@
 import BrowserCore
 import Foundation
+import Storage
 
 /// Exchange rates for currency answers in the command bar. Fetched from
 /// Frankfurter only once someone types a conversion, then cached for half a

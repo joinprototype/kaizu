@@ -15,7 +15,7 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "Kaizu",
-            dependencies: ["BrowserCore", "DesignSystem"],
+            dependencies: ["BrowserCore", "DesignSystem", "Storage", "WebEngine"],
             path: "Sources/Kaizu",
             // An AppKit app: everything is main-actor unless it says otherwise.
             swiftSettings: [.defaultIsolation(MainActor.self)],
@@ -28,7 +28,23 @@ let package = Package(
                 ]),
             ]
         ),
-        .testTarget(name: "KaizuTests", dependencies: ["Kaizu", "DesignSystem", "TestSupport"]),
+        .testTarget(name: "KaizuTests", dependencies: ["Kaizu", "DesignSystem", "Storage", "WebEngine", "TestSupport"]),
+        // Where Kaizu keeps its things: the support folder, its own
+        // preferences (a scratch set for QA runs) and the unified log.
+        .target(
+            name: "Storage",
+            path: "Sources/Storage",
+            swiftSettings: [.defaultIsolation(MainActor.self)]
+        ),
+        // WebKit integration that doesn't need the app's models: content
+        // blocking (rule lists, filter updates, imported lists, autoconsent)
+        // and the user agent. The app reaches it through `package` API.
+        .target(
+            name: "WebEngine",
+            dependencies: ["BrowserCore", "DesignSystem", "Storage"],
+            path: "Sources/WebEngine",
+            swiftSettings: [.defaultIsolation(MainActor.self)]
+        ),
         // Colours, type, motion, the chart drawings and the paper sounds.
         // SwiftUI and AppKit only: nothing here knows about tabs or pages.
         .target(

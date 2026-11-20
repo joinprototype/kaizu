@@ -1,5 +1,6 @@
 import DesignSystem
 import OSLog
+import Storage
 import WebKit
 
 /// Built-in ad, tracker and cookie-banner blocking, YouTube ad removal, and
@@ -11,8 +12,8 @@ import WebKit
 /// content controller so blocking can be paused per site without recompiling
 /// anything.
 @Observable
-final class ContentBlocker {
-    enum State: Equatable {
+package final class ContentBlocker {
+    package enum State: Equatable {
         case idle
         case preparing
         case ready
@@ -27,22 +28,22 @@ final class ContentBlocker {
 
     /// Compiled separately: WebKit caps a list at 150k rules, and an
     /// `ignore-previous-rules` exception only affects its own list.
-    static let listNames = ["easylist", "easyprivacy", "cookies", "kaizu"]
+    package static let listNames = ["easylist", "easyprivacy", "cookies", "kaizu"]
     private static let enabledKey = "contentBlockingEnabled"
     private static let cookieRejectionKey = "cookiePopupRejectionEnabled"
     private static let pausedSitesKey = "blockingPausedSites"
 
-    let importedLists = ImportedRuleLists(directory: AppPaths.support.appending(path: "ImportedRules", directoryHint: .isDirectory))
-    private(set) var state: State = .idle
-    private(set) var isEnabled: Bool
-    private(set) var isCookieRejectionEnabled: Bool
+    package let importedLists = ImportedRuleLists(directory: AppPaths.support.appending(path: "ImportedRules", directoryHint: .isDirectory))
+    package private(set) var state: State = .idle
+    package private(set) var isEnabled: Bool
+    package private(set) var isCookieRejectionEnabled: Bool
     /// Sites (and their subdomains) where the user turned blocking off.
-    private(set) var pausedSites: Set<String>
+    package private(set) var pausedSites: Set<String>
     /// Each private window may override ordinary blocking preferences for its own sites.
     private var privateOverrides: [UUID: [String: Bool]] = [:]
     private struct Page {
         let privateID: UUID?
-        var site: String?
+        package var site: String?
     }
 
     @ObservationIgnored private var ruleLists: [(name: String, list: WKContentRuleList)] = []
@@ -53,19 +54,19 @@ final class ContentBlocker {
     @ObservationIgnored private var waitingNavigations: [(url: URL, privateID: UUID?, proceed: @MainActor () -> Void)] = []
     /// Scripts every page gets whatever the blocking settings; reinstalls
     /// (which clear a controller's scripts) put them back.
-    @ObservationIgnored var standardScripts: [WKUserScript] = []
+    @ObservationIgnored package var standardScripts: [WKUserScript] = []
     @ObservationIgnored private let log = Logger(subsystem: Log.subsystem, category: "ContentBlocker")
 
     private let defaults: UserDefaults
 
-    init(defaults: UserDefaults = AppDefaults.shared) {
+    package init(defaults: UserDefaults = AppDefaults.shared) {
         self.defaults = defaults
         isEnabled = defaults.object(forKey: Self.enabledKey) as? Bool ?? true
         isCookieRejectionEnabled = defaults.object(forKey: Self.cookieRejectionKey) as? Bool ?? true
         pausedSites = Set(defaults.stringArray(forKey: Self.pausedSitesKey) ?? [])
     }
 
-    func start() {
+    package func start() {
         guard state == .idle else { return }
         state = .preparing
         AutoconsentBridge.warmUp()
@@ -82,7 +83,7 @@ final class ContentBlocker {
 
     /// Fetches newer lists if they're due. Open pages keep the rules they
     /// loaded with; their next load gets the new ones.
-    func refreshLists() async {
+    package func refreshLists() async {
         if await FilterListUpdater.updateIfDue() {
             await loadLists()
         }
@@ -90,7 +91,7 @@ final class ContentBlocker {
 
     /// Hold network navigation while WebKit prepares the bundled rules on first launch.
     /// Local pages and sites the user has exempted can open immediately.
-    func whenReady(for url: URL, privateID: UUID? = nil, proceed: @escaping @MainActor () -> Void) {
+    package func whenReady(for url: URL, privateID: UUID? = nil, proceed: @escaping @MainActor () -> Void) {
         if needsRules(for: url, privateID: privateID) {
             waitingNavigations.append((url, privateID, proceed))
         } else {
@@ -104,24 +105,24 @@ final class ContentBlocker {
 
     // MARK: - Settings
 
-    func setEnabled(_ enabled: Bool) {
+    package func setEnabled(_ enabled: Bool) {
         isEnabled = enabled
         defaults.set(enabled, forKey: Self.enabledKey)
         installEverywhere()
     }
 
-    func setCookieRejectionEnabled(_ enabled: Bool) {
+    package func setCookieRejectionEnabled(_ enabled: Bool) {
         isCookieRejectionEnabled = enabled
         defaults.set(enabled, forKey: Self.cookieRejectionKey)
         installEverywhere()
     }
 
-    func isPaused(on url: URL?, privateID: UUID?) -> Bool {
+    package func isPaused(on url: URL?, privateID: UUID?) -> Bool {
         isPaused(site: url.flatMap(Self.site(for:)), privateID: privateID)
     }
 
     @discardableResult
-    func togglePause(on url: URL, privateID: UUID?) -> Bool {
+    package func togglePause(on url: URL, privateID: UUID?) -> Bool {
         guard let site = Self.site(for: url) else { return false }
         if let privateID {
             let pause = !isPaused(site: site, privateID: privateID)
@@ -139,11 +140,11 @@ final class ContentBlocker {
         return isPaused(site: site, privateID: privateID)
     }
 
-    func resume(_ site: String) {
+    package func resume(_ site: String) {
         updatePausedSites { _ = $0.remove(site) }
     }
 
-    func forgetPrivateOverrides(for id: UUID) {
+    package func forgetPrivateOverrides(for id: UUID) {
         privateOverrides.removeValue(forKey: id)
     }
 
@@ -153,7 +154,7 @@ final class ContentBlocker {
         installEverywhere()
     }
 
-    static func site(for url: URL) -> String? {
+    package static func site(for url: URL) -> String? {
         guard let host = url.host(percentEncoded: false)?.lowercased(), !host.isEmpty else { return nil }
         return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
     }
@@ -178,7 +179,7 @@ final class ContentBlocker {
     // MARK: - Tabs
 
     /// A fresh controller for a new web view, with blocking installed.
-    func makeUserContentController(privateID: UUID?) -> WKUserContentController {
+    package func makeUserContentController(privateID: UUID?) -> WKUserContentController {
         let controller = WKUserContentController()
         let key = ObjectIdentifier(controller)
         // Identifiers of deallocated controllers can be reused.
@@ -192,7 +193,7 @@ final class ContentBlocker {
     }
 
     /// Call before each main-frame navigation so per-site settings apply to the new page.
-    func prepare(_ controller: WKUserContentController, for url: URL) {
+    package func prepare(_ controller: WKUserContentController, for url: URL) {
         pages[ObjectIdentifier(controller)]?.site = Self.site(for: url)
         install(on: controller)
     }

@@ -1,5 +1,6 @@
 import AppKit
 import BrowserCore
+import WebEngine
 
 extension BrowserStore {
     func toggleContentBlocking() {

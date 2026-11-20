@@ -3,19 +3,19 @@ import WebKit
 
 /// Keeps the user's original WebKit JSON so a purged or outdated compiled cache can be rebuilt.
 @Observable
-final class ImportedRuleLists {
-    struct Entry: Codable, Identifiable {
-        let id: String
-        let name: String
-        var enabled: Bool
+package final class ImportedRuleLists {
+    package struct Entry: Codable, Identifiable {
+        package let id: String
+        package let name: String
+        package var enabled: Bool
     }
 
     private let directory: URL
     private var index: URL { directory.appendingPathComponent("lists.json") }
-    private(set) var entries: [Entry] = []
-    private(set) var busy = true
-    private(set) var problems: [String: String] = [:]
-    private(set) var indexError: String?
+    package private(set) var entries: [Entry] = []
+    package private(set) var busy = true
+    package private(set) var problems: [String: String] = [:]
+    package private(set) var indexError: String?
     @ObservationIgnored var didChange: (() -> Void)?
     @ObservationIgnored private var compiled: [String: WKContentRuleList] = [:]
 
@@ -50,7 +50,7 @@ final class ImportedRuleLists {
         }
     }
 
-    func add(_ url: URL) async throws {
+    package func add(_ url: URL) async throws {
         guard !busy, indexError == nil else { throw ListError.unavailable }
         busy = true
         defer { busy = false }
@@ -69,7 +69,7 @@ final class ImportedRuleLists {
         didChange?()
     }
 
-    func setEnabled(_ enabled: Bool, id: String) async throws {
+    package func setEnabled(_ enabled: Bool, id: String) async throws {
         guard !busy, indexError == nil else { throw ListError.unavailable }
         guard let position = entries.firstIndex(where: { $0.id == id }), entries[position].enabled != enabled else { return }
         busy = true
@@ -83,7 +83,7 @@ final class ImportedRuleLists {
         didChange?()
     }
 
-    func remove(_ id: String) async throws {
+    package func remove(_ id: String) async throws {
         guard !busy, indexError == nil else { throw ListError.unavailable }
         guard entries.contains(where: { $0.id == id }) else { return }
         busy = true

@@ -1,13 +1,13 @@
 import Foundation
 
-nonisolated enum AppDefaults {
+package nonisolated enum AppDefaults {
     /// Where Kaizu keeps its own preferences: settings, paused sites,
     /// extensions, filter-list checks. A debug run with `KAIZU_SUPPORT` gets
     /// its own set, named after that folder, so QA runs never change the
     /// preferences of the Kaizu the user is browsing with (the debug build
     /// shares its bundle identifier). Running again on the same folder sees
     /// what the last run left. `UserDefaults` is thread-safe, so sharing it is fine.
-    nonisolated(unsafe) static let shared: UserDefaults = {
+    package nonisolated(unsafe) static let shared: UserDefaults = {
         #if DEBUG
         if let path = ProcessInfo.processInfo.environment["KAIZU_SUPPORT"] {
             let folder = URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL.path

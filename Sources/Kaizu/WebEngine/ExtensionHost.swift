@@ -1,6 +1,8 @@
 import AppKit
 import BrowserCore
 import OSLog
+import Storage
+import WebEngine
 import WebKit
 
 /// Web extensions (the cross-browser WebExtension format) on WebKit's

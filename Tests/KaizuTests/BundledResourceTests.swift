@@ -1,7 +1,8 @@
 import DesignSystem
 import Foundation
-import Testing
 @testable import Kaizu
+import Testing
+@testable import WebEngine
 
 /// A test run has no app bundle, so these come from the repo's Resources
 /// folder, the fallback `swift run` uses too. It's found from the source

@@ -1,5 +1,6 @@
 import AppKit
 import BrowserCore
+import Storage
 import SwiftUI
 import UniformTypeIdentifiers
 

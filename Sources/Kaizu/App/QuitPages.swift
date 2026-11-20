@@ -1,4 +1,5 @@
 import OSLog
+import Storage
 import WebKit
 
 /// Gives persistent pages a chance to save their final edits, then commits every
