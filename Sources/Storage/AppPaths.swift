@@ -1,8 +1,8 @@
 import Foundation
 
-nonisolated enum AppPaths {
+package nonisolated enum AppPaths {
     /// `~/Library/Application Support/Kaizu/`, created on first use.
-    static let support: URL = {
+    package static let support: URL = {
         #if DEBUG
         // QA launches can keep to a scratch folder, away from the real session.
         if let path = ProcessInfo.processInfo.environment["KAIZU_SUPPORT"] {

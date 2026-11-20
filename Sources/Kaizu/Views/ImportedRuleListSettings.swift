@@ -1,5 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import WebEngine
 
 struct ImportedRuleListSettings: View {
     let blocker: ContentBlocker

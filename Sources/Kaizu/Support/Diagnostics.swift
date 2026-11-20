@@ -2,6 +2,7 @@ import CryptoKit
 import Foundation
 import MetricKit
 import OSLog
+import Storage
 
 /// Crash and hang reports, kept on this Mac for Help → Report a Bug. Nothing
 /// is sent anywhere on its own.

@@ -1,6 +1,7 @@
 import Foundation
-import Testing
 @testable import Kaizu
+import Testing
+@testable import WebEngine
 
 @MainActor
 struct PrivateBlockingTests {

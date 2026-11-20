@@ -2,6 +2,7 @@ import AppKit
 import BrowserCore
 import CoreSpotlight
 import DesignSystem
+import Storage
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let app: AppModel

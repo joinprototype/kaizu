@@ -1,6 +1,7 @@
 import BrowserCore
 import CryptoKit
 import OSLog
+import Storage
 import WebKit
 
 /// Compiles filter lists in a short-lived copy of the app. A compile peaks near
@@ -9,21 +10,21 @@ import WebKit
 ///
 /// The helper is this same binary, started with an argument and stopped before
 /// `NSApplication`, so it has no Dock icon and shares the app's rule list store.
-enum RuleListCompiler {
+package enum RuleListCompiler {
     private static let argument = "--compile-rule-list"
     /// A list takes seconds. One that's stuck can't hold up the others.
     private static let helperLimit: Duration = .seconds(120)
     private static let log = Logger(subsystem: Log.subsystem, category: "RuleListCompiler")
 
     /// The list this process was started to compile, when it's the helper.
-    static var requestedList: String? {
+    package static var requestedList: String? {
         let arguments = CommandLine.arguments
         guard let index = arguments.firstIndex(of: argument), arguments.indices.contains(index + 1) else { return nil }
         return arguments[index + 1]
     }
 
     /// The helper's whole run.
-    static func runAndExit(list name: String) -> Never {
+    package static func runAndExit(list name: String) -> Never {
         Task {
             var compiled = false
             if let store = WKContentRuleListStore.default(), let text = FilterListUpdater.text(for: name) {

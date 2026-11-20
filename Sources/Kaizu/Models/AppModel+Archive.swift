@@ -1,5 +1,6 @@
 import BrowserCore
 import DesignSystem
+import Storage
 import SwiftUI
 
 /// Arc-style auto-archive: today tabs left alone (12 hours by default) are put

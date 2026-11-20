@@ -1,5 +1,6 @@
 import BrowserCore
 import Foundation
+import Storage
 
 /// A part of a page you asked to hear about: a price, a stock label, a
 /// score. Kaizu loads the page now and then and compares the part's text.

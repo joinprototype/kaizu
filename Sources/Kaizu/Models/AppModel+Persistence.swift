@@ -1,6 +1,7 @@
 import BrowserCore
 import DesignSystem
 import Foundation
+import Storage
 
 /// Session save/restore (`~/Library/Application Support/Kaizu/session.json`).
 extension AppModel {

@@ -1,4 +1,5 @@
 import AppKit
+import Storage
 
 /// Favicons cached in memory and on disk, keyed by host, so pinned and restored
 /// tabs show icons without loading their pages.

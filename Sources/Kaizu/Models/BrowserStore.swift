@@ -2,6 +2,7 @@ import AppKit
 import BrowserCore
 import DesignSystem
 import SwiftUI
+import WebEngine
 
 /// One browser window: which space and tab it shows, its sidebar and
 /// overlays, and the actions views call. What windows share lives in
