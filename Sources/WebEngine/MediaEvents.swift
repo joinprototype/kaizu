@@ -6,9 +6,9 @@ import WebKit
 /// elements it muted itself are unmuted again). Runs in an isolated world,
 /// invisible to pages. The script is one of the content blocker's standard
 /// scripts; each tab adds its own message handler.
-final class MediaEvents: NSObject, WKScriptMessageHandler {
+package final class MediaEvents: NSObject, WKScriptMessageHandler {
     private static let name = "kaizuMedia"
-    static let script = WKUserScript(
+    package static let script = WKUserScript(
         source: """
         (() => {
           let muted = false;
@@ -37,15 +37,20 @@ final class MediaEvents: NSObject, WKScriptMessageHandler {
         in: .defaultClient
     )
 
-    private weak var tab: BrowserTab?
+    private weak var listener: (any MediaEventsListener)?
 
-    static func install(on controller: WKUserContentController, for tab: BrowserTab) {
+    package static func install(on controller: WKUserContentController, for listener: any MediaEventsListener) {
         let events = MediaEvents()
-        events.tab = tab
+        events.listener = listener
         controller.add(events, contentWorld: .defaultClient, name: name)
     }
 
-    func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
-        tab?.mediaDidChange(in: message.frameInfo)
+    package func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+        listener?.mediaDidChange(in: message.frameInfo)
     }
+}
+
+/// What hears a page's media play, stop and change volume: its tab.
+package protocol MediaEventsListener: AnyObject {
+    func mediaDidChange(in frame: WKFrameInfo)
 }
